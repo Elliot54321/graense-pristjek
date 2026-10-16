@@ -12,9 +12,16 @@ which shop gives the cheapest total basket.
 reliable price data and correct product matching, not the website. Prefer simple,
 working solutions over clever ones.
 
-The full plan lives in `border-shopping-roadmap.md` (also kept in Obsidian). Read it
-when deciding what to work on, and record Phase 0 findings in its "Notes and
-findings" section.
+The full plan lives in `border-shopping-roadmap.md` – this repo copy is the source
+of truth. Read it when deciding what to work on.
+
+**Keep the roadmap current as part of every task** (not as a separate step):
+- Tick a checkbox when its item is done; add a short note in brackets if it's only
+  partly done.
+- Record findings and decisions in "Notes and findings" (dated), e.g. what a shop's
+  data looks like or why an approach was chosen.
+- Update the "Current phase" line below when the phase changes.
+- Commit roadmap updates together with the work they describe.
 
 **Current phase:** Phase 0 – Groundwork. Shop data sources researched (see roadmap
 "Notes and findings"): Poetzsch and BorderShop are scrapable (both with EAN);
