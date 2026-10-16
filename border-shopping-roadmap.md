@@ -20,11 +20,11 @@ created: 2026-10-16
 **Goal:** Know exactly what to build and which shops can supply data.
 
 - [ ] Pick 3-5 target shops (see shortlist below)
-- [ ] Read `robots.txt` and terms of service for each shop
-- [ ] For each shop, find the easiest data source: hidden JSON API, JSON-LD, sitemap, or HTML
+- [x] Read `robots.txt` and terms of service for each shop
+- [x] For each shop, find the easiest data source: hidden JSON API, JSON-LD, sitemap, or HTML (see Notes and findings)
 - [ ] Compare ~10 products between website prices and in-store prices (shelf or receipt)
-- [ ] Write a one-page project brief (goal, rules, stack) to give the AI tool as context
-- [ ] Set up repo, Next.js project, Supabase project, Claude Code
+- [x] Write a one-page project brief (goal, rules, stack) to give the AI tool as context (`CLAUDE.md`)
+- [ ] Set up repo, Next.js project, Supabase project, Claude Code (repo + Next.js + Claude Code done; Supabase waits for Phase 1)
 
 **Done when:** At least two shops have a confirmed data source.
 
@@ -153,4 +153,32 @@ Choose based on what Phase 5 showed:
 
 ## Notes and findings
 
-<!-- Add Phase 0 findings here: which shops have JSON APIs, price differences online vs in-store, etc. -->
+### Shop data sources (researched 2026-10-16)
+
+| | Poetzsch | Fleggaard | Calle |
+|---|---|---|---|
+| Platform | Shopware 6 | Next.js (custom) | Same as Fleggaard |
+| Bot protection | None - plain HTTP works | **Cloudflare challenge** (403 to scripts, also on sitemap) | **Cloudflare challenge** |
+| Best source | Sitemap + product page microdata | JSON-LD on product pages (only in a real browser) | Same as Fleggaard |
+| Product count | ~3,800 URLs in sitemap | ? (sitemap blocked) | ? |
+| EAN | Yes (`itemprop="gtin13"`) | **No** | **No** |
+| Price | `itemprop="price"`, DKK | JSON-LD `offers.price`, DKK (EUR shown too) | Same |
+| Pack size / per-unit | "Kasse à 24 x 0,33 liter", "Grundpris: 5,68 kr. / liter" | "1 Ks", "Pris pr. Liter DKK 7,95" | Same |
+| Multi-buy offers | ? | Yes ("Ta' 5 for 99,99") | Likely same |
+| Hidden JSON API | Shopware Store API exists but needs an access key - not exposed | None seen (React Server Components) | Same |
+| robots.txt | Product pages allowed, `/*?` disallowed | Product pages allowed, `/*?` disallowed | Same |
+| Terms of service | Nothing about scraping | Nothing about scraping | - |
+
+**Key findings**
+
+- **Prices are in DKK**, not EUR, at all three shops (Fleggaard also shows EUR).
+- **No Pfand on export cans.** Shoppers who fill out an *eksporterklæring* (export declaration) pay no can deposit on most beer and soda. Both Poetzsch and Fleggaard promote this. Declarations are available in the shops, so Pfand is mostly *not* a cost to add and the user doesn't need to do anything in advance.
+- **Fleggaard and Calle share one catalog.** Product IDs are identical (e.g. SKU `500115926`, Coca-Cola PET 24 x 0,33 l), and the tested product had the same price at both (59,99 DKK). In practice they may count as **one data source, not two**.
+- **Fleggaard prices are the same across all their stores** (one price; JSON-LD lists the stores that carry the item).
+- **EAN matching only helps on the Poetzsch side.** Matching Poetzsch ↔ Fleggaard will need name + brand + pack size matching (Phase 2 gets harder).
+
+**Problem: Fleggaard/Calle block automated access.** Getting past Cloudflare's challenge would mean bypassing their bot protection, which breaks our scraping etiquette. Options:
+1. Ask the Fleggaard group for permission or a product feed (one contact covers both shops): https://fleggaard.freshdesk.com/da/support/home
+2. Look for another independent shop as the second source (BorderShop, Otto Duborg, CITTI)
+
+**Phase 0 status:** 1 shop confirmed (Poetzsch). Fleggaard/Calle data is good but not accessible to a script. Not yet done: compare ~10 products online vs in-store.

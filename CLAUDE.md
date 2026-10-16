@@ -16,7 +16,9 @@ The full plan lives in `border-shopping-roadmap.md` (also kept in Obsidian). Rea
 when deciding what to work on, and record Phase 0 findings in its "Notes and
 findings" section.
 
-**Current phase:** Phase 0 – Groundwork (repo set up; shop data sources not yet researched).
+**Current phase:** Phase 0 – Groundwork. Shop data sources researched (see roadmap
+"Notes and findings"): Poetzsch is scrapable; Fleggaard/Calle sit behind Cloudflare
+bot protection – never try to bypass it.
 
 ## Stack
 
@@ -33,9 +35,13 @@ findings" section.
 
 ## Domain rules (get these right)
 
-- **Prices are in EUR** at the shops; show DKK conversion to the user where useful.
-- **Pfand (deposit)** on cans/bottles is part of the real cost – store it separately
-  from the shelf price and include it in basket totals.
+- **Prices are in DKK** at the shops researched so far (Poetzsch, Fleggaard, Calle).
+  Store the currency per price anyway, in case a future shop uses EUR.
+- **Pfand (deposit):** with an *eksporterklæring* (export declaration), most cans
+  carry no deposit. Store any Pfand separately from the shelf price, but don't assume
+  it applies. The declaration is filled out in the shop, so the user needn't prepare anything.
+- **Multi-buy offers** ("Ta' 5 for 99,99") are common – store them separately from
+  the single-unit price.
 - **Compare per unit** (per liter / per kg) – pack sizes differ between shops.
 - **Match by EAN first.** Fuzzy/LLM matches need a confidence score, and uncertain
   matches must be reviewable. A wrong match gives a wrong "cheapest" answer, which
