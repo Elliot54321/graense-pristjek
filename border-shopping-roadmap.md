@@ -59,7 +59,7 @@ created: 2026-10-16
 **Goal:** Prices from two shops flowing into a database automatically.
 
 - [ ] Design schema: `shops`, `products`, `prices` (with timestamps for history), `product_matches`
-- [ ] Write one scraper module per shop (name, EAN, price, pack size, Pfand, URL, timestamp)
+- [ ] Write one scraper module per shop (name, EAN, price, pack size, Pfand, URL, timestamp) (Poetzsch done in `src/scrapers/`; BorderShop next)
 - [ ] Add validation and alerts (zero products returned, price change over 50%)
 - [ ] Schedule scrapers (GitHub Actions or Vercel Cron)
 
@@ -198,3 +198,11 @@ Choose based on what Phase 5 showed:
 - CITTI and Otto Duborg are not usable as data sources right now.
 
 **Phase 0 status:** 2 shops confirmed (Poetzsch, BorderShop) - the "done when" criterion is met. Fleggaard/Calle waiting on a permission request. Not yet done: compare ~10 products online vs in-store.
+
+### Phase 1 progress (2026-10-16)
+
+- **Poetzsch scraper works** (`npm run scrape -- poetzsch --limit 20`). Test run: 20/20 products parsed, all with EAN; 19/20 have content and price per unit matching the shop's own "Grundpris".
+- Sitemap currently lists **3,747 product URLs**. At one request every 2 seconds a full run takes about 2 hours, which is fine once a day.
+- Poetzsch's "Samlet indhold" field is rounded (0.034 kg shows as "0,03 kg"); the scraper uses the precise price-unit field instead.
+- Some products have no content data (e.g. "3 stks. pakke" sauce mixes) - price per unit stays unknown for those.
+- Product pages carry an "Avis Tilbud" badge for flyer offers; no before/after price was seen yet.

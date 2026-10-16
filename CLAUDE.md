@@ -26,7 +26,9 @@ of truth. Read it when deciding what to work on.
 **Current phase:** Phase 0 – Groundwork. Shop data sources researched (see roadmap
 "Notes and findings"): Poetzsch and BorderShop are scrapable (both with EAN);
 Fleggaard/Calle sit behind Cloudflare bot protection – never try to bypass it.
-Next up: Phase 1 data pipeline.
+
+**Phase 1 – Data pipeline** in progress: Poetzsch scraper done (`src/scrapers/`,
+output to JSON). Next: BorderShop scraper, Supabase schema, then saving to the database.
 
 ## Stack
 
@@ -40,6 +42,16 @@ Next up: Phase 1 data pipeline.
 - `npm run dev` – dev server on http://localhost:3000
 - `npm run build` – production build (run before committing larger changes)
 - `npm run lint` – ESLint
+- `npm run scrape -- <shop> [--limit N]` – run a shop scraper; saves JSON to
+  `data/scrapes/` (git-ignored). Needs `SCRAPER_CONTACT_EMAIL` in `.env.local`
+  (see `.env.example`). Use `--limit 20` while developing to keep load on shops low.
+
+## Scraper layout
+
+- `src/scrapers/types.ts` – `ScrapedProduct` shape every shop scraper returns
+- `src/scrapers/http.ts` – polite fetch (bot User-Agent, 2 s between requests, backoff)
+- `src/scrapers/<shop>.ts` – one module per shop; export the page parser separately
+- `src/scrapers/run.ts` – CLI that runs a scraper and writes the JSON file
 
 ## Domain rules (get these right)
 
