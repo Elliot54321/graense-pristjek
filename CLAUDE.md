@@ -1,0 +1,61 @@
+# Grænse Pris – border shopping price comparison
+
+@AGENTS.md
+
+## What this is
+
+A website for people in Denmark who shop at the German border. The user writes a
+shopping list in Danish (e.g. "24 dåser cola, 2 kg kaffe") and the site tells them
+which shop gives the cheapest total basket.
+
+**Core principle:** prove the idea works before polishing it. The hard part is
+reliable price data and correct product matching, not the website. Prefer simple,
+working solutions over clever ones.
+
+The full plan lives in `border-shopping-roadmap.md` (also kept in Obsidian). Read it
+when deciding what to work on, and record Phase 0 findings in its "Notes and
+findings" section.
+
+**Current phase:** Phase 0 – Groundwork (repo set up; shop data sources not yet researched).
+
+## Stack
+
+- **Next.js** (App Router, TypeScript, `src/` dir, Tailwind CSS v4), deployed on Vercel
+- **Supabase** (Postgres) for shops, products, prices and matches – not yet connected
+- **Scrapers:** one module per shop, run on a schedule (GitHub Actions or Vercel Cron)
+- **LLM API** for interpreting the Danish shopping list and fuzzy product matching
+
+## Commands
+
+- `npm run dev` – dev server on http://localhost:3000
+- `npm run build` – production build (run before committing larger changes)
+- `npm run lint` – ESLint
+
+## Domain rules (get these right)
+
+- **Prices are in EUR** at the shops; show DKK conversion to the user where useful.
+- **Pfand (deposit)** on cans/bottles is part of the real cost – store it separately
+  from the shelf price and include it in basket totals.
+- **Compare per unit** (per liter / per kg) – pack sizes differ between shops.
+- **Match by EAN first.** Fuzzy/LLM matches need a confidence score, and uncertain
+  matches must be reviewable. A wrong match gives a wrong "cheapest" answer, which
+  is the worst failure this product can have.
+- **Show the user what was matched** and let them correct it before calculating.
+- **Danish import limits** apply to alcohol and tobacco – warn when a basket exceeds them.
+- Online prices can differ from in-store prices; treat this as a known risk.
+
+## Scraping rules
+
+- Respect each shop's `robots.txt` and terms of service.
+- Crawl slowly – once or twice a day at most.
+- Identify the bot in the User-Agent with a contact email.
+- Prefer, in order: hidden JSON API → JSON-LD → sitemap → HTML parsing → headless browser.
+- One module per shop so a broken shop never breaks the others. Validate output
+  (alert on zero products or price changes over 50%).
+
+## Conventions
+
+- UI text is in **Danish**; code, comments and commit messages in **English**.
+- Mobile-first UI – people use this on their phone, in the car or in the shop.
+- Never commit secrets. Keys go in `.env.local` (git-ignored).
+- Work in small, testable steps and explain non-obvious code.
