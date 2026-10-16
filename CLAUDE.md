@@ -17,8 +17,9 @@ when deciding what to work on, and record Phase 0 findings in its "Notes and
 findings" section.
 
 **Current phase:** Phase 0 – Groundwork. Shop data sources researched (see roadmap
-"Notes and findings"): Poetzsch is scrapable; Fleggaard/Calle sit behind Cloudflare
-bot protection – never try to bypass it.
+"Notes and findings"): Poetzsch and BorderShop are scrapable (both with EAN);
+Fleggaard/Calle sit behind Cloudflare bot protection – never try to bypass it.
+Next up: Phase 1 data pipeline.
 
 ## Stack
 
@@ -35,7 +36,7 @@ bot protection – never try to bypass it.
 
 ## Domain rules (get these right)
 
-- **Prices are in DKK** at the shops researched so far (Poetzsch, Fleggaard, Calle).
+- **Prices are in DKK** at the shops researched so far (Poetzsch, Fleggaard, Calle, BorderShop).
   Store the currency per price anyway, in case a future shop uses EUR.
 - **Pfand (deposit):** with an *eksporterklæring* (export declaration), most cans
   carry no deposit. Store any Pfand separately from the shelf price, but don't assume

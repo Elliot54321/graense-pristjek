@@ -19,7 +19,7 @@ created: 2026-10-16
 
 **Goal:** Know exactly what to build and which shops can supply data.
 
-- [ ] Pick 3-5 target shops (see shortlist below)
+- [x] Pick 3-5 target shops (see shortlist below; researched in Notes and findings)
 - [x] Read `robots.txt` and terms of service for each shop
 - [x] For each shop, find the easiest data source: hidden JSON API, JSON-LD, sitemap, or HTML (see Notes and findings)
 - [ ] Compare ~10 products between website prices and in-store prices (shelf or receipt)
@@ -177,8 +177,24 @@ Choose based on what Phase 5 showed:
 - **Fleggaard prices are the same across all their stores** (one price; JSON-LD lists the stores that carry the item).
 - **EAN matching only helps on the Poetzsch side.** Matching Poetzsch ↔ Fleggaard will need name + brand + pack size matching (Phase 2 gets harder).
 
-**Problem: Fleggaard/Calle block automated access.** Getting past Cloudflare's challenge would mean bypassing their bot protection, which breaks our scraping etiquette. Options:
-1. Ask the Fleggaard group for permission or a product feed (one contact covers both shops): https://fleggaard.freshdesk.com/da/support/home
-2. Look for another independent shop as the second source (BorderShop, Otto Duborg, CITTI)
+**Problem: Fleggaard/Calle block automated access.** Getting past Cloudflare's challenge would mean bypassing their bot protection, which breaks our scraping etiquette. A permission request has been drafted for the Fleggaard group (one contact covers both shops): https://fleggaard.freshdesk.com/da/support/home
 
-**Phase 0 status:** 1 shop confirmed (Poetzsch). Fleggaard/Calle data is good but not accessible to a script. Not yet done: compare ~10 products online vs in-store.
+### More shops (researched 2026-10-16)
+
+| | BorderShop | CITTI Markt | Otto Duborg |
+|---|---|---|---|
+| Website | bordershop.com (SAP Commerce) | cittimarkt.de | otto-duborg.dk does not resolve |
+| Bot protection | None - plain HTTP works | None | - |
+| Best source | Product sitemaps + JSON-LD on product pages | **No online catalog** - weekly offer PDFs only | Only flyers on eTilbudsavis |
+| Product count | ~4,200 products (Danish, DKK sitemap) | - | - |
+| EAN | **Yes** (JSON-LD `gtin13`) | - | - |
+| Price | JSON-LD `offers.price`, DKK | EUR (flyers) | - |
+| Store | Puttgarden only (Rødby-Puttgarden ferry) | Flensburg store temporarily closed after a fire | Bov |
+| robots.txt | Product pages allowed (facet filters disallowed) | Everything allowed | - |
+| Terms of service | Nothing about scraping | - | - |
+
+- **BorderShop is the second confirmed source.** Same quality as Poetzsch, and both have EANs, so **EAN matching works between Poetzsch and BorderShop**.
+- Caveat: BorderShop is at Puttgarden, not the Padborg/Flensburg land border, so it serves different trips. It's still a fine second shop for building and testing the pipeline and matching.
+- CITTI and Otto Duborg are not usable as data sources right now.
+
+**Phase 0 status:** 2 shops confirmed (Poetzsch, BorderShop) - the "done when" criterion is met. Fleggaard/Calle waiting on a permission request. Not yet done: compare ~10 products online vs in-store.
