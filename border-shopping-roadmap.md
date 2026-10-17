@@ -24,7 +24,7 @@ created: 2026-10-16
 - [x] For each shop, find the easiest data source: hidden JSON API, JSON-LD, sitemap, or HTML (see Notes and findings)
 - [ ] Compare ~10 products between website prices and in-store prices (shelf or receipt)
 - [x] Write a one-page project brief (goal, rules, stack) to give the AI tool as context (`CLAUDE.md`)
-- [ ] Set up repo, Next.js project, Supabase project, Claude Code (repo + Next.js + Claude Code done; Supabase waits for Phase 1)
+- [x] Set up repo, Next.js project, Supabase project, Claude Code
 
 **Done when:** At least two shops have a confirmed data source.
 
@@ -58,9 +58,9 @@ created: 2026-10-16
 
 **Goal:** Prices from two shops flowing into a database automatically.
 
-- [ ] Design schema: `shops`, `products`, `prices` (with timestamps for history), `product_matches`
+- [x] Design schema: `shops`, `products`, `prices` (with timestamps for history), `product_matches` (plus `shop_products` and `scrape_runs`; see `supabase/migrations/`)
 - [ ] Write one scraper module per shop (name, EAN, price, pack size, Pfand, URL, timestamp) (Poetzsch and BorderShop done in `src/scrapers/`)
-- [ ] Add validation and alerts (zero products returned, price change over 50%)
+- [ ] Add validation and alerts (zero products returned, price change over 50%) (checks done and logged in `scrape_runs`; no notification yet)
 - [ ] Schedule scrapers (GitHub Actions or Vercel Cron)
 
 **Done when:** Two shops update by themselves for a week without intervention.
@@ -212,3 +212,6 @@ Choose based on what Phase 5 showed:
 - Many BorderShop products are **"Kan kun købes i butik"** (in-store only) - they still have price and EAN, and are exactly what border shoppers buy.
 - BorderShop's JSON-LD names are in English; the scraper uses the Danish page heading instead.
 - Prices over 1,000 kr. use a dot as thousands separator ("1.142,79") - number parsing handles this for both shops.
+- **Supabase connected** (2026-10-17). Schema applied from `supabase/migrations/20261017000000_initial_schema.sql`. RLS is on for every table: the public key can read prices and products, only the secret key can write; `scrape_runs` is private.
+- **Scrapers save to the database** with `--save`. Test: 20 products per shop saved; re-running added 0 price rows, so prices are only stored when they change. Not yet seen live: a real price change between runs.
+- Current sitemap sizes after filtering to product pages: Poetzsch 3,743, BorderShop 3,713.

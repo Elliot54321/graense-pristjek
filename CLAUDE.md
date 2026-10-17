@@ -27,13 +27,13 @@ of truth. Read it when deciding what to work on.
 "Notes and findings"): Poetzsch and BorderShop are scrapable (both with EAN);
 Fleggaard/Calle sit behind Cloudflare bot protection – never try to bypass it.
 
-**Phase 1 – Data pipeline** in progress: Poetzsch and BorderShop scrapers done
-(`src/scrapers/`, output to JSON). Next: Supabase schema, then saving to the database.
+**Phase 1 – Data pipeline** in progress: Poetzsch and BorderShop scrapers done and
+saving to Supabase. Next: a full run of each shop, then daily scheduling.
 
 ## Stack
 
 - **Next.js** (App Router, TypeScript, `src/` dir, Tailwind CSS v4), deployed on Vercel
-- **Supabase** (Postgres) for shops, products, prices and matches – not yet connected
+- **Supabase** (Postgres, EU region) for shops, products, prices and matches
 - **Scrapers:** one module per shop, run on a schedule (GitHub Actions or Vercel Cron)
 - **LLM API** for interpreting the Danish shopping list and fuzzy product matching
 
@@ -42,16 +42,29 @@ Fleggaard/Calle sit behind Cloudflare bot protection – never try to bypass it.
 - `npm run dev` – dev server on http://localhost:3000
 - `npm run build` – production build (run before committing larger changes)
 - `npm run lint` – ESLint
-- `npm run scrape -- <shop> [--limit N]` – run a shop scraper; saves JSON to
-  `data/scrapes/` (git-ignored). Needs `SCRAPER_CONTACT_EMAIL` in `.env.local`
-  (see `.env.example`). Use `--limit 20` while developing to keep load on shops low.
+- `npm run scrape -- <shop> [--limit N] [--save]` – run a shop scraper; saves JSON
+  to `data/scrapes/` (git-ignored), and with `--save` writes to Supabase and logs
+  the run in `scrape_runs`. Needs the variables in `.env.example` set in `.env.local`.
+  Use `--limit 20` while developing to keep load on shops low.
 
 ## Scraper layout
 
 - `src/scrapers/types.ts` – `ScrapedProduct` shape every shop scraper returns
 - `src/scrapers/http.ts` – polite fetch (bot User-Agent, 2 s between requests, backoff)
 - `src/scrapers/<shop>.ts` – one module per shop; export the page parser separately
-- `src/scrapers/run.ts` – CLI that runs a scraper and writes the JSON file
+- `src/scrapers/save.ts` – writes to Supabase with the secret key: upserts products,
+  adds a price row only when price/offer changed, warns on >50% price jumps
+- `src/scrapers/run.ts` – CLI that runs a scraper, writes JSON and optionally saves
+
+## Database
+
+- Schema lives in `supabase/migrations/` – add a new dated file for every change and
+  run it in the Supabase SQL Editor. Never edit a migration that has been applied.
+- Tables: `shops`, `shop_products` (a product as one shop lists it), `prices`
+  (history, one row per change), `products` + `product_matches` (cross-shop matching),
+  `scrape_runs` (private run log). The `current_prices` view gives the latest price.
+- RLS is on everywhere: public key = read only; secret key (`SUPABASE_SECRET_KEY`)
+  is for scrapers/server code only and must never reach the browser.
 
 ## Domain rules (get these right)
 
