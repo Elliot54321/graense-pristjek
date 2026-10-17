@@ -1,0 +1,46 @@
+# Scrape every shop once a day and save to Supabase.
+#
+# Needs these repository secrets (Settings -> Secrets and variables -> Actions):
+#   NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SECRET_KEY, SCRAPER_CONTACT_EMAIL
+#
+# Run it by hand from the Actions tab with "Run workflow".
+name: Daily scrape
+
+on:
+  schedule:
+    - cron: "0 2 * * *" # 02:00 UTC = 03:00/04:00 Danish time, when shops are quiet
+  workflow_dispatch:
+
+# Never let two runs of the same shop overlap.
+concurrency:
+  group: scrape
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240 # a full run takes ~130 min at one request every 2 s
+    strategy:
+      fail-fast: false # one broken shop must not stop the others
+      matrix:
+        shop: [poetzsch, bordershop]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run scrape -- ${{ matrix.shop }} --save
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          SCRAPER_CONTACT_EMAIL: ${{ secrets.SCRAPER_CONTACT_EMAIL }}
+      # Keep the raw JSON for a week, handy when a run looks wrong.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: scrape-${{ matrix.shop }}
+          path: data/scrapes/
+          retention-days: 7
+          if-no-files-found: ignore
