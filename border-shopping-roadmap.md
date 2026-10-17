@@ -61,7 +61,7 @@ created: 2026-10-16
 - [x] Design schema: `shops`, `products`, `prices` (with timestamps for history), `product_matches` (plus `shop_products` and `scrape_runs`; see `supabase/migrations/`)
 - [ ] Write one scraper module per shop (name, EAN, price, pack size, Pfand, URL, timestamp) (Poetzsch and BorderShop done in `src/scrapers/`)
 - [ ] Add validation and alerts (zero products returned, price change over 50%) (checks done and logged in `scrape_runs`; no notification yet)
-- [ ] Schedule scrapers (GitHub Actions or Vercel Cron)
+- [x] Schedule scrapers (GitHub Actions or Vercel Cron) (GitHub Actions, daily 02:00 UTC; first scheduled run 2026-10-18)
 
 **Done when:** Two shops update by themselves for a week without intervention.
 
@@ -231,3 +231,13 @@ Choose based on what Phase 5 showed:
 - 323 Poetzsch products have content but no "Grundpris" on the page, and a handful of shop-reported unit prices are wrong (e.g. 0,23 kr./kg for 75 g pastilles). **Fixed (2026-10-17):** the scrapers now compute price per unit as price ÷ content and only use the shop's figure when content is unknown. Re-checked on the full-run data: Poetzsch missing unit prices 427 → 104 (the rest have no content), 5 wrong values corrected; BorderShop 1 corrected. The next full run adds a one-time new price row for the ~450 products whose unit price changes.
 - 5 EANs appear on more than one BorderShop product (variants/gift boxes) - matching must allow this.
 - Same EAN does not always mean the same offer: A.H. Riise Non Plus Ultra is 579 kr. at Poetzsch but 799,95 at BorderShop, where it is sold in a gift box.
+
+### Daily scheduling (2026-10-17)
+
+- Repo is public at https://github.com/Elliot54321/graense-pristjek (public = free GitHub Actions minutes; a private repo would need ~7,800 min/month vs 2,000 free). Commits use the GitHub no-reply email.
+- `.github/workflows/scrape.yml` runs both shops in parallel every day at 02:00 UTC, and can be started by hand from the Actions tab with an optional product limit. Secrets (Supabase URL, secret key, contact email) are stored as repository secrets.
+- Test run on GitHub with 20 products per shop: both OK and logged in `scrape_runs`.
+- The workflow uses `npm install`, not `npm ci`: the macOS-made lock file lacks Linux-only optional packages.
+- GitHub emails the repo owner when a scheduled run fails. A run with only warnings (e.g. a >50% price jump) still counts as a success, so check `scrape_runs` for those until real alerts exist.
+- GitHub disables scheduled workflows in public repos after 60 days without repo activity.
+- **"Done when":** both shops update by themselves for a week - check `scrape_runs` around 2026-10-25.

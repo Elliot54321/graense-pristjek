@@ -29,7 +29,8 @@ Fleggaard/Calle sit behind Cloudflare bot protection – never try to bypass it.
 
 **Phase 1 – Data pipeline** in progress: Poetzsch and BorderShop scrapers done and
 saving to Supabase. First full run done (7,453 products, 749 EANs in both shops).
-Next: daily scheduling.
+Daily scraping runs on GitHub Actions (`.github/workflows/scrape.yml`, 02:00 UTC).
+Phase 1 is done once both shops have updated by themselves for a week (~2026-10-25).
 
 ## Stack
 
@@ -99,5 +100,7 @@ Next: daily scheduling.
 
 - UI text is in **Danish**; code, comments and commit messages in **English**.
 - Mobile-first UI – people use this on their phone, in the car or in the shop.
-- Never commit secrets. Keys go in `.env.local` (git-ignored).
+- Never commit secrets. Keys go in `.env.local` (git-ignored) locally and in GitHub
+  repository secrets for the workflow. **The repo is public** – never commit
+  anything you wouldn't want the shops or the internet to read.
 - Work in small, testable steps and explain non-obvious code.
