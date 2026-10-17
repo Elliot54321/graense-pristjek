@@ -215,3 +215,19 @@ Choose based on what Phase 5 showed:
 - **Supabase connected** (2026-10-17). Schema applied from `supabase/migrations/20261017000000_initial_schema.sql`. RLS is on for every table: the public key can read prices and products, only the secret key can write; `scrape_runs` is private.
 - **Scrapers save to the database** with `--save`. Test: 20 products per shop saved; re-running added 0 price rows, so prices are only stored when they change. Not yet seen live: a real price change between runs.
 - Current sitemap sizes after filtering to product pages: Poetzsch 3,743, BorderShop 3,713.
+
+### First full scrape (2026-10-17)
+
+| | Poetzsch | BorderShop |
+|---|---|---|
+| Products saved | 3,743 (0 failed) | 3,710 (3 failed: discontinued pages that redirect to a category) |
+| Run time | 132 min | 129 min |
+| With EAN | 100% | 100% |
+| With content (l/kg) | 3,638 | 3,051 (most of the rest are toys and "More") |
+| Unit price matches price ÷ content | 3,310 / 3,316 | 3,048 / 3,049 |
+| On offer | 777 | 523 |
+
+- **749 products have the same EAN in both shops** - EAN matching will work for a good chunk of the catalog. Of those, Poetzsch is cheaper on 342, BorderShop on 398, and 9 cost the same.
+- 323 Poetzsch products have content but no "Grundpris" on the page, and a handful of shop-reported unit prices are wrong (e.g. 0,23 kr./kg for 75 g pastilles). **Computing price per unit ourselves (price ÷ content) would fix both.**
+- 5 EANs appear on more than one BorderShop product (variants/gift boxes) - matching must allow this.
+- Same EAN does not always mean the same offer: A.H. Riise Non Plus Ultra is 579 kr. at Poetzsch but 799,95 at BorderShop, where it is sold in a gift box.

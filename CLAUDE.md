@@ -28,7 +28,8 @@ of truth. Read it when deciding what to work on.
 Fleggaard/Calle sit behind Cloudflare bot protection – never try to bypass it.
 
 **Phase 1 – Data pipeline** in progress: Poetzsch and BorderShop scrapers done and
-saving to Supabase. Next: a full run of each shop, then daily scheduling.
+saving to Supabase. First full run done (7,453 products, 749 EANs in both shops).
+Next: daily scheduling.
 
 ## Stack
 
