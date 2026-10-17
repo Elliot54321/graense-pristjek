@@ -33,8 +33,10 @@ Daily scraping runs on GitHub Actions (`.github/workflows/scrape.yml`, 02:00 UTC
 Phase 1 is done once both shops have updated by themselves for a week (~2026-10-25).
 
 **Phase 2 – Matching** started: EAN matching done (`src/matching/ean.ts`, 746 products
-in both shops). Next: list the 50 most common items and check coverage, then
-fuzzy/LLM matching and a review view.
+in both shops). Coverage: 81/120 common items matched by EAN, 26 more are the same
+product with a different EAN; categories 25–48% linked. Next: fuzzy/LLM matching on
+name + brand + size, then a review view. Broad coverage is the goal – comparing
+prices is the whole point of the site.
 
 ## Stack
 
@@ -50,6 +52,8 @@ fuzzy/LLM matching and a review view.
 - `npm run lint` – ESLint
 - `npm run match:ean` – one `products` row per EAN, links shop products to it
   (idempotent; runs nightly after scraping)
+- `npm run match:coverage [-- --names]` – category coverage plus the items in
+  `src/matching/common-items.ts`: matched, in both shops but unlinked, or one shop only
 - `npm run scrape -- <shop> [--limit N] [--save]` – run a shop scraper; saves JSON
   to `data/scrapes/` (git-ignored), and with `--save` writes to Supabase and logs
   the run in `scrape_runs`. Needs the variables in `.env.example` set in `.env.local`.

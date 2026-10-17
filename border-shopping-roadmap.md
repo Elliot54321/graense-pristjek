@@ -76,7 +76,7 @@ created: 2026-10-16
 - [x] Compute price per liter or kg for everything (done in the scrapers: price ÷ content)
 - [ ] Build a small admin view to review uncertain matches
 
-**Done when:** The 50 most common items (cola, beer, coffee, etc.) match correctly across both shops.
+**Done when:** The common items (`src/matching/common-items.ts`, 120+ and growing) match correctly across both shops, and most of each category's shared range (soda, beer, candy/chocolate, spirits) is linked. Comparing prices is the whole point of the site, so broad coverage matters more than a short list.
 
 ---
 
@@ -124,6 +124,7 @@ created: 2026-10-16
 Choose based on what Phase 5 showed:
 
 - [ ] More shops and more product coverage
+- [ ] Look at the Swedish border as well (BorderShop already has Swedish-language sitemaps and sells many Swedish beers such as Norrlands, Pripps, Mariestads)
 - [ ] Price history and "on offer now" alerts
 - [ ] Saved shopping lists and a "my usual trip" feature
 - [ ] UI polish (Danish/English), SEO pages for common products
@@ -252,3 +253,27 @@ Choose based on what Phase 5 showed:
   - Poetzsch's "Mærke" field is now used as brand.
 - Real differences remain flagged, e.g. Kijafa 0,75 l (Poetzsch) vs 0,7 l (BorderShop), and BorderShop data errors such as Polly Lakrids "400g" in the name but 0,1 kg in the content field. These need the review view.
 - The database still holds the old, wrong contents until the next nightly scrape; after that, matching should re-score the wine cases to 1.0.
+
+### Phase 2: coverage (2026-10-17)
+
+`npm run match:coverage` measures two things: whole categories, and a hand-made list of common items (`src/matching/common-items.ts`, 120 items: soda, beer, energy drinks, spirits, candy, chocolate, snacks - wine left out on purpose). **The list is a guess from what the shops sell - grow it with real search data in Phase 5.**
+
+**Categories** (products linked to the same product in both shops, EAN only so far):
+
+| Category | Poetzsch | BorderShop | Linked | Share of smaller range |
+|---|---|---|---|---|
+| Soda and energy drinks | 101 | 114 | 48 | 48% |
+| Beer | 84 | 109 | 37 | 44% |
+| Candy, chocolate and snacks | 966 | 646 | 228 | 35% |
+| Spirits | 725 | 1,199 | 182 | 25% |
+
+**Common items:** 81 of 120 matched by EAN; **26 are in both shops but not linked** (different EAN); 11 only in one shop; 2 in neither.
+
+- Not linked yet (the target for fuzzy/LLM matching): Fanta Orange, Sprite, Mirinda, Monster Energy, Monster Ultra White, Carlsberg Pilsner ("Carlsberg Grøn"), Tuborg Grøn ("Tuborg Pilsner" at Poetzsch), Tuborg Guld, Carlsberg Sort Guld ("Black Gold"), Elephant, Harboe Pilsner, Royal Pilsner, Royal Export, Heineken, Birra Moretti, San Miguel, Jägermeister, Aalborg Taffel, Jim Beam, Bombay Sapphire, Haribo Matador Mix 1 kg, Toblerone Milk, Lossepladsen, M&M's Peanut, Pringles (different sizes), Toms Skildpadder.
+- The first 50-item run wrongly counted Tuborg Grøn, Royal Pilsner and Harboe Pilsner as matched - only their 0,0% versions share an EAN. The check now ignores alcohol-free and bottled variants unless the item asks for them.
+- The differing EANs follow no pattern (case vs. can barcode, country versions, packaging variants), and names differ in ways a simple text match misses ("Carlsberg Pilsner" = "Carlsberg Grøn", "Sort Guld" = "Black Gold", "Ga-Jol Blå" = "Ga-Jol Mentol"). The next step needs **name + brand + size** matching, likely with an LLM.
+
+**Not available online from these two shops** - needs another source (weekly flyers, e.g. eTilbudsavis, manual checks in store, or shops that publish it):
+- Fresh meat such as **minced beef and pork** (only pet food and soups show up)
+- **Pick-and-mix candy** (bland selv slik)
+- Coffee and tobacco; Poetzsch has almost no household products
