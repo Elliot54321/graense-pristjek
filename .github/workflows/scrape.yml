@@ -10,6 +10,11 @@ on:
   schedule:
     - cron: "0 2 * * *" # 02:00 UTC = 03:00/04:00 Danish time, when shops are quiet
   workflow_dispatch:
+    inputs:
+      limit:
+        description: "Only scrape this many products per shop (empty = all)"
+        required: false
+        default: ""
 
 # Never let two runs of the same shop overlap.
 concurrency:
@@ -31,7 +36,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run scrape -- ${{ matrix.shop }} --save
+      - run: npm run scrape -- ${{ matrix.shop }} --save ${{ inputs.limit && format('--limit {0}', inputs.limit) || '' }}
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
