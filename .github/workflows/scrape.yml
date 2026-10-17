@@ -35,14 +35,16 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
+      # Not `npm ci`: the lock file is made on macOS and lacks some Linux-only
+      # optional packages, which makes `npm ci` refuse to install.
+      - run: npm install --no-audit --no-fund
       - run: npm run scrape -- ${{ matrix.shop }} --save ${{ inputs.limit && format('--limit {0}', inputs.limit) || '' }}
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           SCRAPER_CONTACT_EMAIL: ${{ secrets.SCRAPER_CONTACT_EMAIL }}
       # Keep the raw JSON for a week, handy when a run looks wrong.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         if: always()
         with:
           name: scrape-${{ matrix.shop }}
