@@ -52,6 +52,8 @@ Next: daily scheduling.
 
 - `src/scrapers/types.ts` – `ScrapedProduct` shape every shop scraper returns
 - `src/scrapers/http.ts` – polite fetch (bot User-Agent, 2 s between requests, backoff)
+- `src/scrapers/quantity.ts` – number/quantity parsing and `unitPrice` (price ÷ content;
+  shops' own unit prices are sometimes wrong, so only used when content is unknown)
 - `src/scrapers/<shop>.ts` – one module per shop; export the page parser separately
 - `src/scrapers/save.ts` – writes to Supabase with the secret key: upserts products,
   adds a price row only when price/offer changed, warns on >50% price jumps

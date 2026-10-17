@@ -73,7 +73,7 @@ created: 2026-10-16
 
 - [ ] Match by EAN first (most reliable)
 - [ ] Fuzzy/LLM matching on brand, type and size for the rest, with a confidence score
-- [ ] Compute price per liter or kg for everything
+- [x] Compute price per liter or kg for everything (done in the scrapers: price ÷ content)
 - [ ] Build a small admin view to review uncertain matches
 
 **Done when:** The 50 most common items (cola, beer, coffee, etc.) match correctly across both shops.
@@ -228,6 +228,6 @@ Choose based on what Phase 5 showed:
 | On offer | 777 | 523 |
 
 - **749 products have the same EAN in both shops** - EAN matching will work for a good chunk of the catalog. Of those, Poetzsch is cheaper on 342, BorderShop on 398, and 9 cost the same.
-- 323 Poetzsch products have content but no "Grundpris" on the page, and a handful of shop-reported unit prices are wrong (e.g. 0,23 kr./kg for 75 g pastilles). **Computing price per unit ourselves (price ÷ content) would fix both.**
+- 323 Poetzsch products have content but no "Grundpris" on the page, and a handful of shop-reported unit prices are wrong (e.g. 0,23 kr./kg for 75 g pastilles). **Fixed (2026-10-17):** the scrapers now compute price per unit as price ÷ content and only use the shop's figure when content is unknown. Re-checked on the full-run data: Poetzsch missing unit prices 427 → 104 (the rest have no content), 5 wrong values corrected; BorderShop 1 corrected. The next full run adds a one-time new price row for the ~450 products whose unit price changes.
 - 5 EANs appear on more than one BorderShop product (variants/gift boxes) - matching must allow this.
 - Same EAN does not always mean the same offer: A.H. Riise Non Plus Ultra is 579 kr. at Poetzsch but 799,95 at BorderShop, where it is sold in a gift box.

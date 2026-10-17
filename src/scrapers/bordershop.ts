@@ -1,6 +1,6 @@
 import * as cheerio from "cheerio";
 import { fetchSitemap, fetchText, sitemapLocs } from "./http";
-import { PRICE_NUMBER, parseDecimal, parseQuantity } from "./quantity";
+import { PRICE_NUMBER, parseDecimal, parseQuantity, unitPrice } from "./quantity";
 import type { ScrapedProduct, Scraper } from "./types";
 
 const BASE = "https://www.bordershop.com";
@@ -65,7 +65,7 @@ export function parseProductPage(html: string, url: string): ScrapedProduct | nu
   const refMatch = reference.match(new RegExp(`(${PRICE_NUMBER})\\s*DKK\\s*/\\s*(.+?)\\)`));
   const refQuantity = parseQuantity(refMatch?.[2]);
   const refPrice = parseDecimal(refMatch?.[1] ?? "");
-  const pricePerUnit =
+  const shopUnitPrice =
     refPrice && refQuantity ? Math.round((refPrice / refQuantity.amount) * 100) / 100 : null;
 
   const onOffer = card.find(".c-price--special").length > 0;
@@ -89,7 +89,7 @@ export function parseProductPage(html: string, url: string): ScrapedProduct | nu
     packCount: pack?.packCount ?? null,
     unitSize: pack?.unitSize ?? null,
     totalContent,
-    pricePerUnit,
+    pricePerUnit: unitPrice(price, totalContent, shopUnitPrice),
     onOffer,
     regularPrice,
     offerEndsAt: onOffer ? (offer?.priceValidUntil ?? null) : null,

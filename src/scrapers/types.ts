@@ -28,7 +28,7 @@ export interface ScrapedProduct {
   unitSize: Quantity | null;
   /** Total content of the sellable unit (7.92 l). */
   totalContent: Quantity | null;
-  /** Price per base unit as reported by the shop (DKK per liter/kg). */
+  /** Price per base unit (DKK per liter/kg/piece): price ÷ content, or the shop's own figure when content is unknown. */
   pricePerUnit: number | null;
   /** True when the shop marks the price as an offer. */
   onOffer: boolean;

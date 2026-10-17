@@ -41,3 +41,17 @@ export function parseQuantity(text: string | null | undefined): Quantity | null 
   // Round away float noise such as 0.33 * 0.01.
   return { amount: Math.round(amount * unit[1] * 1e6) / 1e6, unit: unit[0] };
 }
+
+/**
+ * Price per liter / kg / piece, calculated from price and content. Shops'
+ * own unit prices are sometimes missing or wrong, so we only fall back to
+ * the shop's figure when the content is unknown.
+ */
+export function unitPrice(
+  price: number,
+  content: Quantity | null,
+  shopUnitPrice: number | null,
+): number | null {
+  if (!content || content.amount <= 0) return shopUnitPrice;
+  return Math.round((price / content.amount) * 100) / 100;
+}
