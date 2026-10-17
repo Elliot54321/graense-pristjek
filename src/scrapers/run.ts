@@ -6,10 +6,11 @@
  * --limit N picks N products spread evenly across the sitemap (handy for testing).
  */
 import { mkdirSync, writeFileSync } from "node:fs";
+import { bordershop } from "./bordershop";
 import { poetzsch } from "./poetzsch";
 import type { ScrapedProduct, Scraper } from "./types";
 
-const SCRAPERS: Record<string, Scraper> = { poetzsch };
+const SCRAPERS: Record<string, Scraper> = { poetzsch, bordershop };
 
 function parseArgs(argv: string[]) {
   const shop = argv.find((a) => !a.startsWith("--"));

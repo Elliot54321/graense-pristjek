@@ -1,8 +1,18 @@
 import type { Quantity } from "./types";
 
-/** Parse a Danish/German decimal like "0,33" or "7.92". */
+/**
+ * Regex source for a price in shop text: "5,68", "7.92" or "1.142,79"
+ * (a dot as thousands separator when a decimal comma follows).
+ */
+export const PRICE_NUMBER = String.raw`\d{1,3}(?:\.\d{3})+,\d+|\d+(?:[.,]\d+)?`;
+
+/** Parse a Danish/German decimal like "0,33", "7.92" or "1.142,79". */
 export function parseDecimal(text: string): number | null {
-  const n = Number(text.trim().replace(/\s/g, "").replace(",", "."));
+  let s = text.trim().replace(/\s/g, "");
+  // With a decimal comma present, dots are thousands separators.
+  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
+  if (!s) return null;
+  const n = Number(s);
   return Number.isFinite(n) ? n : null;
 }
 

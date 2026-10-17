@@ -27,8 +27,8 @@ of truth. Read it when deciding what to work on.
 "Notes and findings"): Poetzsch and BorderShop are scrapable (both with EAN);
 Fleggaard/Calle sit behind Cloudflare bot protection – never try to bypass it.
 
-**Phase 1 – Data pipeline** in progress: Poetzsch scraper done (`src/scrapers/`,
-output to JSON). Next: BorderShop scraper, Supabase schema, then saving to the database.
+**Phase 1 – Data pipeline** in progress: Poetzsch and BorderShop scrapers done
+(`src/scrapers/`, output to JSON). Next: Supabase schema, then saving to the database.
 
 ## Stack
 

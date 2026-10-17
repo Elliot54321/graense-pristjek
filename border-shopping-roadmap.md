@@ -59,7 +59,7 @@ created: 2026-10-16
 **Goal:** Prices from two shops flowing into a database automatically.
 
 - [ ] Design schema: `shops`, `products`, `prices` (with timestamps for history), `product_matches`
-- [ ] Write one scraper module per shop (name, EAN, price, pack size, Pfand, URL, timestamp) (Poetzsch done in `src/scrapers/`; BorderShop next)
+- [ ] Write one scraper module per shop (name, EAN, price, pack size, Pfand, URL, timestamp) (Poetzsch and BorderShop done in `src/scrapers/`)
 - [ ] Add validation and alerts (zero products returned, price change over 50%)
 - [ ] Schedule scrapers (GitHub Actions or Vercel Cron)
 
@@ -206,3 +206,9 @@ Choose based on what Phase 5 showed:
 - Poetzsch's "Samlet indhold" field is rounded (0.034 kg shows as "0,03 kg"); the scraper uses the precise price-unit field instead.
 - Some products have no content data (e.g. "3 stks. pakke" sauce mixes) - price per unit stays unknown for those.
 - Product pages carry an "Avis Tilbud" badge for flyer offers; no before/after price was seen yet.
+- **BorderShop scraper works** (2026-10-17, `npm run scrape -- bordershop --limit 20`). Test run: 20/20 parsed, all with EAN; all 15 food/drink products have content and a unit price matching the shop's own. The other 5 were toys/electronics, which have no content.
+- BorderShop lists **~4,200 products**; a large share is wine, spirits, toys and travel items rather than groceries.
+- BorderShop shows offers clearly: the scraper stores the regular "Før" price and the offer end date ("Den nedsatte pris gælder indtil 03/11/26").
+- Many BorderShop products are **"Kan kun købes i butik"** (in-store only) - they still have price and EAN, and are exactly what border shoppers buy.
+- BorderShop's JSON-LD names are in English; the scraper uses the Danish page heading instead.
+- Prices over 1,000 kr. use a dot as thousands separator ("1.142,79") - number parsing handles this for both shops.

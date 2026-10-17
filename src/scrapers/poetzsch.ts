@@ -1,6 +1,6 @@
 import * as cheerio from "cheerio";
 import { fetchSitemap, fetchText, sitemapLocs } from "./http";
-import { parseDecimal, parseQuantity } from "./quantity";
+import { PRICE_NUMBER, parseDecimal, parseQuantity } from "./quantity";
 import type { ScrapedProduct, Scraper } from "./types";
 
 const BASE = "https://www.poetzsch-padborg.dk";
@@ -44,7 +44,7 @@ export function parseProductPage(html: string, url: string): ScrapedProduct | nu
   // "Grundpris: 5,68 kr. / liter"; products without content show 0, which means unknown.
   const basePriceText = $(".price-unit-reference-content").first().text();
   const pricePerUnit =
-    parseDecimal(basePriceText.match(/(\d+(?:[.,]\d+)?)\s*kr/)?.[1] ?? "") || null;
+    parseDecimal(basePriceText.match(new RegExp(`(${PRICE_NUMBER})\\s*kr`))?.[1] ?? "") || null;
 
   const categories = $('input[name*="[categoryNames]"]')
     .map((_, el) => $(el).attr("value") ?? "")
@@ -67,6 +67,8 @@ export function parseProductPage(html: string, url: string): ScrapedProduct | nu
     totalContent,
     pricePerUnit,
     onOffer: $(".wgtl-detail-badge--tilbud").length > 0,
+    regularPrice: null,
+    offerEndsAt: null,
     // Poetzsch charges no can deposit with an export declaration (see roadmap).
     pfand: null,
     scrapedAt: new Date().toISOString(),

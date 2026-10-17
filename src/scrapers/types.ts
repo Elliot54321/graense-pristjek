@@ -32,6 +32,10 @@ export interface ScrapedProduct {
   pricePerUnit: number | null;
   /** True when the shop marks the price as an offer. */
   onOffer: boolean;
+  /** Normal price when on offer ("Før 99,95"), if the shop shows it. */
+  regularPrice: number | null;
+  /** Last day the offer price applies (YYYY-MM-DD), if the shop shows it. */
+  offerEndsAt: string | null;
   /** Deposit per sellable unit, when the shop charges one; null if none is shown. */
   pfand: number | null;
   scrapedAt: string;
