@@ -32,6 +32,10 @@ saving to Supabase. First full run done (7,453 products, 749 EANs in both shops)
 Daily scraping runs on GitHub Actions (`.github/workflows/scrape.yml`, 02:00 UTC).
 Phase 1 is done once both shops have updated by themselves for a week (~2026-10-25).
 
+**Phase 2 – Matching** started: EAN matching done (`src/matching/ean.ts`, 746 products
+in both shops). Next: list the 50 most common items and check coverage, then
+fuzzy/LLM matching and a review view.
+
 ## Stack
 
 - **Next.js** (App Router, TypeScript, `src/` dir, Tailwind CSS v4), deployed on Vercel
@@ -44,6 +48,8 @@ Phase 1 is done once both shops have updated by themselves for a week (~2026-10-
 - `npm run dev` – dev server on http://localhost:3000
 - `npm run build` – production build (run before committing larger changes)
 - `npm run lint` – ESLint
+- `npm run match:ean` – one `products` row per EAN, links shop products to it
+  (idempotent; runs nightly after scraping)
 - `npm run scrape -- <shop> [--limit N] [--save]` – run a shop scraper; saves JSON
   to `data/scrapes/` (git-ignored), and with `--save` writes to Supabase and logs
   the run in `scrape_runs`. Needs the variables in `.env.example` set in `.env.local`.
@@ -59,6 +65,9 @@ Phase 1 is done once both shops have updated by themselves for a week (~2026-10-
 - `src/scrapers/save.ts` – writes to Supabase with the secret key: upserts products,
   adds a price row only when price/offer changed, warns on >50% price jumps
 - `src/scrapers/run.ts` – CLI that runs a scraper, writes JSON and optionally saves
+- `src/db/admin.ts` – Supabase admin client (secret key) and `fetchAll` pager
+- `src/matching/ean.ts` – EAN matching; same EAN with different content gets
+  confidence 0.6 for review
 
 ## Database
 

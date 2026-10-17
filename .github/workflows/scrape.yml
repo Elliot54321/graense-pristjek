@@ -1,4 +1,4 @@
-# Scrape every shop once a day and save to Supabase.
+# Scrape every shop once a day, save to Supabase, then match products by EAN.
 #
 # Needs these repository secrets (Settings -> Secrets and variables -> Actions):
 #   NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SECRET_KEY, SCRAPER_CONTACT_EMAIL
@@ -51,3 +51,22 @@ jobs:
           path: data/scrapes/
           retention-days: 7
           if-no-files-found: ignore
+
+  # Link newly seen products by EAN once all shops are scraped. Runs even if
+  # one shop failed, so the other shop's new products still get matched.
+  match:
+    needs: scrape
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm install --no-audit --no-fund
+      - run: npm run match:ean
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}

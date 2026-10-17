@@ -56,7 +56,8 @@ export function parseProductPage(html: string, url: string): ScrapedProduct | nu
     shopProductId: id,
     url,
     name,
-    brand: $('input[name$="[manufacturerName]"]').attr("value")?.trim() || null,
+    brand:
+      $('input[name$="[manufacturerName]"]').attr("value")?.trim() || specs.get("Mærke") || null,
     ean: $('meta[itemprop="gtin13"]').attr("content")?.trim() || null,
     categories,
     price,

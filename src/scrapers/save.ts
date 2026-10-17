@@ -1,20 +1,12 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { fetchAll } from "../db/admin";
 import type { ScrapedProduct } from "./types";
 
+export { adminClient } from "../db/admin";
+
 const BATCH_SIZE = 500;
-const PAGE_SIZE = 1000; // Supabase's default max rows per request
 /** A price change bigger than this (as a fraction) is reported as a warning. */
 const BIG_CHANGE = 0.5;
-
-/** Server-side client with the secret key: bypasses RLS, never use in the browser. */
-export function adminClient(): SupabaseClient {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SECRET_KEY;
-  if (!url || !key) {
-    throw new Error("Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SECRET_KEY in .env.local.");
-  }
-  return createClient(url, key, { auth: { persistSession: false } });
-}
 
 export interface RunSummary {
   urlsFound: number;
@@ -65,18 +57,15 @@ interface PriceRow {
 
 /** Latest price of every product in a shop, keyed by shop_products.id. */
 async function currentPrices(db: SupabaseClient, shop: string): Promise<Map<number, PriceRow>> {
-  const result = new Map<number, PriceRow>();
-  for (let from = 0; ; from += PAGE_SIZE) {
-    const { data, error } = await db
+  const rows = await fetchAll<PriceRow>((from, to) =>
+    db
       .from("current_prices")
       .select("shop_product_id, price, price_per_unit, on_offer, regular_price, offer_ends_at, pfand")
       .eq("shop_id", shop)
       .order("shop_product_id")
-      .range(from, from + PAGE_SIZE - 1);
-    if (error) throw error;
-    for (const row of data) result.set(row.shop_product_id, row);
-    if (data.length < PAGE_SIZE) return result;
-  }
+      .range(from, to),
+  );
+  return new Map(rows.map((row) => [row.shop_product_id, row]));
 }
 
 // Compare money as fixed 2-decimal strings so 5.68 vs "5.68" vs 5.680001 count as equal.

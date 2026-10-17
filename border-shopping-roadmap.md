@@ -71,7 +71,7 @@ created: 2026-10-16
 
 **Goal:** Know that shop A's product and shop B's product are the same thing.
 
-- [ ] Match by EAN first (most reliable)
+- [x] Match by EAN first (most reliable) (`npm run match:ean`, runs nightly after scraping)
 - [ ] Fuzzy/LLM matching on brand, type and size for the rest, with a confidence score
 - [x] Compute price per liter or kg for everything (done in the scrapers: price ÷ content)
 - [ ] Build a small admin view to review uncertain matches
@@ -241,3 +241,14 @@ Choose based on what Phase 5 showed:
 - GitHub emails the repo owner when a scheduled run fails. A run with only warnings (e.g. a >50% price jump) still counts as a success, so check `scrape_runs` for those until real alerts exist.
 - GitHub disables scheduled workflows in public repos after 60 days without repo activity.
 - **"Done when":** both shops update by themselves for a week - check `scrape_runs` around 2026-10-25.
+
+### Phase 2: EAN matching (2026-10-17)
+
+- `npm run match:ean` creates one `products` row per EAN and links every shop product to it in `product_matches` (method `ean`). Re-runs only add new products, refresh brand/content/category, and re-score unreviewed EAN matches. It runs in the nightly workflow after both shops are scraped.
+- First run: **6,702 products** from 7,453 shop products; **746 products are sold in both shops**.
+- Same EAN with different content gets confidence 0.6 instead of 1.0 so it can be reviewed. The first run flagged 19, which exposed scraper bugs:
+  - BorderShop sometimes shows nonsense content ("0,001 l." and "39.950,00 DKK / 1 l." for a 0,75 l wine). The scraper now falls back to the size in the product name when content is under 10 ml / 10 g.
+  - Poetzsch writes "1.250 gram" with a thousands dot; it was read as 1,25 g. Fixed for g/ml.
+  - Poetzsch's "Mærke" field is now used as brand.
+- Real differences remain flagged, e.g. Kijafa 0,75 l (Poetzsch) vs 0,7 l (BorderShop), and BorderShop data errors such as Polly Lakrids "400g" in the name but 0,1 kg in the content field. These need the review view.
+- The database still holds the old, wrong contents until the next nightly scrape; after that, matching should re-score the wine cases to 1.0.

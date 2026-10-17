@@ -1,12 +1,15 @@
 import * as cheerio from "cheerio";
 import { fetchSitemap, fetchText, sitemapLocs } from "./http";
-import { PRICE_NUMBER, parseDecimal, parseQuantity, unitPrice } from "./quantity";
+import { PRICE_NUMBER, parseDecimal, parseQuantity, quantityFromName, unitPrice } from "./quantity";
 import type { ScrapedProduct, Scraper } from "./types";
 
 const BASE = "https://www.bordershop.com";
 
 // Product URLs look like /da/puttgarden/harboe/harboe-exotic-24x0-33l-daase/p/000000000001769352/
 const PRODUCT_PATH = /^\/da\/[^/]+\/.+\/p\/(\d+)\/?$/;
+
+/** Less than 10 ml / 10 g in the order card is a data error on BorderShop's side. */
+const MIN_PLAUSIBLE_CONTENT = 0.01;
 
 async function listProductUrls(): Promise<string[]> {
   const index = await fetchSitemap(`${BASE}/en/global/sitemap.xml`);
@@ -58,7 +61,20 @@ export function parseProductPage(html: string, url: string): ScrapedProduct | nu
 
   // Order card: "<p>7,92 l.</p>", then "(6,31 DKK / 1 l.)" and, on offers, "Før 99,95 DKK".
   const card = $("#product-order-card");
-  const totalContent = parseQuantity(card.children("p").first().text());
+  const pack = packFromName(name);
+  // The card sometimes shows nonsense like "0,001 l." for a 0,75 l bottle; the
+  // name ("..., 0,75 L" or "24x0,33L") is right in those cases.
+  const cardContent = parseQuantity(card.children("p").first().text());
+  const nameContent = pack?.unitSize
+    ? {
+        amount: Math.round(pack.packCount * pack.unitSize.amount * 1e6) / 1e6,
+        unit: pack.unitSize.unit,
+      }
+    : quantityFromName(name);
+  const totalContent =
+    cardContent && (cardContent.unit === "piece" || cardContent.amount >= MIN_PLAUSIBLE_CONTENT)
+      ? cardContent
+      : (nameContent ?? cardContent);
 
   // The reference can be per 1 l / 1 kg or per e.g. 100 g, so convert to per base unit.
   const reference = card.find(".c-price-box__reference").first().text();
@@ -72,8 +88,6 @@ export function parseProductPage(html: string, url: string): ScrapedProduct | nu
   const regularPrice = onOffer
     ? parseDecimal(card.find(".c-price-box__info s").first().text().replace(/DKK/, ""))
     : null;
-
-  const pack = packFromName(name);
 
   return {
     shop: "bordershop",

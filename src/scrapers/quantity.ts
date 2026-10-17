@@ -30,14 +30,33 @@ const UNIT_FACTORS: Record<string, [Quantity["unit"], number]> = {
   stk: ["piece", 1],
 };
 
-/** Parse "0,33 liter", "500 g", "7.92 liter" into a normalized quantity. */
+const QUANTITY = new RegExp(`(${PRICE_NUMBER})\\s*([a-zA-Z]+)`, "g");
+
+/** Parse "0,33 liter", "500 g", "7.92 liter", "1.250 gram" into a normalized quantity. */
 export function parseQuantity(text: string | null | undefined): Quantity | null {
-  if (!text) return null;
-  const m = text.replace(/ /g, " ").match(/(\d+(?:[.,]\d+)?)\s*([a-zA-Z]+)/);
-  if (!m) return null;
-  const amount = parseDecimal(m[1]);
-  const unit = UNIT_FACTORS[m[2].toLowerCase()];
-  if (amount === null || !unit) return null;
+  return text ? quantities(text)[0] ?? null : null;
+}
+
+/** The last quantity in a product name, e.g. "Cava, 0,75L" or "Haribo ... 225g". */
+export function quantityFromName(name: string): Quantity | null {
+  return quantities(name).at(-1) ?? null;
+}
+
+/** All number + known unit pairs in a text, skipping things like "24 x". */
+function quantities(text: string): Quantity[] {
+  return [...text.replace(/\u00a0/g, " ").matchAll(QUANTITY)]
+    .map((m) => toQuantity(m[1], m[2]))
+    .filter((q): q is Quantity => q !== null);
+}
+
+function toQuantity(number: string, unitText: string): Quantity | null {
+  const unit = UNIT_FACTORS[unitText.toLowerCase()];
+  if (!unit) return null;
+  // "1.250 gram" uses a dot as thousands separator; for g/ml a decimal with
+  // exactly three digits after the dot would make no sense, so treat it as one.
+  const thousands = unit[1] < 1 && /^\d{1,3}(?:\.\d{3})+$/.test(number);
+  const amount = parseDecimal(thousands ? number.replace(/\./g, "") : number);
+  if (amount === null) return null;
   // Round away float noise such as 0.33 * 0.01.
   return { amount: Math.round(amount * unit[1] * 1e6) / 1e6, unit: unit[0] };
 }
