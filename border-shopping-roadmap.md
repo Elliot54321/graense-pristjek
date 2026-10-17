@@ -73,6 +73,7 @@ created: 2026-10-16
 
 - [x] Match by EAN first (most reliable) (`npm run match:ean`, runs nightly after scraping)
 - [ ] Fuzzy/LLM matching on brand, type and size for the rest, with a confidence score
+- [ ] Group products into **product families** (same drink/candy regardless of pack size) so baskets compare price per liter/kg - see "Decisions" below
 - [x] Compute price per liter or kg for everything (done in the scrapers: price ÷ content)
 - [ ] Build a small admin view to review uncertain matches
 
@@ -84,10 +85,11 @@ created: 2026-10-16
 
 **Goal:** A user types a shopping list and gets the cheapest shop.
 
+- [ ] Search bar: typing e.g. "cola" lists matching families (Coca-Cola, Pepsi, Harboe Cola...) with their **best price per liter** and **best price per specific pack** - the user picks a family or an exact pack before the comparison
 - [ ] Free-text input in Danish (e.g. "24 dåser cola, 2 kg kaffe")
 - [ ] LLM translates and maps to products
 - [ ] Show the interpretation and let the user correct it before calculating
-- [ ] Basket comparison: total per shop, unmatched items flagged
+- [ ] Basket comparison: total per shop, unmatched items flagged; compare **families by price per liter/kg** and show both "cheapest per liter" and "cheapest for the amount you want"
 - [ ] Simple mobile-first UI
 - [ ] Deploy to a real domain
 
@@ -277,3 +279,19 @@ Choose based on what Phase 5 showed:
 - Fresh meat such as **minced beef and pork** (only pet food and soups show up)
 - **Pick-and-mix candy** (bland selv slik)
 - Coffee and tobacco; Poetzsch has almost no household products
+
+### Decisions (2026-10-17)
+
+**Match once, remember.** Matches live in `product_matches` and are reused. Every matching step (EAN, fuzzy, LLM) only processes shop products that aren't linked yet, and never changes a match a human has reviewed. The first LLM pass over the ~7,000 existing products is a one-off; after that, each night only handles newly listed products. The common-items list will keep growing, but matching work doesn't grow with it.
+
+**Compare volume, not pack size.** Most shoppers don't need 0,33 l cans specifically - they want the cheapest cola (or beer, candy...) per liter/kg. So:
+- Add a level above `products`: a **product family** = the same drink/candy regardless of pack ("Coca-Cola original" covers 24x0,33 cans, 24x0,33 bottles, 6x1,5 l PET...). Planned as a `product_families` table and `products.family_id`.
+- The LLM matching step should assign families at the same time as it links products ("Carlsberg Grøn 24x0,33" -> family "Carlsberg Pilsner").
+- The basket compares **families by price per liter/kg** and picks the cheapest pack (or combination of packs) covering the wanted amount, across shops.
+- Show two answers: **cheapest per liter** and **cheapest for the amount you want** - a big pack can win per liter but cost more in total.
+- Optional preferences for users who care: e.g. cans only, no PET, sugar-free.
+- Measure coverage per family as well: Bacardi Carta Blanca (1 l at BorderShop, 1,5 l/3 l at Poetzsch) is comparable per liter even though no exact pack matches.
+
+**Search shows both best prices before comparing.** Typing "cola" lists the matching families, each with its best price per liter (and which pack/shop gives it) and the best price for each specific pack. The user then picks "any Coca-Cola, cheapest per liter" or "exactly 24x0,33 cans", and the basket comparison starts from that choice.
+- Store both as database **views** on top of `prices`, so they are never stale: `product_best_prices` (cheapest current price per exact product, and which shop) and `family_best_prices` (cheapest price per liter/kg per family, and which pack/shop). If they get slow, turn them into snapshots refreshed after the nightly scrape.
+- Families need **search words**, since nothing is named just "cola": e.g. "cola", "sodavand" for Coca-Cola; "øl", "pilsner" for Carlsberg Pilsner. The LLM step that assigns families can write them at the same time.

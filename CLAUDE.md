@@ -94,7 +94,16 @@ prices is the whole point of the site.
   the single-unit price.
 - **Compare per unit** (per liter / per kg) – pack sizes differ between shops.
 - **Match by EAN first.** Fuzzy/LLM matches need a confidence score, and uncertain
-  matches must be reviewable. A wrong match gives a wrong "cheapest" answer, which
+  matches must be reviewable. Matches are stored and reused: matching steps only
+  process unlinked shop products and never change human-reviewed matches.
+- **Compare families by price per liter/kg, not exact packs.** Shoppers want the
+  cheapest cola, not specifically 0,33 l cans. Products belong to a product family
+  (same item regardless of pack size); baskets pick the cheapest pack(s) for the
+  wanted amount and show both "cheapest per liter" and "cheapest for your amount".
+- **Search before comparing:** searching e.g. "cola" lists families with their best
+  price per liter and best price per specific pack; the user picks one, then the
+  basket compares. Best prices come from database views (`product_best_prices`,
+  `family_best_prices`) so they're never stale; families carry search words. A wrong match gives a wrong "cheapest" answer, which
   is the worst failure this product can have.
 - **Show the user what was matched** and let them correct it before calculating.
 - **Danish import limits** apply to alcohol and tobacco – warn when a basket exceeds them.
