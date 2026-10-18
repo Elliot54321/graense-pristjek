@@ -299,3 +299,23 @@ Choose based on what Phase 5 showed:
 ### Keys and accounts to renew
 
 - **Claude API key** (`ANTHROPIC_API_KEY` in `.env.local`, created 2026-10-18 at platform.claude.com) **expires around 2026-11-18.** Before then: create a new key in the Console (Settings -> API Keys), replace it in `.env.local`, and in the GitHub repo secret too if the nightly workflow uses it by then. Prepaid API credit at creation: $8.76.
+
+### Phase 2: LLM matching test (2026-10-18)
+
+`npm run match:llm-test -- <model> ...` (`src/matching/llm-test.ts`, prompt and schema in `src/matching/llm.ts`) gives a model 241 products in 5 blocks of look-alikes (sodas, energy drinks, beers, spirits, candy) and scores the cross-shop links against 80 known pairs: 58 linked by EAN plus 22 hand-checked pairs with different EANs. The prompt gives no product-specific hints. Nothing is written to the database.
+
+| | Haiku 5.5 | Sonnet 5.5 |
+|---|---|---|
+| Known pairs found | 29 / 80 | **75 / 80** |
+| Hand-checked, different EAN (the real job) | 7 / 22 | **21 / 22** |
+| Definitely wrong links | 1 | 2 |
+| Cost for 241 products | $0.015 | $0.137 |
+| Estimated full first run (~7,450 products) | ~$0.45 | ~$4.20, ~$2.10 with Batch API |
+
+- **Sonnet 5.5 is the clear choice.** It recognised "Carlsberg Grøn" = "Carlsberg Pilsner", "Sort Guld" = "Black Gold", "Tuborg Grøn" = "Tuborg Pilsner", German/English/Danish name variants, and wrote sensible Danish search words. Haiku 5.5 is cheap but far too cautious (it even kept "Tuborg Classic" and "Tuborg Classic 4,6 % 24 x 0,33L dåse" apart).
+- Sonnet's real mistake: Poetzsch "Heineken" (cans, 79,99 kr.) linked to BorderShop "Heineken øl 24x0,33L flaske" (bottles, 139,95 kr.). **Add a price sanity check:** a cross-shop link with the same pack but more than ~40% price difference goes to review instead of being trusted.
+- Its misses were mostly pairs EAN matching already links - the LLM only needs to handle unlinked products, so those don't matter in production.
+- "Pepsi Classic" and "Pepsi Cola" are two Poetzsch listings at the same price with different EANs; linking both to BorderShop's Pepsi Cola is probably right.
+- Test spend: ~$0.15 of the $8.76 API credit.
+
+**Next:** run Sonnet 5.5 over the whole catalog in blocks (category + brand), via the Batch API; save families, search words and links to the database with method `llm` and a confidence; send low-confidence and price-outlier links to review; keep nightly runs to new, unlinked products only.

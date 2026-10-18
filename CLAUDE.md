@@ -72,6 +72,9 @@ prices is the whole point of the site.
 - `src/db/admin.ts` – Supabase admin client (secret key) and `fetchAll` pager
 - `src/matching/ean.ts` – EAN matching; same EAN with different content gets
   confidence 0.6 for review
+- `src/matching/llm.ts` – LLM matching (families, variants, search words) with
+  structured output; `llm-test.ts` scores models on known pairs
+  (`npm run match:llm-test -- <model>`). Sonnet 5.5 chosen: 21/22 hard pairs vs Haiku 7/22.
 
 ## Database
 

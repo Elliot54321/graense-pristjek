@@ -43,3 +43,6 @@ next-env.d.ts
 
 # scraper output
 /data/scrapes
+
+# LLM test results
+/data/llm-tests
