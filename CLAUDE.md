@@ -32,16 +32,16 @@ saving to Supabase. First full run done (7,453 products, 749 EANs in both shops)
 Daily scraping runs on GitHub Actions (`.github/workflows/scrape.yml`, 02:00 UTC).
 Phase 1 is done once both shops have updated by themselves for a week (~2026-10-25).
 
-**Phase 2 – Matching** started: EAN matching done (`src/matching/ean.ts`, 746 products
-in both shops). Coverage: 81/120 common items matched by EAN, 26 more are the same
-product with a different EAN; categories 25–48% linked. Next: fuzzy/LLM matching on
-name + brand + size, then a review view. Broad coverage is the goal – comparing
+**Phase 2 – Matching**: EAN matching and a first full LLM run done (3,697 families with
+search words; 101/120 common items matched; categories 32–63% linked). Next: a review
+view for suggestions/low-confidence links, LLM matching for new products in the nightly
+run, and the ~280 products the first run skipped. Broad coverage is the goal – comparing
 prices is the whole point of the site.
 
 ## Stack
 
 - **Next.js** (App Router, TypeScript, `src/` dir, Tailwind CSS v4), deployed on Vercel
-- **Supabase** (Postgres, EU region) for shops, products, prices and matches
+- **Supabase** (Postgres, EU region) for shops, products, product families, prices and matches
 - **Scrapers:** one module per shop, run on a schedule (GitHub Actions or Vercel Cron)
 - **LLM API** for interpreting the Danish shopping list and fuzzy product matching
 
@@ -75,6 +75,10 @@ prices is the whole point of the site.
 - `src/matching/llm.ts` – LLM matching (families, variants, search words) with
   structured output; `llm-test.ts` scores models on known pairs
   (`npm run match:llm-test -- <model>`). Sonnet 5.5 chosen: 21/22 hard pairs vs Haiku 7/22.
+- `src/matching/llm-run.ts` – full LLM matching (`npm run match:llm -- plan | run | submit |
+  collect <batch-id>`). Only saves a link when confidence is high/medium, prices are within
+  40% and names don't mix bottle/can; otherwise writes a suggestion note on the match.
+  Always `--dry-run` first and read `data/llm-batches/last-links.txt` before saving.
 
 ## Database
 

@@ -10,7 +10,8 @@
     "scrape": "tsx --env-file-if-exists=.env.local src/scrapers/run.ts",
     "match:ean": "tsx --env-file-if-exists=.env.local src/matching/ean.ts",
     "match:coverage": "tsx --env-file-if-exists=.env.local src/matching/coverage.ts",
-    "match:llm-test": "tsx --env-file-if-exists=.env.local src/matching/llm-test.ts"
+    "match:llm-test": "tsx --env-file-if-exists=.env.local src/matching/llm-test.ts",
+    "match:llm": "tsx --env-file-if-exists=.env.local src/matching/llm-run.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",

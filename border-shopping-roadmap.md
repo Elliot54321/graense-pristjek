@@ -72,8 +72,8 @@ created: 2026-10-16
 **Goal:** Know that shop A's product and shop B's product are the same thing.
 
 - [x] Match by EAN first (most reliable) (`npm run match:ean`, runs nightly after scraping)
-- [ ] Fuzzy/LLM matching on brand, type and size for the rest, with a confidence score
-- [ ] Group products into **product families** (same drink/candy regardless of pack size) so baskets compare price per liter/kg - see "Decisions" below
+- [x] Fuzzy/LLM matching on brand, type and size for the rest, with a confidence score (`npm run match:llm`, Sonnet 5.5; first full run 2026-10-18)
+- [x] Group products into **product families** (same drink/candy regardless of pack size) so baskets compare price per liter/kg - see "Decisions" below (`product_families`, done by the LLM run)
 - [x] Compute price per liter or kg for everything (done in the scrapers: price ÷ content)
 - [ ] Build a small admin view to review uncertain matches
 
@@ -319,3 +319,17 @@ Choose based on what Phase 5 showed:
 - Test spend: ~$0.15 of the $8.76 API credit.
 
 **Next:** run Sonnet 5.5 over the whole catalog in blocks (category + brand), via the Batch API; save families, search words and links to the database with method `llm` and a confidence; send low-confidence and price-outlier links to review; keep nightly runs to new, unlinked products only.
+
+### Phase 2: full LLM matching run (2026-10-18)
+
+- Migration `20261018000000_product_families.sql` (applied in Supabase): `product_families` (name, category, search words), `products.family_id`, `product_matches.note`, and the views `matched_prices`, `product_best_prices` and `family_best_prices`.
+- `npm run match:llm -- plan | run | submit | collect <batch-id>` (`src/matching/llm-run.ts`): chunks of ~100 products per comparison category (soda, beer, candy, spirits, groceries, household - wine, toys and BorderShop's "More" left out), sorted so the same brand from both shops lands in the same chunk. Only products without a family are sent, so re-runs continue where they stopped.
+- **Safety rules** (a wrong link = a wrong "cheapest" answer): a link is only saved when the model says high/medium confidence, the prices within the variant are within 40% of each other, and the names don't mix bottles with cans. Otherwise the shop product keeps its own product and gets a note "LLM suggests same product as #...", for the review view. Reviewed and manual matches are never touched.
+- A 206-product soda dry run: 10 links saved (Fanta, Mirinda, Monster, Ramlösa, Pepsi bottles...), all correct; 1 suggestion. Earlier dry runs showed why the rules are needed: the model once merged still with sparkling water, different cocktail-mixer flavours with identical names, and a can with a bottle.
+- Full batch (`msgbatch_01Fhj2ZZnDijF1PBhYGbhHR6`): 51 chunks, 5,230 shop products, all succeeded. **Cost $1.85** (Batch API). Saved: **3,697 families with search words, 4,411 products with a family, 122 new links, 46 suggestions** for review.
+- Extra checks added after reading the full result: gift box vs plain, alcohol % differs, size differs >5% -> suggestion instead of link. They caught e.g. Crystal Head Vodka vs the gift-box version and Minttu 35% vs the 32% shot. Still linked but doubtful, for the review view: "Ritter Sport Butterbiscuit" <-> "Knusperkeks", "Captain Morgan Dark Rum" <-> "Dark Spiced Rum", "Ga-Jol Rød Original 100g" <-> "Cupholder".
+- 4 chunks came back with 60-74 products left out (candy-8, candy-10, spirits-36, groceries-39; ~280 products). They have no family yet; `npm run match:llm -- run --dry-run` picks them up.
+- **Result:** linked share of each category's smaller range: soda 48% -> **56%**, beer 44% -> **63%**, candy 35% -> 38%, spirits 25% -> 32%. Common items matched: 81 -> **101 / 120**.
+- **Search works end to end:** `family_best_prices` filtered on search word "cola" (public key) returns 12 families - Coca-Cola, Coca-Cola Zero, Pepsi Max, Harboe Cola, Jolly Cola... - each with its cheapest price per liter (e.g. Coca-Cola cheapest as 6 bottles at Poetzsch, 5,33 kr./l).
+- Total Claude API spend so far: ~$2.45 of $8.76.
+- Known gaps: brand names that differ at the start of the name across shops ("Albani Odense Pilsner" vs "Odense Pilsner") may land in different chunks; families with the same name in different chunks are merged when saving. Nightly runs don't include LLM matching yet - new products need a small `run` (or a nightly job) to get families.

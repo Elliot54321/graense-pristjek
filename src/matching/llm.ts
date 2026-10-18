@@ -25,7 +25,7 @@ export interface LlmProduct {
   category: string;
 }
 
-const MatchResult = z.object({
+export const MatchResult = z.object({
   families: z.array(
     z.object({
       family: z.string().describe("Danish display name of the product family, without pack size"),
@@ -34,6 +34,9 @@ const MatchResult = z.object({
         z.object({
           pack: z.string().describe('Pack description, e.g. "24 x 0,33 l dåse"'),
           ids: z.array(z.number()).describe("ids of the exact same product, from one or more shops"),
+          confidence: z
+            .enum(["high", "medium", "low"])
+            .describe("How sure you are that the ids are the exact same product (high if only one id)"),
         }),
       ),
     }),
@@ -58,7 +61,9 @@ Group the products below into product families, and inside each family into vari
 - Shops name the same product differently: different languages (Danish, German, English,
   Swedish), local or marketing names, alcohol percentages, pack details or none at all.
   Use your knowledge of these brands to recognise the same product.
-- Only group products you are confident are the same. When unsure, keep them apart.
+- Only group products you are confident are the same. When unsure, keep them apart. Give each
+  variant a confidence: high when you are sure, medium when very likely, low when plausible
+  but uncertain.
 - Every id must appear in exactly one variant.
 - Family names in Danish, without pack size. Search words: lowercase Danish words a
   shopper might type to find it, including generic ones (e.g. the product type).`;
@@ -76,32 +81,50 @@ export interface MatchCall {
   costUsd: number;
 }
 
+/** Request body for one block of products; used directly and in the Batch API. */
+export function matchRequest(model: string, products: LlmProduct[]) {
+  return {
+    model,
+    max_tokens: 16000,
+    output_config: { effort: "low" as const, format: zodOutputFormat(MatchResult) },
+    system: INSTRUCTIONS,
+    messages: [
+      {
+        role: "user" as const,
+        content: `id | shop | name | brand | content | category\n${formatProducts(products)}`,
+      },
+    ],
+  };
+}
+
+/** Parse the JSON text of a batch result (the Batch API has no parse helper). */
+export function parseMatchText(text: string): MatchResult {
+  return MatchResult.parse(JSON.parse(text));
+}
+
+export function costUsd(model: string, inputTokens: number, outputTokens: number, batch = false) {
+  const price = PRICES[model];
+  if (!price) return NaN;
+  return ((inputTokens * price.input + outputTokens * price.output) / 1e6) * (batch ? 0.5 : 1);
+}
+
 export async function matchProducts(
   client: Anthropic,
   model: string,
   products: LlmProduct[],
 ): Promise<MatchCall> {
-  const response = await client.messages.parse({
-    model,
-    max_tokens: 16000,
-    output_config: { effort: "low", format: zodOutputFormat(MatchResult) },
-    system: INSTRUCTIONS,
-    messages: [
-      { role: "user", content: `id | shop | name | brand | content | category\n${formatProducts(products)}` },
-    ],
-  });
+  const response = await client.messages.parse(matchRequest(model, products));
 
   if (response.stop_reason === "refusal") throw new Error(`${model} declined the request`);
   if (response.stop_reason === "max_tokens") throw new Error(`${model} ran out of output tokens`);
   if (!response.parsed_output) throw new Error(`${model} returned no parsable result`);
 
-  const price = PRICES[model];
   const { input_tokens, output_tokens } = response.usage;
   return {
     result: response.parsed_output,
     inputTokens: input_tokens,
     outputTokens: output_tokens,
-    costUsd: price ? (input_tokens * price.input + output_tokens * price.output) / 1e6 : NaN,
+    costUsd: costUsd(model, input_tokens, output_tokens),
   };
 }
 
