@@ -75,7 +75,7 @@ created: 2026-10-16
 - [x] Fuzzy/LLM matching on brand, type and size for the rest, with a confidence score (`npm run match:llm`, Sonnet 5.5; first full run 2026-10-18)
 - [x] Group products into **product families** (same drink/candy regardless of pack size) so baskets compare price per liter/kg - see "Decisions" below (`product_families`, done by the LLM run)
 - [x] Compute price per liter or kg for everything (done in the scrapers: price ÷ content)
-- [ ] Build a small admin view to review uncertain matches
+- [x] Build a small admin view to review uncertain matches (`/admin`, password in `ADMIN_PASSWORD`; LLM suggestions and LLM links - EAN matches with confidence 0.6 not shown yet)
 
 **Done when:** The common items (`src/matching/common-items.ts`, 120+ and growing) match correctly across both shops, and most of each category's shared range (soda, beer, candy/chocolate, spirits) is linked. Comparing prices is the whole point of the site, so broad coverage matters more than a short list.
 
@@ -333,3 +333,17 @@ Choose based on what Phase 5 showed:
 - **Search works end to end:** `family_best_prices` filtered on search word "cola" (public key) returns 12 families - Coca-Cola, Coca-Cola Zero, Pepsi Max, Harboe Cola, Jolly Cola... - each with its cheapest price per liter (e.g. Coca-Cola cheapest as 6 bottles at Poetzsch, 5,33 kr./l).
 - Total Claude API spend so far: ~$2.45 of $8.76.
 - Known gaps: brand names that differ at the start of the name across shops ("Albani Odense Pilsner" vs "Odense Pilsner") may land in different chunks; families with the same name in different chunks are merged when saving. Nightly runs don't include LLM matching yet - new products need a small `run` (or a nightly job) to get families.
+
+### Phase 2: admin review page (2026-10-18)
+
+- `/admin` (`src/app/admin/`) lists the open LLM **suggestions** (notes "LLM suggests same product as #...", 58 shop products from the 46 suggestions) and the unreviewed **LLM links** (127). Each card shows both sides with shop, content, price, price per unit and a link to the shop page. Mobile first; buttons are full width on a phone.
+- Actions (server actions, secret key only on the server; every action checks the login cookie because actions can be POSTed to directly):
+  - Suggestion **Link**: match points to the suggested product, method `manual`, confidence 1, reviewed, note cleared.
+  - Suggestion **Ikke den samme**: keeps the current product, reviewed, note becomes "Rejected in review: ..." so the reason is kept.
+  - LLM link **Bekræft**: reviewed.
+  - LLM link **Fjern link**: back to the shop product's own EAN product (method `ean`, reviewed); if there is none, a new product in the same family (method `manual`). Every shop product has an EAN so far, so the second path is untested on real data.
+  - Reviewed matches are skipped by every matching step, so decisions stick.
+- **Protection:** one password in `ADMIN_PASSWORD` (`.env.local`, and Vercel env vars when deployed). The cookie holds an HMAC of the password, httpOnly, `sameSite=strict`, path `/admin`, 30 days; changing the password logs everyone out. No password set = admin closed. Wrong passwords wait 1 s. The page is `noindex`.
+- Verified on real rows: linked Sierra Tequila Blanco (Poetzsch 4040 -> product 2806, price gap was an offer), rejected Crystal Head plain vs gift box (4416), confirmed Beefeater 1 l (5750), unlinked Captain Morgan Dark Rum from Dark *Spiced* Rum (4039 -> its own EAN product 3890).
+- Found: the secret-key role (`service_role`) has no grant on the views from the second migration (`matched_prices`, `product_best_prices`, `family_best_prices`) - "permission denied for view matched_prices". The admin page reads `product_matches` + `current_prices` instead; a small migration granting `select` on those views to `service_role` would fix it for server code later.
+- Noticed while testing: BorderShop lists all SMÅ-serien flavours under the same name ("SMÅ-serien, aromatiseret vodka, 16,4 %, 1,0L"), so those suggestions can only be decided by opening the shop page.

@@ -33,8 +33,8 @@ Daily scraping runs on GitHub Actions (`.github/workflows/scrape.yml`, 02:00 UTC
 Phase 1 is done once both shops have updated by themselves for a week (~2026-10-25).
 
 **Phase 2 – Matching**: EAN matching and a first full LLM run done (3,697 families with
-search words; 101/120 common items matched; categories 32–63% linked). Next: a review
-view for suggestions/low-confidence links, LLM matching for new products in the nightly
+search words; 101/120 common items matched; categories 32–63% linked). Review page at `/admin`
+done (suggestions and LLM links). Next: LLM matching for new products in the nightly
 run, and the ~280 products the first run skipped. Broad coverage is the goal – comparing
 prices is the whole point of the site.
 
@@ -79,6 +79,9 @@ prices is the whole point of the site.
   collect <batch-id>`). Only saves a link when confidence is high/medium, prices are within
   40% and names don't mix bottle/can; otherwise writes a suggestion note on the match.
   Always `--dry-run` first and read `data/llm-batches/last-links.txt` before saving.
+- `src/app/admin/` – review page `/admin` (password `ADMIN_PASSWORD`): LLM suggestions
+  (Link / Ikke den samme) and unreviewed LLM links (Bekræft / Fjern link). Server actions
+  in `actions.ts` write with the secret key and must each call `requireAdmin()` first.
 
 ## Database
 
