@@ -295,3 +295,7 @@ Choose based on what Phase 5 showed:
 **Search shows both best prices before comparing.** Typing "cola" lists the matching families, each with its best price per liter (and which pack/shop gives it) and the best price for each specific pack. The user then picks "any Coca-Cola, cheapest per liter" or "exactly 24x0,33 cans", and the basket comparison starts from that choice.
 - Store both as database **views** on top of `prices`, so they are never stale: `product_best_prices` (cheapest current price per exact product, and which shop) and `family_best_prices` (cheapest price per liter/kg per family, and which pack/shop). If they get slow, turn them into snapshots refreshed after the nightly scrape.
 - Families need **search words**, since nothing is named just "cola": e.g. "cola", "sodavand" for Coca-Cola; "øl", "pilsner" for Carlsberg Pilsner. The LLM step that assigns families can write them at the same time.
+
+### Keys and accounts to renew
+
+- **Claude API key** (`ANTHROPIC_API_KEY` in `.env.local`, created 2026-10-18 at platform.claude.com) **expires around 2026-11-18.** Before then: create a new key in the Console (Settings -> API Keys), replace it in `.env.local`, and in the GitHub repo secret too if the nightly workflow uses it by then. Prepaid API credit at creation: $8.76.

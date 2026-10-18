@@ -122,6 +122,7 @@ prices is the whole point of the site.
 
 - UI text is in **Danish**; code, comments and commit messages in **English**.
 - Mobile-first UI – people use this on their phone, in the car or in the shop.
+- The Claude API key expires around 2026-11-18 (see roadmap "Keys and accounts to renew").
 - Never commit secrets. Keys go in `.env.local` (git-ignored) locally and in GitHub
   repository secrets for the workflow. **The repo is public** – never commit
   anything you wouldn't want the shops or the internet to read.
