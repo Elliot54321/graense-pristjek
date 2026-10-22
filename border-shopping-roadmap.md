@@ -348,3 +348,11 @@ Choose based on what Phase 5 showed:
 - Verified on real rows: linked Sierra Tequila Blanco (Poetzsch 4040 -> product 2806, price gap was an offer), rejected Crystal Head plain vs gift box (4416), confirmed Beefeater 1 l (5750), unlinked Captain Morgan Dark Rum from Dark *Spiced* Rum (4039 -> its own EAN product 3890).
 - Found: the secret-key role (`service_role`) has no grant on the views from the second migration (`matched_prices`, `product_best_prices`, `family_best_prices`) - "permission denied for view matched_prices". The admin page reads `product_matches` + `current_prices` instead; a small migration granting `select` on those views to `service_role` would fix it for server code later.
 - Noticed while testing: BorderShop lists all SMÅ-serien flavours under the same name ("SMÅ-serien, aromatiseret vodka, 16,4 %, 1,0L"), so those suggestions can only be decided by opening the shop page.
+
+### Health check after the first week of nightly runs (2026-10-22)
+
+- 5/5 nightly GitHub runs succeeded (18-22 Oct, ~125 min each); 10 runs logged in `scrape_runs`, 9 ok and 1 warning (price jump on "Nordthy Kakao krymmel", 57,99 -> 20 kr.). GitHub starts the 02:00 UTC schedule around 06:45 - harmless.
+- ~8,000 price rows. After the one-off unit-price recalculation on 18 Oct, 5-34 real price changes per night.
+- The shops' catalogs shrink a little (BorderShop 3,713 -> 3,587 product pages in 4 days). **96 products hadn't been seen for 3+ days but their last price still counted** in the best-price views - a shopper could have been sent for something no longer sold. Fixed with migration `20261022000000_only_listed_products.sql`: `matched_prices` (and so both best-price views) only include products seen in the last 3 days. Nothing is deleted; returning products reappear.
+- Also fixed: the secret key couldn't read the views added on 18 Oct (only the public roles had been granted). Migration `20261022000001_service_role_view_access.sql` grants it and makes it the default for future tables/views.
+- Running cost: $0 per night (public repo = free GitHub Actions; Supabase free tier; no LLM calls at night yet). Claude API spent so far ~$2.45 of $8.76.

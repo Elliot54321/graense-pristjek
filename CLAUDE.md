@@ -23,21 +23,18 @@ of truth. Read it when deciding what to work on.
 - Update the "Current phase" line below when the phase changes.
 - Commit roadmap updates together with the work they describe.
 
-**Current phase:** Phase 0 – Groundwork. Shop data sources researched (see roadmap
-"Notes and findings"): Poetzsch and BorderShop are scrapable (both with EAN);
-Fleggaard/Calle sit behind Cloudflare bot protection – never try to bypass it.
-
-**Phase 1 – Data pipeline** in progress: Poetzsch and BorderShop scrapers done and
-saving to Supabase. First full run done (7,453 products, 749 EANs in both shops).
-Daily scraping runs on GitHub Actions (`.github/workflows/scrape.yml`, 02:00 UTC).
-Phase 1 is done once both shops have updated by themselves for a week (~2026-10-25).
-
-**Phase 2 – Matching**: EAN matching and a first full LLM run done (3,697 families with
-search words; 101/120 common items matched; categories 32–63% linked). Review page at `/admin`
-done (suggestions and LLM links); going through them is deferred to the final stages –
-don't push the user to review matches before then. Next: LLM matching for new products in the nightly
-run, and the ~280 products the first run skipped. Broad coverage is the goal – comparing
-prices is the whole point of the site.
+**Current phase:** Phase 1 (data pipeline) is running and finishes once both shops
+have updated by themselves for a week (~2026-10-25); Phase 2 (matching) is largely done.
+- Data: Poetzsch and BorderShop scraped nightly on GitHub Actions
+  (`.github/workflows/scrape.yml`, scheduled 02:00 UTC, GitHub usually starts it ~06:45),
+  ~7,400 products. Fleggaard/Calle sit behind Cloudflare bot protection – never try to
+  bypass it.
+- Matching: EAN plus a full LLM run (3,697 families with search words; 101/120 common
+  items matched; categories 32–63% linked). Review page at `/admin`; going through it is
+  deferred to the final stages – don't push the user to review matches before then.
+- Next: Phase 3 – the first usable version (search + basket comparison), plus LLM
+  matching for new products in the nightly run. Broad coverage is the goal – comparing
+  prices is the whole point of the site.
 
 ## Stack
 
@@ -90,7 +87,12 @@ prices is the whole point of the site.
   run it in the Supabase SQL Editor. Never edit a migration that has been applied.
 - Tables: `shops`, `shop_products` (a product as one shop lists it), `prices`
   (history, one row per change), `products` + `product_matches` (cross-shop matching),
-  `scrape_runs` (private run log). The `current_prices` view gives the latest price.
+  `scrape_runs` (private run log), `product_families`. `current_prices` = latest price
+  of every shop product (used by the scrapers); `matched_prices` and the best-price
+  views only include shop products **seen in the last 3 days**, so products a shop
+  removed are never recommended.
+- New tables/views get service_role access by default (since 2026-10-22); still grant
+  the public roles explicitly when something should be readable by the website.
 - RLS is on everywhere: public key = read only; secret key (`SUPABASE_SECRET_KEY`)
   is for scrapers/server code only and must never reach the browser.
 
