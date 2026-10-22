@@ -356,3 +356,24 @@ Choose based on what Phase 5 showed:
 - The shops' catalogs shrink a little (BorderShop 3,713 -> 3,587 product pages in 4 days). **96 products hadn't been seen for 3+ days but their last price still counted** in the best-price views - a shopper could have been sent for something no longer sold. Fixed with migration `20261022000000_only_listed_products.sql`: `matched_prices` (and so both best-price views) only include products seen in the last 3 days. Nothing is deleted; returning products reappear.
 - Also fixed: the secret key couldn't read the views added on 18 Oct (only the public roles had been granted). Migration `20261022000001_service_role_view_access.sql` grants it and makes it the default for future tables/views.
 - Running cost: $0 per night (public repo = free GitHub Actions; Supabase free tier; no LLM calls at night yet). Claude API spent so far ~$2.45 of $8.76.
+
+### Fleggaard / Calle answer (2026-10-22)
+
+- **Fleggaard replied that they don't allow data scraping.** This covers Calle too (same group, same website). Their sites will not be scraped - not with a bot, and not by working around Cloudflare.
+- Their prices are still needed: Fleggaard, Calle and Poetzsch are what a Padborg shopper actually chooses between, while BorderShop (Puttgarden) serves a different trip.
+- Their reply only says no to scraping the website; it doesn't mention other use of their prices.
+- **Plan: use their weekly offer newsletter.** The user saves each newsletter (PDF or exported email) in `data/newsletters/` (git-ignored - the repo is public); a script has Claude extract the offers (name, pack, price, multi-buy, valid dates); the user checks the list before it is saved as Fleggaard/Calle prices and matched to existing families. Offer prices expire on their end date instead of the "seen in the last 3 days" rule. Step 1: test the extraction on one real newsletter.
+- Open questions:
+  - Does their answer only forbid automated scraping, or any use of their prices on the site? Ask them directly whether prices from their public flyer/newsletter may be shown (with a link back to them).
+  - A flyer only covers that week's offers (typically 50-150 items), not the full range - fine for "this week's deals", not for a full basket comparison.
+  - Flyer aggregators (e.g. eTilbudsavis) have their own terms; reusing their data needs their permission or a partner agreement.
+
+### Fleggaard newsletter extraction test (2026-10-22)
+
+- Newsletter "Oktober 2" (`data/newsletters/fleggaard-2026-oktober-2.pdf`, git-ignored): 64 pages, 69 MB, made in InDesign. It is a **catalog of regular prices ("ALTID LAV PRIS") plus offers**, not just offers, and it includes items the webshops lack, such as **coffee** (Lavazza).
+- The PDF text layer is scrambled across columns and contains leftover template text (old dates, "2023"), so it can't be parsed on its own. Some pages have their prices only in the image.
+- `npm run flyer:extract -- <pdf> [--pages ...]` (`src/flyers/extract.ts`) renders each page to an image (poppler `pdftoppm`) and has Sonnet 5.5 read it, with the text layer as a hint for digits. Output: every product under a price, pack, price, price per liter/kg (and "max"), multi-buy ("3 ks. 155,-"), ALTID LAV PRIS, "SPAR x% ift. DK", "Ingen pant", limits, and the validity period printed on the page. Saved to `<pdf>.offers.json`; nothing goes to the database.
+- Test on 4 pages (front page, beers, a single item, premium wine/spirits): **20 offers, all correct** against the page images, including which badge belongs to which product. Validity: main newsletter 21/10-03/11, the premium wine/spirits section until 31/12. Cost **$0.08** -> ~$1.30 for the whole newsletter (~$0.65 with the Batch API).
+- Improvement for later: "Flere varianter" blocks picture more varieties than they name (e.g. Haribo Click Mix, Stjerne Mix, Vampyrer, Matador Mix...) - ask the model to list the visible varieties too, to help matching.
+- **Decision (2026-10-22): don't extract whole newsletters yet.** Their prices expire within ~2 weeks, so extracting before the site is live wastes money. Run the extraction on the current newsletter once the site is ready to show Fleggaard prices.
+- Still to decide before saving: how flyer prices are stored (Fleggaard and Calle as shops; prices valid until the printed end date instead of the "seen in the last 3 days" rule) and how they're matched to existing families.

@@ -47,3 +47,4 @@ next-env.d.ts
 # LLM test results
 /data/llm-tests
 /data/llm-batches
+/data/newsletters

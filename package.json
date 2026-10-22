@@ -11,7 +11,8 @@
     "match:ean": "tsx --env-file-if-exists=.env.local src/matching/ean.ts",
     "match:coverage": "tsx --env-file-if-exists=.env.local src/matching/coverage.ts",
     "match:llm-test": "tsx --env-file-if-exists=.env.local src/matching/llm-test.ts",
-    "match:llm": "tsx --env-file-if-exists=.env.local src/matching/llm-run.ts"
+    "match:llm": "tsx --env-file-if-exists=.env.local src/matching/llm-run.ts",
+    "flyer:extract": "tsx --env-file-if-exists=.env.local src/flyers/extract.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",

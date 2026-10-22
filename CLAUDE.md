@@ -29,6 +29,7 @@ have updated by themselves for a week (~2026-10-25); Phase 2 (matching) is large
   (`.github/workflows/scrape.yml`, scheduled 02:00 UTC, GitHub usually starts it ~06:45),
   ~7,400 products. Fleggaard/Calle sit behind Cloudflare bot protection – never try to
   bypass it.
+  Fleggaard has said no to data scraping (2026-10-22) - don't scrape their sites at all.
 - Matching: EAN plus a full LLM run (3,697 families with search words; 101/120 common
   items matched; categories 32–63% linked). Review page at `/admin`; going through it is
   deferred to the final stages – don't push the user to review matches before then.
@@ -77,6 +78,9 @@ have updated by themselves for a week (~2026-10-25); Phase 2 (matching) is large
   collect <batch-id>`). Only saves a link when confidence is high/medium, prices are within
   40% and names don't mix bottle/can; otherwise writes a suggestion note on the match.
   Always `--dry-run` first and read `data/llm-batches/last-links.txt` before saving.
+- `src/flyers/extract.ts` – reads a PDF newsletter page by page with Claude vision
+  (`npm run flyer:extract -- <pdf> [--pages ...]`), writes `<pdf>.offers.json` for review.
+  Newsletters live in `data/newsletters/` (git-ignored). Needs poppler (`pdftoppm`, `pdftotext`).
 - `src/app/admin/` – review page `/admin` (password `ADMIN_PASSWORD`): LLM suggestions
   (Link / Ikke den samme) and unreviewed LLM links (Bekræft / Fjern link). Server actions
   in `actions.ts` write with the secret key and must each call `requireAdmin()` first.
