@@ -33,8 +33,8 @@ have updated by themselves for a week (~2026-10-25); Phase 2 (matching) is large
 - Matching: EAN plus a full LLM run (3,697 families with search words; 101/120 common
   items matched; categories 32–63% linked). Review page at `/admin`; going through it is
   deferred to the final stages – don't push the user to review matches before then.
-- Next: Phase 3 – the first usable version (search + basket comparison), plus LLM
-  matching for new products in the nightly run. Broad coverage is the goal – comparing
+- Phase 3 started: search (`/`) and basket comparison (`/kurv`) work; first deploy to
+  Vercel pending. Also next: LLM matching for new products in the nightly run. Broad coverage is the goal – comparing
   prices is the whole point of the site.
 
 ## Stack
@@ -81,6 +81,11 @@ have updated by themselves for a week (~2026-10-25); Phase 2 (matching) is large
 - `src/flyers/extract.ts` – reads a PDF newsletter page by page with Claude vision
   (`npm run flyer:extract -- <pdf> [--pages ...]`), writes `<pdf>.offers.json` for review.
   Newsletters live in `data/newsletters/` (git-ignored). Needs poppler (`pdftoppm`, `pdftotext`).
+- `src/catalog/` – website data: `data.ts` (cached reads with the publishable key: search,
+  packs for a basket, shops), `compare.ts` (basket price per shop), `types.ts`
+- `src/app/page.tsx` – search; `src/app/kurv/` – basket (client) + `src/app/api/compare/`
+- `src/components/basket.ts` – basket in localStorage (`useBasket`, `addToBasket`, ...)
+- `src/db/public.ts` – read-only Supabase client (publishable key) for website code
 - `src/app/admin/` – review page `/admin` (password `ADMIN_PASSWORD`): LLM suggestions
   (Link / Ikke den samme) and unreviewed LLM links (Bekræft / Fjern link). Server actions
   in `actions.ts` write with the secret key and must each call `requireAdmin()` first.

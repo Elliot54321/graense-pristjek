@@ -86,13 +86,13 @@ created: 2026-10-16
 
 **Goal:** A user types a shopping list and gets the cheapest shop.
 
-- [ ] Search bar: typing e.g. "cola" lists matching families (Coca-Cola, Pepsi, Harboe Cola...) with their **best price per liter** and **best price per specific pack** - the user picks a family or an exact pack before the comparison
+- [x] Search bar: typing e.g. "cola" lists matching families (Coca-Cola, Pepsi, Harboe Cola...) with their **best price per liter** and **best price per specific pack** - the user picks a family or an exact pack before the comparison (`/`, first version 2026-10-22)
 - [ ] Free-text input in Danish (e.g. "24 dåser cola, 2 kg kaffe")
 - [ ] LLM translates and maps to products
 - [ ] Show the interpretation and let the user correct it before calculating
-- [ ] Basket comparison: total per shop, unmatched items flagged; compare **families by price per liter/kg** and show both "cheapest per liter" and "cheapest for the amount you want"
-- [ ] Simple mobile-first UI
-- [ ] Deploy to a real domain
+- [x] Basket comparison: total per shop, unmatched items flagged; compare **families by price per liter/kg** and show both "cheapest per liter" and "cheapest for the amount you want" (`/kurv`; whole packs only, mixing pack sizes not tried yet)
+- [x] Simple mobile-first UI
+- [ ] Deploy to a real domain (Vercel config in `vercel.json`, Frankfurt region; first deploy pending)
 
 **Done when:** You can use it on a real shopping trip and trust the answer.
 
@@ -377,3 +377,12 @@ Choose based on what Phase 5 showed:
 - Improvement for later: "Flere varianter" blocks picture more varieties than they name (e.g. Haribo Click Mix, Stjerne Mix, Vampyrer, Matador Mix...) - ask the model to list the visible varieties too, to help matching.
 - **Decision (2026-10-22): don't extract whole newsletters yet.** Their prices expire within ~2 weeks, so extracting before the site is live wastes money. Run the extraction on the current newsletter once the site is ready to show Fleggaard prices.
 - Still to decide before saving: how flyer prices are stored (Fleggaard and Calle as shops; prices valid until the printed end date instead of the "seen in the last 3 days" rule) and how they're matched to existing families.
+
+
+### Phase 3: first website version (2026-10-22)
+
+- **Search (`/`)**: matches families whose name has a word starting with the query, or whose search words contain all query words (a plain "contains" match found "Corny Big Chocolate" for "cola"). Ranked by how common: sold in more shops, then more pack sizes. Each family shows its best price per liter/kg and shop; each pack lists every shop's price, offers with end date, and a link to the shop. "Billigste i kurv" adds the family (we pick the pack), "Læg i kurv" adds an exact pack.
+- **Basket (`/kurv`)**: kept in the browser (localStorage, no login). Family lines are an amount ("18 l", +/- one pack size); exact packs a quantity. `/api/compare` prices it per shop: exact pack x quantity, or for a family the pack giving the lowest total for the amount (whole packs). Complete baskets rank first; a shop missing items says so and leaves them out of the total. Shop locations are shown, since Poetzsch (Padborg) and BorderShop (Puttgarden) are different trips.
+- Reads use the publishable key only and are cached for an hour (`'use cache'`); prices change once a night.
+- Tested on a phone-sized screen: "cola" search, adding Pepsi Max (9 l -> 18 l picks 2 x 6 x 1,5 l PET) and a Haribo tub; totals and the "missing" note are right.
+- Known gaps: Poetzsch "Haribo Matador Mix 1 kg" and BorderShop "Matador i bøtte, 1000g" aren't linked, so an exact pack shows as missing at the other shop (adding the family instead works around it); Fleggaard prices (from the newsletter) not in yet; no free-text shopping list yet.
