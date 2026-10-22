@@ -34,7 +34,8 @@ Phase 1 is done once both shops have updated by themselves for a week (~2026-10-
 
 **Phase 2 – Matching**: EAN matching and a first full LLM run done (3,697 families with
 search words; 101/120 common items matched; categories 32–63% linked). Review page at `/admin`
-done (suggestions and LLM links). Next: LLM matching for new products in the nightly
+done (suggestions and LLM links); going through them is deferred to the final stages –
+don't push the user to review matches before then. Next: LLM matching for new products in the nightly
 run, and the ~280 products the first run skipped. Broad coverage is the goal – comparing
 prices is the whole point of the site.
 
