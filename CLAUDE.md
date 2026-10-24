@@ -129,7 +129,8 @@ have updated by themselves for a week (~2026-10-25); Phase 2 (matching) is large
   is the worst failure this product can have.
 - **Show the user what was matched** and let them correct it before calculating.
 - **Danish import limits** apply to alcohol and tobacco – warn when a basket exceeds them.
-- Online prices can differ from in-store prices; treat this as a known risk.
+- Online prices are assumed to match the shelf (decided 2026-10-24) – don't ask the user
+  to verify them in store. Keep the short "may differ in store" note on the site.
 
 ## Scraping rules
 

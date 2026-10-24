@@ -22,7 +22,7 @@ created: 2026-10-16
 - [x] Pick 3-5 target shops (see shortlist below; researched in Notes and findings)
 - [x] Read `robots.txt` and terms of service for each shop
 - [x] For each shop, find the easiest data source: hidden JSON API, JSON-LD, sitemap, or HTML (see Notes and findings)
-- [ ] Compare ~10 products between website prices and in-store prices (shelf or receipt)
+- [x] ~~Compare ~10 products between website prices and in-store prices (shelf or receipt)~~ - dropped 2026-10-24: the prices come from the shops' own websites every night, so we assume they match the shelf
 - [x] Write a one-page project brief (goal, rules, stack) to give the AI tool as context (`CLAUDE.md`)
 - [x] Set up repo, Next.js project, Supabase project, Claude Code
 
@@ -142,7 +142,7 @@ Choose based on what Phase 5 showed:
 |---|---|
 | A shop blocks or changes its site | One module per shop, alerts, several shops so one failure doesn't kill the site |
 | Wrong product matches give wrong "cheapest" answers | EAN-first matching, review tools, show the user what was matched |
-| Online prices differ from in-store prices | Verify against the physical shop in Phase 0 |
+| Online prices differ from in-store prices | Assumed to match (prices come from the shops' own sites nightly; decided 2026-10-24). The site keeps a short "prices may differ in store" note |
 | Legal objections from a shop | Crawl politely, link back, be ready to remove a shop or ask permission |
 | Scope creep | Don't start Phase 4 until Phase 3 works, don't start Phase 6 until Phase 5 is done |
 
