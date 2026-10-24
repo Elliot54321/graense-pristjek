@@ -76,8 +76,9 @@ export function BasketView() {
         ))}
       </ol>
       <p className="mt-4 text-xs text-zinc-500">
-        Butikkerne ligger forskellige steder – Poetzsch i Padborg og BorderShop i Puttgarden (færgen Rødby–Puttgarden). Har en
-        butik ikke en vare, tæller den ikke med i totalen.
+        Butikkerne ligger forskellige steder: Fleggaard og Poetzsch ved Padborg/Harrislee, BorderShop i Puttgarden (færgen
+        Rødby–Puttgarden). Fleggaards priser kommer fra deres avis og gælder til avisens slutdato. Har en butik ikke en vare,
+        tæller den ikke med i totalen.
       </p>
     </>
   );
@@ -158,6 +159,11 @@ function ShopCard({ result, cheapest }: { result: ShopResult; cheapest: boolean 
               <>
                 <a href={l.buy.url} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 hover:underline">
                   {l.buy.quantity} × {l.buy.productName}
+                  {l.buy.multiBuy && (
+                    <span className="ml-1 text-xs text-sky-700 dark:text-sky-400">
+                      ({l.buy.multiBuy.quantity} for {kr(l.buy.multiBuy.price)})
+                    </span>
+                  )}
                   {l.buy.onOffer && (
                     <span className="ml-1 text-xs text-amber-700 dark:text-amber-400">
                       tilbud{l.buy.offerEndsAt ? ` til ${day(l.buy.offerEndsAt)}` : ""}

@@ -25,7 +25,8 @@ of truth. Read it when deciding what to work on.
 
 **Current phase:** Phase 1 (data pipeline) is running and finishes once both shops
 have updated by themselves for a week (~2026-10-25); Phase 2 (matching) is largely done.
-- Data: Poetzsch and BorderShop scraped nightly on GitHub Actions
+- Data: Fleggaard prices come from its newsletter (no scraping allowed), imported by hand per
+  issue (`data/newsletters/`, git-ignored). Poetzsch and BorderShop scraped nightly on GitHub Actions
   (`.github/workflows/scrape.yml`, scheduled 02:00 UTC, GitHub usually starts it ~06:45),
   ~7,400 products. Fleggaard/Calle sit behind Cloudflare bot protection – never try to
   bypass it.
@@ -78,6 +79,12 @@ have updated by themselves for a week (~2026-10-25); Phase 2 (matching) is large
   collect <batch-id>`). Only saves a link when confidence is high/medium, prices are within
   40% and names don't mix bottle/can; otherwise writes a suggestion note on the match.
   Always `--dry-run` first and read `data/llm-batches/last-links.txt` before saving.
+- `src/flyers/import.ts` – `npm run flyer:import -- <offers.json> --shop fleggaard --valid-to <date>
+  [--section 26-38:<date>]`: newsletter offers -> shop products/prices (with `listed_until`,
+  multi-buy, "spar %"). Then run `npm run match:new`.
+- `src/matching/llm-new.ts` – `npm run match:new [-- --dry-run]`: matches unmatched shop products
+  (and products without family) against existing products with Sonnet 5.5; shared safety
+  rules in `src/matching/safety.ts`.
 - `src/flyers/extract.ts` – reads a PDF newsletter page by page with Claude vision
   (`npm run flyer:extract -- <pdf> [--pages ...]`), writes `<pdf>.offers.json` for review.
   Newsletters live in `data/newsletters/` (git-ignored). Needs poppler (`pdftoppm`, `pdftotext`).

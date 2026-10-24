@@ -150,6 +150,14 @@ function PackRow({ pack, shops }: { pack: Pack; shops: Map<string, Shop> }) {
                   Tilbud{o.offerEndsAt ? ` til ${day(o.offerEndsAt)}` : ""}
                 </span>
               )}
+              {o.multiBuy && (
+                <span className="ml-1 rounded bg-sky-100 px-1 text-xs text-sky-900 dark:bg-sky-900 dark:text-sky-100">
+                  {o.multiBuy.quantity} for {kr(o.multiBuy.price)}
+                </span>
+              )}
+              {o.savingVsDkPercent !== null && (
+                <span className="ml-1 text-xs text-zinc-500">(butikken: spar {o.savingVsDkPercent}% ift. DK)</span>
+              )}
             </li>
           ))}
         </ul>

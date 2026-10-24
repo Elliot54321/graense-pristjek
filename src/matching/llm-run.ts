@@ -31,19 +31,13 @@ import {
   type MatchResult,
   parseMatchText,
 } from "./llm";
+import { linkDoubts } from "./safety";
 
 const MODEL = "claude-sonnet-5-5";
 const CHUNK_SIZE = 100;
 const MAX_CHUNK = 140; // allow a chunk to grow this far to keep a brand together
 const BATCH_SIZE = 500;
-/** Highest/lowest price above this ratio for one product across shops -> review. */
-const PRICE_OUTLIER = 1.4;
 const CONFIDENCE = { high: 0.9, medium: 0.75 } as const;
-const BOTTLE = /flask|flaske|\bfl\b|\bpet\b|bottle/i;
-const GIFT_BOX = /gaveæske|gave-?pakning|gift ?box|geschenk/i;
-const PERCENT = /(\d+(?:[.,]\d+)?)\s*%/;
-/** Contents further apart than this (as a fraction) are a different pack. */
-const SIZE_TOLERANCE = 0.05;
 const MANIFEST_DIR = "data/llm-batches";
 
 /** Comparison categories (wine, toys and "More" - mostly perfume and gadgets - left out). */
@@ -219,25 +213,16 @@ function addToPlan(plan: Plan, cat: Catalog, chunk: Chunk, result: MatchResult) 
 
       // Is this link safe to save, or only a suggestion for review?
       const shops = new Set(rows.map((r) => r.shop_id));
-      const prices = rows.map((r) => cat.prices.get(r.id)).filter((p): p is number => p !== undefined);
-      const ratio = prices.length > 1 ? Math.max(...prices) / Math.min(...prices) : 1;
-      const doubts: string[] = [];
-      if (variant.confidence === "low") doubts.push("low confidence");
-      if (shops.size > 1 && ratio > PRICE_OUTLIER) doubts.push(`price differs ${Math.round((ratio - 1) * 100)}%`);
-      const bottles = rows.filter((r) => BOTTLE.test(r.name)).length;
-      if (bottles && bottles < rows.length) doubts.push("bottle vs can");
-      const gifts = rows.filter((r) => GIFT_BOX.test(r.name)).length;
-      if (gifts && gifts < rows.length) doubts.push("gift box vs plain");
-      const percents = new Set(
-        rows.map((r) => r.name.match(PERCENT)?.[1]).filter(Boolean).map((p) => Number(p!.replace(",", "."))),
+      const doubts = linkDoubts(
+        rows.map((r) => ({
+          shopId: r.shop_id,
+          name: r.name,
+          contentAmount: r.content_amount === null ? null : Number(r.content_amount),
+          contentUnit: r.content_unit,
+          price: cat.prices.get(r.id),
+        })),
+        variant.confidence,
       );
-      if (percents.size > 1 && Math.max(...percents) - Math.min(...percents) > 0.5) doubts.push("alcohol % differs");
-      const sized = rows.filter((r) => r.content_amount !== null && Number(r.content_amount) > 0);
-      const units = new Set(sized.map((r) => r.content_unit));
-      const amounts = sized.map((r) => Number(r.content_amount));
-      if (units.size > 1 || (amounts.length > 1 && Math.max(...amounts) / Math.min(...amounts) > 1 + SIZE_TOLERANCE)) {
-        doubts.push("size differs");
-      }
       const describe = rows.map((x) => `${x.shop_id} "${x.name}" ${cat.prices.get(x.id) ?? "?"}`).join("  <->  ");
 
       if (doubts.length) {

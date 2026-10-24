@@ -38,6 +38,12 @@ export interface ScrapedProduct {
   offerEndsAt: string | null;
   /** Deposit per sellable unit, when the shop charges one; null if none is shown. */
   pfand: number | null;
+  /** Newsletter prices only: on sale until this date (YYYY-MM-DD), even if not seen again. */
+  listedUntil?: string | null;
+  /** Multi-buy deal, e.g. 3 for 155 kr. */
+  multiBuy?: { quantity: number; price: number } | null;
+  /** The shop's own "SPAR x% ift. DK" claim. */
+  savingVsDkPercent?: number | null;
   scrapedAt: string;
 }
 

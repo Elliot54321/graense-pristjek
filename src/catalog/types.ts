@@ -21,6 +21,10 @@ export interface Offer {
   offerEndsAt: string | null;
   url: string;
   observedAt: string;
+  /** Multi-buy deal from a newsletter, e.g. 3 for 174,99. */
+  multiBuy: { quantity: number; price: number } | null;
+  /** The shop's own "SPAR x% ift. DK" claim. */
+  savingVsDkPercent: number | null;
 }
 
 /** An exact product (one pack), with every shop's price. */
@@ -52,7 +56,16 @@ export interface LineResult {
   key: string;
   label: string;
   /** What to buy at this shop, or null if the shop doesn't have it. */
-  buy: { productName: string; quantity: number; price: number; url: string; onOffer: boolean; offerEndsAt: string | null } | null;
+  buy: {
+    productName: string;
+    quantity: number;
+    price: number;
+    url: string;
+    onOffer: boolean;
+    offerEndsAt: string | null;
+    /** Set when a multi-buy deal was used for (part of) the quantity. */
+    multiBuy: { quantity: number; price: number } | null;
+  } | null;
   cost: number | null;
 }
 

@@ -6,8 +6,20 @@
  * - A family with an amount ("Coca-Cola, 8 liter") is filled with the pack that
  *   gives the lowest total in that shop: whole packs only, so 8 liter from
  *   7,92 l cases means 2 cases. Mixing pack sizes is not tried yet.
+ * - Multi-buy deals ("3 for 174,99") are used for every full group of that size;
+ *   the rest is charged at the single price.
  */
-import type { BasketItem, LineResult, Pack, Shop, ShopResult } from "./types";
+import type { BasketItem, LineResult, Offer, Pack, Shop, ShopResult } from "./types";
+
+/** Cost of `quantity` packs, using a multi-buy deal for every full group when it's cheaper. */
+export function costFor(offer: Offer, quantity: number): { cost: number; usedMultiBuy: boolean } {
+  const single = quantity * offer.price;
+  const deal = offer.multiBuy;
+  if (!deal || quantity < deal.quantity) return { cost: single, usedMultiBuy: false };
+  const groups = Math.floor(quantity / deal.quantity);
+  const withDeal = groups * deal.price + (quantity - groups * deal.quantity) * offer.price;
+  return withDeal < single ? { cost: withDeal, usedMultiBuy: true } : { cost: single, usedMultiBuy: false };
+}
 
 /** Cheapest offer for a product in one shop (a shop can list the same product twice). */
 function offerAt(pack: Pack, shopId: string) {
@@ -19,11 +31,20 @@ function priceLine(item: BasketItem, packs: Pack[], shopId: string): LineResult 
     const pack = packs.find((p) => p.productId === item.productId);
     const offer = pack && offerAt(pack, shopId);
     if (!pack || !offer) return { key: item.key, label: item.label, buy: null, cost: null };
+    const { cost, usedMultiBuy } = costFor(offer, item.quantity);
     return {
       key: item.key,
       label: item.label,
-      buy: { productName: pack.name, quantity: item.quantity, price: offer.price, url: offer.url, onOffer: offer.onOffer, offerEndsAt: offer.offerEndsAt },
-      cost: item.quantity * offer.price,
+      buy: {
+        productName: pack.name,
+        quantity: item.quantity,
+        price: offer.price,
+        url: offer.url,
+        onOffer: offer.onOffer,
+        offerEndsAt: offer.offerEndsAt,
+        multiBuy: usedMultiBuy ? offer.multiBuy : null,
+      },
+      cost,
     };
   }
 
@@ -34,12 +55,20 @@ function priceLine(item: BasketItem, packs: Pack[], shopId: string): LineResult 
     if (!offer) continue;
     // Whole packs only; the small epsilon keeps 7,92 l / 7,92 l from becoming 2 packs.
     const quantity = Math.max(1, Math.ceil(item.amount / pack.contentAmount - 1e-9));
-    const cost = quantity * offer.price;
+    const { cost, usedMultiBuy } = costFor(offer, quantity);
     if (!best || cost < best.cost!) {
       best = {
         key: item.key,
         label: item.label,
-        buy: { productName: pack.name, quantity, price: offer.price, url: offer.url, onOffer: offer.onOffer, offerEndsAt: offer.offerEndsAt },
+        buy: {
+          productName: pack.name,
+          quantity,
+          price: offer.price,
+          url: offer.url,
+          onOffer: offer.onOffer,
+          offerEndsAt: offer.offerEndsAt,
+          multiBuy: usedMultiBuy ? offer.multiBuy : null,
+        },
         cost,
       };
     }

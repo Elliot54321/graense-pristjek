@@ -53,6 +53,9 @@ interface PriceRow {
   regular_price: number | null;
   offer_ends_at: string | null;
   pfand: number | null;
+  multi_buy_quantity: number | null;
+  multi_buy_price: number | null;
+  saving_vs_dk_percent: number | null;
 }
 
 /** Latest price of every product in a shop, keyed by shop_products.id. */
@@ -60,7 +63,9 @@ async function currentPrices(db: SupabaseClient, shop: string): Promise<Map<numb
   const rows = await fetchAll<PriceRow>((from, to) =>
     db
       .from("current_prices")
-      .select("shop_product_id, price, price_per_unit, on_offer, regular_price, offer_ends_at, pfand")
+      .select(
+        "shop_product_id, price, price_per_unit, on_offer, regular_price, offer_ends_at, pfand, multi_buy_quantity, multi_buy_price, saving_vs_dk_percent",
+      )
       .eq("shop_id", shop)
       .order("shop_product_id")
       .range(from, to),
@@ -80,6 +85,9 @@ function priceRow(id: number, p: ScrapedProduct): PriceRow {
     regular_price: p.regularPrice,
     offer_ends_at: p.offerEndsAt,
     pfand: p.pfand,
+    multi_buy_quantity: p.multiBuy?.quantity ?? null,
+    multi_buy_price: p.multiBuy?.price ?? null,
+    saving_vs_dk_percent: p.savingVsDkPercent ?? null,
   };
 }
 
@@ -90,7 +98,10 @@ function hasChanged(prev: PriceRow, next: PriceRow): boolean {
     prev.on_offer !== next.on_offer ||
     money(prev.regular_price) !== money(next.regular_price) ||
     prev.offer_ends_at !== next.offer_ends_at ||
-    money(prev.pfand) !== money(next.pfand)
+    money(prev.pfand) !== money(next.pfand) ||
+    (prev.multi_buy_quantity ?? null) !== (next.multi_buy_quantity ?? null) ||
+    money(prev.multi_buy_price) !== money(next.multi_buy_price) ||
+    money(prev.saving_vs_dk_percent) !== money(next.saving_vs_dk_percent)
   );
 }
 
@@ -131,6 +142,7 @@ export async function saveProducts(
           content_amount: p.totalContent?.amount ?? null,
           content_unit: p.totalContent?.unit ?? null,
           last_seen_at: now,
+          listed_until: p.listedUntil ?? null,
         })),
         { onConflict: "shop_id,shop_product_id" },
       )

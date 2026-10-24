@@ -21,12 +21,19 @@ import { z } from "zod";
 import { costUsd } from "../matching/llm";
 
 const IMAGE_WIDTH = 1150; // px; small print ("18 x 0,33 l.") stays readable
+const CONCURRENCY = 4;
 
 const Offer = z.object({
   products: z
     .array(z.string())
     .describe('Every product the price applies to, each fully named, e.g. "Royal XMAS", "Royal Blanche", "Royal IPA"'),
   more_variants: z.boolean().describe('True if the flyer says "Flere varianter" or similar'),
+  visible_variants: z
+    .array(z.string())
+    .describe("Further varieties you can clearly read on the pictured packs but that are not named in the text, fully named (e.g. \"Haribo Matador Mix\"); empty if none"),
+  category: z
+    .enum(["soda", "beer", "candy", "spirits", "wine", "groceries", "household", "other"])
+    .describe("soda incl. water, juice and energy drinks; candy incl. chocolate, chips and nuts; spirits incl. liqueurs; groceries = other food and coffee; household incl. cleaning, toiletries and pet food"),
   pack: z.string().describe('Pack as printed, e.g. "18 x 0,33 l." or "250-375 g."'),
   unit_count: z.number().nullable().describe("Number of items in the pack (18 for 18 x 0,33 l.), null if not stated"),
   unit_size: z.number().nullable().describe("Size of one item in liters or kg (0.33), null if a range or unknown"),
@@ -64,6 +71,8 @@ German side of the border, prices in DKK) and list every priced product on it.
 - One price often covers several products ("Royal XMAS, Blanche el. IPA", "Pepsi, Mirinda
   el. Mountain Dew"). List each product fully named ("Royal XMAS", "Royal Blanche",
   "Royal IPA"). If it also says "Flere varianter", set more_variants.
+- When the pictured packs show varieties the text doesn't name (e.g. a "Flere varianter" block
+  with several bags), list those you can clearly read in visible_variants. Don't guess.
 - Only list items with a price. Skip pure images, recipes, headings and store adverts.
 - Dates: only when this page prints a validity period ("Priserne gælder fra ... til og
   med ..."), and only from the image.`;
@@ -140,8 +149,14 @@ async function main() {
   const out: { page: number; result: PageResult }[] = [];
   let cost = 0;
   try {
-    for (const page of pages) {
-      const { result, cost: c, tokens } = await readPage(client, model, pdf, page, dir);
+    // A few pages at a time; results are printed in page order.
+    const done: { page: number; result: PageResult; cost: number; tokens: { input: number; output: number } }[] = [];
+    for (let i = 0; i < pages.length; i += CONCURRENCY) {
+      const batch = pages.slice(i, i + CONCURRENCY);
+      done.push(...(await Promise.all(batch.map(async (page) => ({ page, ...(await readPage(client, model, pdf, page, dir)) })))));
+      process.stderr.write(`  read ${Math.min(i + CONCURRENCY, pages.length)}/${pages.length} pages\n`);
+    }
+    for (const { page, result, cost: c, tokens } of done) {
       cost += c;
       out.push({ page, result });
       const dates = result.valid_from || result.valid_to ? ` | valid ${result.valid_from ?? "?"} - ${result.valid_to ?? "?"}` : "";
@@ -153,6 +168,7 @@ async function main() {
           o.saving_vs_dk_percent !== null && `spar ${o.saving_vs_dk_percent}%`,
           o.no_deposit && "ingen pant",
           o.more_variants && "flere varianter",
+          o.visible_variants.length && `+ ${o.visible_variants.join(" / ")}`,
           o.limit_note,
         ].filter(Boolean);
         console.log(
