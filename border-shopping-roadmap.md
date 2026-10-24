@@ -92,7 +92,7 @@ created: 2026-10-16
 - [ ] Show the interpretation and let the user correct it before calculating
 - [x] Basket comparison: total per shop, unmatched items flagged; compare **families by price per liter/kg** and show both "cheapest per liter" and "cheapest for the amount you want" (`/kurv`; whole packs only, mixing pack sizes not tried yet)
 - [x] Simple mobile-first UI
-- [ ] Deploy to a real domain (Vercel config in `vercel.json`, Frankfurt region; first deploy pending)
+- [ ] Deploy to a real domain (live on Vercel at https://graense-pristjek.vercel.app since 2026-10-24, auto-deploys on every push; own domain still to do)
 
 **Done when:** You can use it on a real shopping trip and trust the answer.
 
@@ -386,3 +386,5 @@ Choose based on what Phase 5 showed:
 - Reads use the publishable key only and are cached for an hour (`'use cache'`); prices change once a night.
 - Tested on a phone-sized screen: "cola" search, adding Pepsi Max (9 l -> 18 l picks 2 x 6 x 1,5 l PET) and a Haribo tub; totals and the "missing" note are right.
 - Known gaps: Poetzsch "Haribo Matador Mix 1 kg" and BorderShop "Matador i bøtte, 1000g" aren't linked, so an exact pack shows as missing at the other shop (adding the family instead works around it); Fleggaard prices (from the newsletter) not in yet; no free-text shopping list yet.
+- **Live (2026-10-24):** https://graense-pristjek.vercel.app - search, basket, `/api/compare` and the `/admin` login all work in production. Environment variables in Vercel (Settings -> Environment Variables): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` (admin only), `ADMIN_PASSWORD`. Vercel's free Hobby plan is for non-commercial use.
+- Search ranking needs work: "carlsberg" shows Carlsberg Brewmasters IPA first, not Carlsberg Pilsner. "Sold in both shops / number of packs" is too crude a stand-in for popularity.

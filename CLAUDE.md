@@ -33,8 +33,8 @@ have updated by themselves for a week (~2026-10-25); Phase 2 (matching) is large
 - Matching: EAN plus a full LLM run (3,697 families with search words; 101/120 common
   items matched; categories 32–63% linked). Review page at `/admin`; going through it is
   deferred to the final stages – don't push the user to review matches before then.
-- Phase 3 started: search (`/`) and basket comparison (`/kurv`) work; first deploy to
-  Vercel pending. Also next: LLM matching for new products in the nightly run. Broad coverage is the goal – comparing
+- Phase 3 started: search (`/`) and basket comparison (`/kurv`) are live at
+  https://graense-pristjek.vercel.app (Vercel, deploys on every push to `main`). Also next: LLM matching for new products in the nightly run. Broad coverage is the goal – comparing
   prices is the whole point of the site.
 
 ## Stack
