@@ -95,6 +95,7 @@ after 8 unattended nightly runs; Phase 2 (matching) is largely done.
 - `src/app/page.tsx` – search; `src/app/kurv/` – basket (client) + `src/app/api/compare/`
 - `src/components/basket.ts` – basket in localStorage (`useBasket`, `addToBasket`, ...)
 - `src/db/public.ts` – read-only Supabase client (publishable key) for website code
+- `src/catalog/interpret.ts` – free-text list interpretation; **shelved, not used** (roadmap 2026-10-25)
 - `src/app/admin/` – review page `/admin` (password `ADMIN_PASSWORD`): LLM suggestions
   (Link / Ikke den samme) and unreviewed LLM links (Bekræft / Fjern link). Server actions
   in `actions.ts` write with the secret key and must each call `requireAdmin()` first.

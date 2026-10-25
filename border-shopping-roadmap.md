@@ -87,9 +87,9 @@ created: 2026-10-16
 **Goal:** A user types a shopping list and gets the cheapest shop.
 
 - [x] Search bar: typing e.g. "cola" lists matching families (Coca-Cola, Pepsi, Harboe Cola...) with their **best price per liter** and **best price per specific pack** - the user picks a family or an exact pack before the comparison (`/`, first version 2026-10-22)
-- [ ] Free-text input in Danish (e.g. "24 dåser cola, 2 kg kaffe")
-- [ ] LLM translates and maps to products
-- [ ] Show the interpretation and let the user correct it before calculating
+- [ ] Free-text input in Danish (e.g. "24 dåser cola, 2 kg kaffe") - **shelved 2026-10-25, revisit in the final stages if relevant**
+- [ ] LLM translates and maps to products (shelved, see above)
+- [ ] Show the interpretation and let the user correct it before calculating (shelved, see above)
 - [x] Basket comparison: total per shop, unmatched items flagged; compare **families by price per liter/kg** and show both "cheapest per liter" and "cheapest for the amount you want" (`/kurv`; whole packs only, mixing pack sizes not tried yet)
 - [x] Simple mobile-first UI
 - [ ] Deploy to a real domain (live on Vercel at https://graense-pristjek.vercel.app since 2026-10-24, auto-deploys on every push; own domain still to do)
@@ -419,3 +419,10 @@ Choose based on what Phase 5 showed:
   - "Tuborg Grøn" and "Tuborg Pilsner" are separate families although they're the same beer (one of the 6 "same product, not linked" common items) - for the review stage.
   - Some newsletter families carry the pack in the name ("Faxe Kondi 24 x 0,33 l.", "Gordon's Gin 1 l. 17-37,5%.") because `match:new` falls back to the product name.
   - Some BorderShop products have a marketing sentence as their name ("En raffineret single malt, der ...") - the scraper should prefer a better name source for those pages.
+
+### Free-text shopping list - shelved (2026-10-25)
+
+- Started, then shelved by decision: the search + basket already cover the need; revisit in the final stages if relevant.
+- What exists: `src/catalog/interpret.ts` (not wired to any page or API) - Claude splits a Danish list into items with search words and one amount (liters, kg or packs; "24 dåser" = 7,92 l, "2 ks" = 2 cases, "en flaske gin" = 1). The plan was: the site's own search suggests families per item, the user corrects them on a `/liste` page, then everything goes into the basket.
+- Model test on 4 realistic lists: **Haiku, Sonnet and Opus 5.5 gave the same items and amounts.** Cost per list: Haiku $0.0002, Sonnet $0.004, Opus $0.008 (Opus ~1 s slower). The model choice is still open - it's the user's call; the module reads it from `LIST_MODEL`.
+- When picking it up again: a public endpoint spends API money per visitor, so cap text length, limit calls per visitor, cache identical lists, and add `ANTHROPIC_API_KEY` in Vercel.
