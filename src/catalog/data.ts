@@ -7,9 +7,12 @@
  */
 import { cacheLife } from "next/cache";
 import { publicClient } from "@/db/public";
+import { finalScore, preScore } from "./ranking";
 import type { FamilyResult, Offer, Pack, Shop, Unit } from "./types";
 
 const MAX_FAMILIES = 30;
+/** Families fetched for a query before ranking (broad words like "øl" match hundreds). */
+const MAX_CANDIDATES = 400;
 
 interface ProductRow {
   id: number;
@@ -105,8 +108,11 @@ async function loadPacks(productIds: number[], familyIds: number[]): Promise<Pac
 }
 
 /**
- * Families whose name has a word starting with the query, or whose search words
- * contain every word of the query ("pepsi max" -> {pepsi, max}).
+ * Families whose name has a word starting with the query (spaces and hyphens
+ * match each other), or whose search words contain every query word. Many
+ * families can match a broad word like "øl", so up to MAX_CANDIDATES are
+ * pre-ranked on name and search words, and only the best get prices loaded.
+ * Ranking: see ranking.ts.
  */
 export async function searchFamilies(rawQuery: string): Promise<FamilyResult[]> {
   "use cache";
@@ -114,17 +120,22 @@ export async function searchFamilies(rawQuery: string): Promise<FamilyResult[]> 
   const q = cleanQuery(rawQuery);
   if (q.length < 2) return [];
 
-  const words = q.split(" ");
+  const words = q.split(/[ -]/).filter(Boolean);
+  // "_" matches any single character, so "coca cola" also finds "Coca-Cola".
+  const pattern = q.replace(/[ -]/g, "_");
   const { data: families, error } = await publicClient()
     .from("product_families")
-    .select("id, name, category")
-    .or(`name.ilike.${q}*,name.ilike.* ${q}*,search_words.cs.{${words.join(",")}}`)
-    .limit(MAX_FAMILIES * 2);
+    .select("id, name, category, search_words")
+    .or(`name.ilike.${pattern}*,name.ilike.* ${pattern}*,name.ilike.*-${pattern}*,search_words.cs.{${words.join(",")}}`)
+    .limit(MAX_CANDIDATES);
   if (error) throw error;
   if (!families.length) return [];
 
-  const packs = await loadPacks([], families.map((f) => f.id));
-  const results: FamilyResult[] = families.map((f) => {
+  const pre = new Map(families.map((f) => [f.id, preScore(f.name, f.search_words ?? [], q)]));
+  const shortlist = [...families].sort((a, b) => pre.get(b.id)! - pre.get(a.id)!).slice(0, MAX_FAMILIES * 2);
+
+  const packs = await loadPacks([], shortlist.map((f) => f.id));
+  const results = shortlist.map((f) => {
     const own = packs.filter((p) => p.familyId === f.id);
     let best: FamilyResult["best"] = null;
     for (const pack of own) {
@@ -135,17 +146,17 @@ export async function searchFamilies(rawQuery: string): Promise<FamilyResult[]> 
         }
       }
     }
-    return { id: f.id, name: f.name, category: f.category, best, packs: own };
+    const shops = new Set(own.flatMap((p) => p.offers.map((o) => o.shopId))).size;
+    const result: FamilyResult = { id: f.id, name: f.name, category: f.category, best, packs: own };
+    return { result, score: finalScore(pre.get(f.id)!, shops, own.length) };
   });
 
-  // Families nobody sells right now are dropped. Ranking stands in for "how common":
-  // sold in more shops first, then more pack sizes, then names starting with the query.
-  const shopCount = (r: FamilyResult) => new Set(r.packs.flatMap((p) => p.offers.map((o) => o.shopId))).size;
-  const starts = (r: FamilyResult) => (r.name.toLowerCase().startsWith(q) ? 0 : 1);
+  // Families nobody sells right now are dropped.
   return results
-    .filter((r) => r.packs.length > 0)
-    .sort((a, b) => shopCount(b) - shopCount(a) || b.packs.length - a.packs.length || starts(a) - starts(b))
-    .slice(0, MAX_FAMILIES);
+    .filter((r) => r.result.packs.length > 0)
+    .sort((a, b) => b.score - a.score || a.result.name.length - b.result.name.length)
+    .slice(0, MAX_FAMILIES)
+    .map((r) => r.result);
 }
 
 /** Everything the basket comparison needs: the basket's exact products and all packs of its families. */

@@ -90,7 +90,8 @@ after 8 unattended nightly runs; Phase 2 (matching) is largely done.
   (`npm run flyer:extract -- <pdf> [--pages ...]`), writes `<pdf>.offers.json` for review.
   Newsletters live in `data/newsletters/` (git-ignored). Needs poppler (`pdftoppm`, `pdftotext`).
 - `src/catalog/` – website data: `data.ts` (cached reads with the publishable key: search,
-  packs for a basket, shops), `compare.ts` (basket price per shop), `types.ts`
+  packs for a basket, shops), `ranking.ts` (search scoring; bestsellers in `common-items.ts`),
+  `compare.ts` (basket price per shop), `types.ts`
 - `src/app/page.tsx` – search; `src/app/kurv/` – basket (client) + `src/app/api/compare/`
 - `src/components/basket.ts` – basket in localStorage (`useBasket`, `addToBasket`, ...)
 - `src/db/public.ts` – read-only Supabase client (publishable key) for website code

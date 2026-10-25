@@ -57,7 +57,8 @@ Group the products below into product families, and inside each family into vari
 - A FAMILY is the same product regardless of pack size or packaging, so it can be compared
   per liter or kg: e.g. a cola in 24 x 0,33 l cans and in 6 x 1,5 l bottles is one family
   with two variants. Regular and sugar-free versions are different families, and so are
-  regular and alcohol-free beers, and different flavours.
+  regular and alcohol-free beers, and different flavours. A family is ONE product - never a
+  catch-all such as "Andre spiritus" or "Diverse slik" for unrelated products.
 - Shops name the same product differently: different languages (Danish, German, English,
   Swedish), local or marketing names, alcohol percentages, pack details or none at all.
   Use your knowledge of these brands to recognise the same product.

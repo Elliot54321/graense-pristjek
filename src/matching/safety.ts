@@ -12,6 +12,16 @@ const BOTTLE = /flask|flaske|\bfl\b|\bpet\b|bottle/i;
 const GIFT_BOX = /gaveæske|gave-?pakning|gift ?box|geschenk/i;
 const PERCENT = /(\d+(?:[.,]\d+)?)\s*%/;
 
+/**
+ * Family names that group unrelated products ("Andre spiritus A-F" once lumped
+ * bourbon, vodka and port together - nonsense for price per liter).
+ */
+const CATCH_ALL = /^(andre|anden|diverse|øvrige|blandede? varer|forskellige|misc|other|various)\b|\b[a-zæøå]-[a-zæøå]$/i;
+
+export function isCatchAllFamilyName(name: string): boolean {
+  return CATCH_ALL.test(name.trim());
+}
+
 export interface LinkCandidate {
   shopId: string;
   name: string;

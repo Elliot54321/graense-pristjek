@@ -22,7 +22,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import { adminClient, fetchAll } from "../db/admin";
 import { costUsd } from "./llm";
-import { linkDoubts } from "./safety";
+import { isCatchAllFamilyName, linkDoubts } from "./safety";
 
 const MODEL = "claude-sonnet-5-5";
 const CHUNK_SIZE = 40;
@@ -104,7 +104,8 @@ For every NEW product decide:
   cola in cans and in bottles). Set it whenever a family fits, also with same_product_id.
 - new_family: only when no existing family fits. Give a Danish name without pack size and
   search words a shopper might type, including the product type. NEW products that belong
-  together get exactly the same new_family name.
+  together get exactly the same new_family name. A family is ONE product (e.g. "Four Roses
+  Bourbon"), never a catch-all like "Andre spiritus" or "Diverse slik".
 - confidence: high when sure, medium when very likely, low when plausible but uncertain.
 
 Shops name the same thing differently (languages, local names, with or without pack
@@ -249,7 +250,9 @@ async function main() {
         familyFor.set(item.id, d.family_id);
         report.joinedFamily++;
       } else {
-        const name = (d.new_family?.name ?? item.name).trim();
+        // A catch-all name ("Andre spiritus A-F") would mix unrelated products; use the product's own name.
+        const proposed = d.new_family?.name?.trim();
+        const name = proposed && !isCatchAllFamilyName(proposed) ? proposed : item.name.trim();
         const key = `${chunk.group}|${name.toLowerCase()}`;
         const fam = newFamilies.get(key) ?? { category: chunk.group, name, search_words: new Set<string>() };
         for (const w of d.new_family?.search_words ?? []) fam.search_words.add(w.trim().toLowerCase());

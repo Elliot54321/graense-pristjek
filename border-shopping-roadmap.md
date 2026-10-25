@@ -387,7 +387,7 @@ Choose based on what Phase 5 showed:
 - Tested on a phone-sized screen: "cola" search, adding Pepsi Max (9 l -> 18 l picks 2 x 6 x 1,5 l PET) and a Haribo tub; totals and the "missing" note are right.
 - Known gaps: Poetzsch "Haribo Matador Mix 1 kg" and BorderShop "Matador i bøtte, 1000g" aren't linked, so an exact pack shows as missing at the other shop (adding the family instead works around it); Fleggaard prices (from the newsletter) not in yet; no free-text shopping list yet.
 - **Live (2026-10-24):** https://graense-pristjek.vercel.app - search, basket, `/api/compare` and the `/admin` login all work in production. Environment variables in Vercel (Settings -> Environment Variables): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` (admin only), `ADMIN_PASSWORD`. Vercel's free Hobby plan is for non-commercial use.
-- Search ranking needs work: "carlsberg" shows Carlsberg Brewmasters IPA first, not Carlsberg Pilsner. "Sold in both shops / number of packs" is too crude a stand-in for popularity.
+- ~~Search ranking needs work~~ - improved 2026-10-25, see "Search ranking" below.
 
 ### Fleggaard prices live from the newsletter (2026-10-24)
 
@@ -408,3 +408,14 @@ Choose based on what Phase 5 showed:
 - **The nightly workflow now has a third job, `match-new`** (after `scrape` and `match`): `npm run match:new` gives new products a family and links them across shops, so they appear in search the next day. Same safety rules; doubtful links become suggestions for `/admin`. Nights without new products make no API calls. Expected cost about $0.001 per product, ~$0.20/month. It's a separate job, so if it fails (expired key, no credit) the prices are still saved and GitHub emails the failure. The run's link list is kept as an artifact for a week.
 - Considered and rejected: waiting until N new products pile up. Cost depends on the number of products, not runs, so it would save almost nothing and delay new (often seasonal) products by 1-2 weeks.
 - `ANTHROPIC_API_KEY` is now also a GitHub repository secret - **renew it there too** when the key is replaced (~2026-11-18).
+
+### Search ranking (2026-10-25)
+
+- Measured first on 18 typical queries (cola, coca cola, carlsberg, tuborg, pepsi, faxe, haribo, øl, red bull, monster, jägermeister, gin, vodka, chips, toms, marabou, kaffe, bland selv slik). Problems: "coca cola" found nothing (family is "Coca-Cola"); niche variants first (carlsberg -> 1883, faxe -> Energy, tuborg -> alkoholfri before Grøn); broad words found the wrong things (kaffe -> paper coffee cups, vodka -> "SMÅ-serien"); broad words like "øl" match hundreds of families but only the first 60 found were ranked.
+- New scoring (`src/catalog/ranking.ts`): text match (exact name > brand as first word > whole word > search word > word prefix) + common-items bonus (+40; **20 items marked `bestseller`** in `common-items.ts` get +65 - a guess at the Danish market, replace with real search data in Phase 5) - 4 per extra name word - 12 for alkoholfri/sukkerfri/zero variants unless searched for + 8 per shop + 2 per pack. Spaces and hyphens match each other. Up to 400 families are pre-ranked on name/search words; the best 60 get prices loaded.
+- After: cola -> Coca-Cola; coca cola -> Coca-Cola; carlsberg -> Carlsberg Pilsner; faxe -> Faxe Kondi; øl -> Royal/Tuborg/Harboe/Carlsberg pilsners; gin -> Bombay Sapphire, Gordon's; vodka -> Absolut, Smirnoff; kaffe -> real coffee; toms -> Guldkarameller; marabou -> Mælkechokolade.
+- **Found on the way:** the first LLM run had created one catch-all family, "Andre spiritus A-F" (35 unrelated spirits - bourbon, vodka, port...), which would have made "cheapest per liter" meaningless. Dissolved and re-matched with `match:new` ($0.05; 32 proper families). Both matching steps now tell the model never to make catch-all families, and `isCatchAllFamilyName` (in `safety.ts`) rejects names like "Andre ...", "Diverse ...", "Øvrige ...". A scan found no other such family.
+- Still open (data, not ranking):
+  - "Tuborg Grøn" and "Tuborg Pilsner" are separate families although they're the same beer (one of the 6 "same product, not linked" common items) - for the review stage.
+  - Some newsletter families carry the pack in the name ("Faxe Kondi 24 x 0,33 l.", "Gordon's Gin 1 l. 17-37,5%.") because `match:new` falls back to the product name.
+  - Some BorderShop products have a marketing sentence as their name ("En raffineret single malt, der ...") - the scraper should prefer a better name source for those pages.
