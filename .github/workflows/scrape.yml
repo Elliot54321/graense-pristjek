@@ -1,7 +1,8 @@
-# Scrape every shop once a day, save to Supabase, then match products by EAN.
+# Scrape every shop once a day, save to Supabase, match products by EAN, then
+# match new products (families, cross-shop links) with Claude.
 #
 # Needs these repository secrets (Settings -> Secrets and variables -> Actions):
-#   NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SECRET_KEY, SCRAPER_CONTACT_EMAIL
+#   NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SECRET_KEY, SCRAPER_CONTACT_EMAIL, ANTHROPIC_API_KEY
 #
 # Run it by hand from the Actions tab with "Run workflow".
 name: Daily scrape
@@ -70,3 +71,32 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+
+  # Give new products a family (and link them across shops) with Claude, so they
+  # show up in search. Its own job: if it fails (e.g. expired API key or no credit
+  # left), the scraped prices are already saved and GitHub emails the failure.
+  match-new:
+    needs: match
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm install --no-audit --no-fund
+      - run: npm run match:new
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      # What was linked and what became a suggestion, kept for a week.
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: match-new
+          path: data/llm-batches/last-new-links.txt
+          retention-days: 7
+          if-no-files-found: ignore

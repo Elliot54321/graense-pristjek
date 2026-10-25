@@ -23,11 +23,12 @@ of truth. Read it when deciding what to work on.
 - Update the "Current phase" line below when the phase changes.
 - Commit roadmap updates together with the work they describe.
 
-**Current phase:** Phase 1 (data pipeline) is running and finishes once both shops
-have updated by themselves for a week (~2026-10-25); Phase 2 (matching) is largely done.
+**Current phase:** Phase 3 (first usable version). Phase 1 (data pipeline) finished 2026-10-25
+after 8 unattended nightly runs; Phase 2 (matching) is largely done.
 - Data: Fleggaard prices come from its newsletter (no scraping allowed), imported by hand per
   issue (`data/newsletters/`, git-ignored). Poetzsch and BorderShop scraped nightly on GitHub Actions
-  (`.github/workflows/scrape.yml`, scheduled 02:00 UTC, GitHub usually starts it ~06:45),
+  (`.github/workflows/scrape.yml`: scrape -> EAN matching -> `match:new` for new products;
+  scheduled 02:00 UTC, GitHub usually starts it ~06:45),
   ~7,400 products. Fleggaard/Calle sit behind Cloudflare bot protection – never try to
   bypass it.
   Fleggaard has said no to data scraping (2026-10-22) - don't scrape their sites at all.
@@ -152,7 +153,8 @@ have updated by themselves for a week (~2026-10-25); Phase 2 (matching) is large
 
 - UI text is in **Danish**; code, comments and commit messages in **English**.
 - Mobile-first UI – people use this on their phone, in the car or in the shop.
-- The Claude API key expires around 2026-11-18 (see roadmap "Keys and accounts to renew").
+- The Claude API key expires around 2026-11-18 and lives in `.env.local` **and** as a GitHub
+  secret (nightly `match-new`) – replace both (see roadmap "Keys and accounts to renew").
 - Never commit secrets. Keys go in `.env.local` (git-ignored) locally and in GitHub
   repository secrets for the workflow. **The repo is public** – never commit
   anything you wouldn't want the shops or the internet to read.

@@ -164,6 +164,7 @@ async function main() {
     return !m || productById.get(m.product_id)?.family_id == null;
   });
   console.log(`${newItems.length} new shop products to match against ${candidates.length} existing products.`);
+  if (!newItems.length) return console.log("Nothing to match - no API calls made.");
 
   // Chunks per category, alphabetical so the same brand lands together.
   const chunks: { group: string; items: ShopRow[]; candidateIds: number[] }[] = [];

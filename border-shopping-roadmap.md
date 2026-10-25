@@ -59,7 +59,7 @@ created: 2026-10-16
 **Goal:** Prices from two shops flowing into a database automatically.
 
 - [x] Design schema: `shops`, `products`, `prices` (with timestamps for history), `product_matches` (plus `shop_products` and `scrape_runs`; see `supabase/migrations/`)
-- [ ] Write one scraper module per shop (name, EAN, price, pack size, Pfand, URL, timestamp) (Poetzsch and BorderShop done in `src/scrapers/`)
+- [x] Write one scraper module per shop (name, EAN, price, pack size, Pfand, URL, timestamp) (Poetzsch and BorderShop in `src/scrapers/`; Fleggaard comes from its newsletter instead)
 - [ ] Add validation and alerts (zero products returned, price change over 50%) (checks done and logged in `scrape_runs`; no notification yet)
 - [x] Schedule scrapers (GitHub Actions or Vercel Cron) (GitHub Actions, daily 02:00 UTC; first scheduled run 2026-10-18)
 
@@ -299,7 +299,7 @@ Choose based on what Phase 5 showed:
 
 ### Keys and accounts to renew
 
-- **Claude API key** (`ANTHROPIC_API_KEY` in `.env.local`, created 2026-10-18 at platform.claude.com) **expires around 2026-11-18.** Before then: create a new key in the Console (Settings -> API Keys), replace it in `.env.local`, and in the GitHub repo secret too if the nightly workflow uses it by then. Prepaid API credit at creation: $8.76.
+- **Claude API key** (`ANTHROPIC_API_KEY` in `.env.local` **and** the GitHub repository secret of the same name, created 2026-10-18 at platform.claude.com) **expires around 2026-11-18.** Before then: create a new key in the Console (Settings -> API Keys) and replace it in both places - otherwise the nightly `match-new` job starts failing. Prepaid API credit at creation: $8.76.
 
 ### Phase 2: LLM matching test (2026-10-18)
 
@@ -400,3 +400,11 @@ Choose based on what Phase 5 showed:
 - Claude API spend so far: ~$5.50 of $8.76.
 - Next time a newsletter arrives: save it in `data/newsletters/`, run `flyer:extract`, `flyer:import` (with its dates) and `match:new`. Not yet automatic.
 - `match:new` could also run nightly for new scraped products (cents per night), but that needs `ANTHROPIC_API_KEY` as a GitHub secret - not set up yet.
+
+### Phase 1 done; nightly matching of new products (2026-10-25)
+
+- **Phase 1 is complete:** 8 nightly runs in a row (18-25 Oct) succeeded without anyone touching them - the "done when" was a week. Only open Phase 1 item: alerts are logged in `scrape_runs` but nobody is notified yet.
+- New products per night over the first week: 0-19 (about 6 on average).
+- **The nightly workflow now has a third job, `match-new`** (after `scrape` and `match`): `npm run match:new` gives new products a family and links them across shops, so they appear in search the next day. Same safety rules; doubtful links become suggestions for `/admin`. Nights without new products make no API calls. Expected cost about $0.001 per product, ~$0.20/month. It's a separate job, so if it fails (expired key, no credit) the prices are still saved and GitHub emails the failure. The run's link list is kept as an artifact for a week.
+- Considered and rejected: waiting until N new products pile up. Cost depends on the number of products, not runs, so it would save almost nothing and delay new (often seasonal) products by 1-2 weeks.
+- `ANTHROPIC_API_KEY` is now also a GitHub repository secret - **renew it there too** when the key is replaced (~2026-11-18).
