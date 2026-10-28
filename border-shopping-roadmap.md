@@ -126,7 +126,7 @@ created: 2026-10-16
 
 Choose based on what Phase 5 showed:
 
-- [ ] More shops and more product coverage
+- [ ] More shops and more product coverage (overview of all relevant shops and data sources: "Shop landscape", 2026-10-28)
 - [ ] Look at the Swedish border as well (BorderShop already has Swedish-language sitemaps and sells many Swedish beers such as Norrlands, Pripps, Mariestads)
 - [ ] Price history and "on offer now" alerts
 - [ ] Saved shopping lists and a "my usual trip" feature
@@ -426,3 +426,32 @@ Choose based on what Phase 5 showed:
 - What exists: `src/catalog/interpret.ts` (not wired to any page or API) - Claude splits a Danish list into items with search words and one amount (liters, kg or packs; "24 dåser" = 7,92 l, "2 ks" = 2 cases, "en flaske gin" = 1). The plan was: the site's own search suggests families per item, the user corrects them on a `/liste` page, then everything goes into the basket.
 - Model test on 4 realistic lists: **Haiku, Sonnet and Opus 5.5 gave the same items and amounts.** Cost per list: Haiku $0.0002, Sonnet $0.004, Opus $0.008 (Opus ~1 s slower). The model choice is still open - it's the user's call; the module reads it from `LIST_MODEL`.
 - When picking it up again: a public endpoint spends API money per visitor, so cap text length, limit calls per visitor, cache identical lists, and add `ANTHROPIC_API_KEY` in Vercel.
+
+### Shop landscape for Danes at the German border (researched 2026-10-28)
+
+Grouped by crossing, since that's the trip a shopper chooses. Sources: chains' own sites, sparty.dk shop list, Fleggaard press releases, ScandiPark site, Bundestag/Folketing documents on deposit; see the conversation for links. Addresses change - verify before showing them on the site.
+
+**Padborg / Kruså / Harrislee (E45 and Kruså road) - the main area**
+
+| Shop | Where | Data | Status in project |
+|---|---|---|---|
+| Fleggaard (several stores: Padborg Industrieweg 49 - the former Otto Duborg, reopened 26 Jun 2026 with a big CandyKing pick-and-mix; Harrislee Industrieweg 27; Kruså Alte Zollstr. 44; Kobbermølle and Wassersleben) | Harrislee | Newsletter only (scraping refused) | **In** (newsletter) |
+| Calle (Kruså Lykberg 1, Harrislee) | Harrislee | Same group as Fleggaard; scraping refused; tested product had the same price | Not in - probably covered by Fleggaard's prices; check if Calle has its own newsletter |
+| Poetzsch (Padborg Industrieweg 40; Kruså Lykberg 1) | Harrislee | Website, EAN | **In** (nightly) |
+| **Scandinavian Park ("ScandiPark")** | Handewitt, right at the A7/E45 exit, ~10 km south | **Webshop (JTL-Shop) with EAN; robots.txt allows bots**; prices shown in EUR incl. German Pfand (the Danish DKK shop is gone); store itself sells deposit-free with export declaration; offer catalogue | **Best candidate to add** - check terms first |
+| Smaller: Sonja & Wolfgang, Grenzmarkt zur Krone (Ochsenweg 85), Nielsen Scan Shop (took over two Priss shops) | Harrislee | Nothing found online | Skip for now |
+| Otto Duborg | - | - | **Gone** - bought by Fleggaard (2026) |
+
+**Tønder crossings (Süderlügum / Aventoft)**: Fleggaard and Calle stores, Süderlügumer Zentralmarkt, Købmandsgården (Süderlügum). Fleggaard newsletter prices likely apply; the independents have no online data found.
+
+**Ferry routes**
+- Rødby-Puttgarden: **BorderShop Puttgarden** (**in**, nightly); Calle Burg and Heiligenhafen (Fleggaard group).
+- Gedser-Rostock: **BorderShop Rostock** at the terminal - the BorderShop webshop already offers Rostock as a pickup store, so the existing scraper could probably cover it.
+
+**City supermarkets (Flensburg, ~10 km from Padborg)**: Aldi Nord, Lidl, Netto, Penny (discounters); REWE, Edeka, Kaufland, famila. CITTI Markt Flensburg is closed after a fire.
+- **Drinks: usually not worth it.** Ordinary German shops must charge Pfand of EUR 0,25 per can/bottle (24 cans = EUR 6, about 45 kr.), which can't be refunded in Denmark; border shops sell deposit-free with the export declaration (a practice the EU Court of Justice let stand in 2023). Danish brands are also mostly at border shops.
+- **Groceries: possibly worth it** (meat, dairy, cheese, coffee, toiletries, cleaning) - the claim is common but no recent independent comparison was found. Worth testing with data before promising it on the site.
+- Data: discounters publish only weekly offer flyers; full shelf prices are mostly not online. REWE's Flensburg markets have an online shop (click & collect) with prices - the most complete source, terms to be checked. Flyer aggregators (kaufDA, marktguru) would need an agreement.
+- If added, the site needs a deposit rule: +EUR 0,25 per can/bottle at ordinary German shops, converted to DKK.
+
+**Suggested order:** (1) Scandinavian Park webshop, (2) BorderShop Rostock via the existing scraper, (3) a "Flensburg city" source for groceries (REWE online shop or flyers) together with the deposit rule, (4) Calle only if its prices turn out to differ from Fleggaard's.
