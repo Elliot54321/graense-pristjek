@@ -44,6 +44,16 @@ const GROUPS: Record<string, (r: ShopRow) => string | undefined> = {
   },
   bordershop: (r) =>
     ({ Beverages: "soda", Beer: "beer", "Candy and Snacks": "candy", Spirits: "spirits", Household: "household" })[r.categories[0]],
+  // Scandinavian Park: category path from its German webshop (wine and "sonstiges" left out).
+  scandipark: (r) => {
+    const c = r.categories[0] ?? "";
+    if (c === "getraenke/bier") return "beer";
+    if (/^getraenke\/(eistee|energy-drinks|weitere-getraenke)$/.test(c)) return "soda";
+    if (/^spirituosen\/(?!spirituosen-glaeser)|^skandinavische-produkte\/getraenke$/.test(c)) return "spirits";
+    if (/^suesswaren\/|^skandinavische-produkte\/suesswaren$|^lebensmittel\/(party-snacks|riegel)$/.test(c)) return "candy";
+    if (/^lebensmittel\/|^skandinavische-produkte\/(lebensmittel|essentials)$/.test(c)) return "groceries";
+    if (/^kosmetik\//.test(c)) return "household";
+  },
   // Newsletter products carry the comparison category directly.
   fleggaard: (r) => (["soda", "beer", "candy", "spirits", "groceries", "household"].includes(r.categories[0]) ? r.categories[0] : undefined),
 };

@@ -12,10 +12,11 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { bordershop } from "./bordershop";
 import { poetzsch } from "./poetzsch";
+import { scandipark } from "./scandipark";
 import { adminClient, finishRun, saveProducts, startRun, type RunSummary } from "./save";
 import type { ScrapedProduct, Scraper } from "./types";
 
-const SCRAPERS: Record<string, Scraper> = { poetzsch, bordershop };
+const SCRAPERS: Record<string, Scraper> = { poetzsch, bordershop, scandipark };
 
 /** More failed pages than this (as a fraction) marks the run as a warning. */
 const MAX_FAILURE_RATE = 0.1;
