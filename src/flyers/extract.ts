@@ -1,18 +1,21 @@
 /**
  * Extract prices from a shop's PDF newsletter/flyer with Claude (vision).
  *
- *   npm run flyer:extract -- data/newsletters/<file>.pdf [--pages 2,6,26] [--model claude-sonnet-5-5]
+ *   npm run flyer:extract -- data/newsletters/<file>.pdf [--pages 2,6,26] [--model claude-sonnet-5-5] [--direct]
  *
  * Fleggaard doesn't allow scraping their website, so their prices come from the
  * newsletter they send out. Each page is rendered to an image (poppler's
  * pdftoppm) and read by the model; the PDF's text layer is passed along only as
  * a hint for exact digits - it is scrambled and contains leftover template text.
  *
+ * Pages go through the Batch API by default (half price; the command waits for the
+ * result). --direct uses the normal API instead: full price, but no waiting in line.
+ *
  * Writes <pdf>.offers.json next to the PDF (git-ignored folder) and prints a
  * table. Nothing goes to the database - review the result first.
  */
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
@@ -21,7 +24,8 @@ import { z } from "zod";
 import { costUsd } from "../matching/llm";
 
 const IMAGE_WIDTH = 1150; // px; small print ("18 x 0,33 l.") stays readable
-const CONCURRENCY = 4;
+const CONCURRENCY = 4; // pages at a time with --direct
+const POLL_SECONDS = 60; // how often to check a batch
 
 const Offer = z.object({
   products: z
@@ -98,31 +102,112 @@ function pageText(pdf: string, page: number): string {
     .trim();
 }
 
-async function readPage(client: Anthropic, model: string, pdf: string, page: number, dir: string) {
+/** Request body for one page; used directly and in the Batch API. */
+function pageRequest(model: string, pdf: string, page: number, dir: string) {
   const image = readFileSync(renderPage(pdf, page, dir)).toString("base64");
-  const response = await client.messages.parse({
+  return {
     model,
     max_tokens: 16000,
-    output_config: { effort: "medium", format: zodOutputFormat(PageResult) },
+    output_config: { effort: "medium" as const, format: zodOutputFormat(PageResult) },
     system: INSTRUCTIONS,
     messages: [
       {
-        role: "user",
+        role: "user" as const,
         content: [
-          { type: "image", source: { type: "base64", media_type: "image/jpeg", data: image } },
-          { type: "text", text: `Page ${page}. Text layer (hint only):\n${pageText(pdf, page)}` },
+          { type: "image" as const, source: { type: "base64" as const, media_type: "image/jpeg" as const, data: image } },
+          { type: "text" as const, text: `Page ${page}. Text layer (hint only):\n${pageText(pdf, page)}` },
         ],
       },
     ],
-  });
-  if (response.stop_reason === "refusal") throw new Error(`Page ${page}: model declined`);
-  if (response.stop_reason === "max_tokens") throw new Error(`Page ${page}: ran out of output tokens`);
-  if (!response.parsed_output) throw new Error(`Page ${page}: no parsable result`);
-  return {
-    result: response.parsed_output,
-    cost: costUsd(model, response.usage.input_tokens, response.usage.output_tokens),
-    tokens: { input: response.usage.input_tokens, output: response.usage.output_tokens },
   };
+}
+
+type PageDone = { page: number; result: PageResult; cost: number; tokens: { input: number; output: number } };
+
+/** Turn a finished response into a page result, or throw with the reason it can't be used. */
+function pageDone(page: number, model: string, stopReason: string | null, usage: Anthropic.Usage, parsed: () => PageResult | null, batch: boolean): PageDone {
+  if (stopReason === "refusal") throw new Error(`Page ${page}: model declined`);
+  if (stopReason === "max_tokens") throw new Error(`Page ${page}: ran out of output tokens`);
+  const result = parsed();
+  if (!result) throw new Error(`Page ${page}: no parsable result`);
+  return {
+    page,
+    result,
+    cost: costUsd(model, usage.input_tokens, usage.output_tokens, batch),
+    tokens: { input: usage.input_tokens, output: usage.output_tokens },
+  };
+}
+
+/** Direct API: a few pages at a time, full price, result in minutes. */
+async function readDirect(client: Anthropic, model: string, pdf: string, pages: number[], dir: string): Promise<PageDone[]> {
+  const done: PageDone[] = [];
+  for (let i = 0; i < pages.length; i += CONCURRENCY) {
+    const batch = pages.slice(i, i + CONCURRENCY);
+    done.push(
+      ...(await Promise.all(
+        batch.map(async (page) => {
+          const r = await client.messages.parse(pageRequest(model, pdf, page, dir));
+          return pageDone(page, model, r.stop_reason, r.usage, () => r.parsed_output, false);
+        }),
+      )),
+    );
+    process.stderr.write(`  read ${Math.min(i + CONCURRENCY, pages.length)}/${pages.length} pages\n`);
+  }
+  return done;
+}
+
+/**
+ * Batch API: half price, but results come back when Anthropic gets to them (usually
+ * minutes, at most 24 hours). The batch id is saved in <pdf>.batch.json, so if this
+ * process is stopped, running the same command again picks the batch up instead of
+ * paying for a new one.
+ */
+async function readBatch(client: Anthropic, model: string, pdf: string, pages: number[], dir: string): Promise<PageDone[]> {
+  const manifestFile = pdf.replace(/\.pdf$/, ".batch.json");
+  let manifest: { batchId: string; model: string; pages: number[] };
+  if (existsSync(manifestFile)) {
+    manifest = JSON.parse(readFileSync(manifestFile, "utf8"));
+    console.log(`Picking up batch ${manifest.batchId} from ${manifestFile} (${manifest.pages.length} pages, ${manifest.model}).`);
+  } else {
+    const batch = await client.messages.batches.create({
+      requests: pages.map((page) => ({ custom_id: `page-${page}`, params: pageRequest(model, pdf, page, dir) })),
+    });
+    manifest = { batchId: batch.id, model, pages };
+    writeFileSync(manifestFile, JSON.stringify(manifest, null, 2));
+    console.log(`Submitted ${pages.length} pages as batch ${batch.id}; waiting for results (usually minutes, at most 24 h).`);
+  }
+
+  for (;;) {
+    const batch = await client.messages.batches.retrieve(manifest.batchId);
+    const c = batch.request_counts;
+    if (batch.processing_status === "ended") break;
+    process.stderr.write(`  ${new Date().toLocaleTimeString("da-DK")}: ${c.succeeded + c.errored}/${manifest.pages.length} pages done\n`);
+    await new Promise((r) => setTimeout(r, POLL_SECONDS * 1000));
+  }
+
+  const done: PageDone[] = [];
+  const problems: string[] = [];
+  for await (const item of await client.messages.batches.results(manifest.batchId)) {
+    const page = Number(item.custom_id.replace("page-", ""));
+    if (item.result.type !== "succeeded") {
+      problems.push(`Page ${page}: ${item.result.type}`);
+      continue;
+    }
+    const message = item.result.message;
+    try {
+      done.push(
+        pageDone(page, manifest.model, message.stop_reason, message.usage, () => {
+          const text = message.content.find((b) => b.type === "text");
+          return PageResult.parse(JSON.parse(text?.type === "text" ? text.text : ""));
+        }, true),
+      );
+    } catch (e) {
+      problems.push(String(e instanceof Error ? e.message : e).slice(0, 160));
+    }
+  }
+  for (const p of problems) console.warn(`  WARNING: ${p} - rerun with --pages ${p.match(/Page (\d+)/)?.[1] ?? "?"} --direct`);
+  rmSync(manifestFile);
+  return done.sort((a, b) => a.page - b.page);
 }
 
 function parsePages(arg: string | undefined, total: number): number[] {
@@ -138,7 +223,7 @@ async function main() {
   const pdf = args.find((a) => a.endsWith(".pdf"));
   const opt = (name: string) => (args.includes(name) ? args[args.indexOf(name) + 1] : undefined);
   if (!pdf) {
-    console.error("Usage: npm run flyer:extract -- <file.pdf> [--pages 2,6,26 | 1-10] [--model <id>]");
+    console.error("Usage: npm run flyer:extract -- <file.pdf> [--pages 2,6,26 | 1-10] [--model <id>] [--direct]");
     process.exit(1);
   }
   const model = opt("--model") ?? "claude-sonnet-5-5";
@@ -149,13 +234,9 @@ async function main() {
   const out: { page: number; result: PageResult }[] = [];
   let cost = 0;
   try {
-    // A few pages at a time; results are printed in page order.
-    const done: { page: number; result: PageResult; cost: number; tokens: { input: number; output: number } }[] = [];
-    for (let i = 0; i < pages.length; i += CONCURRENCY) {
-      const batch = pages.slice(i, i + CONCURRENCY);
-      done.push(...(await Promise.all(batch.map(async (page) => ({ page, ...(await readPage(client, model, pdf, page, dir)) })))));
-      process.stderr.write(`  read ${Math.min(i + CONCURRENCY, pages.length)}/${pages.length} pages\n`);
-    }
+    const done = args.includes("--direct")
+      ? await readDirect(client, model, pdf, pages, dir)
+      : await readBatch(client, model, pdf, pages, dir);
     for (const { page, result, cost: c, tokens } of done) {
       cost += c;
       out.push({ page, result });
@@ -183,7 +264,7 @@ async function main() {
   const file = pdf.replace(/\.pdf$/, `.offers.json`);
   writeFileSync(file, JSON.stringify({ pdf: path.basename(pdf), model, extractedAt: new Date().toISOString(), pages: out }, null, 2));
   const offers = out.reduce((n, p) => n + p.result.offers.length, 0);
-  console.log(`\n${offers} offers from ${out.length} pages. Cost: $${cost.toFixed(4)}. Saved to ${file}`);
+  console.log(`\n${offers} offers from ${out.length} pages. Cost: $${cost.toFixed(4)}${args.includes("--direct") ? "" : " (batch price)"}. Saved to ${file}`);
 }
 
 main().catch((e) => {

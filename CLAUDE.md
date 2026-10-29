@@ -87,7 +87,9 @@ after 8 unattended nightly runs; Phase 2 (matching) is largely done.
   (and products without family) against existing products with Sonnet 5.5; shared safety
   rules in `src/matching/safety.ts`.
 - `src/flyers/extract.ts` – reads a PDF newsletter page by page with Claude vision
-  (`npm run flyer:extract -- <pdf> [--pages ...]`), writes `<pdf>.offers.json` for review.
+  (`npm run flyer:extract -- <pdf> [--pages ...] [--direct]`), writes `<pdf>.offers.json` for review.
+  Uses the Batch API by default (half price; waits for the result, rerun the same command to resume);
+  `--direct` for the normal API.
   Newsletters live in `data/newsletters/` (git-ignored). Needs poppler (`pdftoppm`, `pdftotext`).
 - `src/catalog/` – website data: `data.ts` (cached reads with the publishable key: search,
   packs for a basket, shops), `ranking.ts` (search scoring; bestsellers in `common-items.ts`),

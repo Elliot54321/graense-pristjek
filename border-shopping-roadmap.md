@@ -398,7 +398,7 @@ Choose based on what Phase 5 showed:
 - Result: **133 links to existing products** (e.g. Coca-Cola, Pepsi Max, Ramlösa, Tuborg Squash, Monster, Brewmasters IPA, Harboe/Royal Classic, Mamba, No.1 Gin), 29 suggestions for review, 237 joined existing families, 666 new families, 542 new products. It also matched the ~280 products the first LLM run skipped - **0 unmatched products left**. Cost **$1.00** (estimated $0.65).
 - **672 Fleggaard prices are visible on the site** (all but the 85 wine products - wine isn't compared yet). Search shows multi-buy ("3 for 174,99") and the shop's "spar x% ift. DK" claim; the basket uses multi-buy deals for every full group (3 cases of Slots Pilsner = 174,99).
 - Claude API spend so far: ~$5.50 of $8.76.
-- Next time a newsletter arrives: save it in `data/newsletters/`, run `flyer:extract`, `flyer:import` (with its dates) and `match:new`. Not yet automatic.
+- Next time a newsletter arrives: save it in `data/newsletters/`, run `flyer:extract` (Batch API by default since 2026-10-29), `flyer:import` (with its dates) and `match:new`. Not yet automatic.
 - `match:new` could also run nightly for new scraped products (cents per night), but that needs `ANTHROPIC_API_KEY` as a GitHub secret - not set up yet.
 
 ### Phase 1 done; nightly matching of new products (2026-10-25)
@@ -439,8 +439,10 @@ Grouped by crossing, since that's the trip a shopper chooses. Sources: chains' o
 | Calle (Kruså Lykberg 1, Harrislee) | Harrislee | Same group as Fleggaard; scraping refused; tested product had the same price | Not in - probably covered by Fleggaard's prices; check if Calle has its own newsletter |
 | Poetzsch (Padborg Industrieweg 40; Kruså Lykberg 1) | Harrislee | Website, EAN | **In** (nightly) |
 | **Scandinavian Park ("ScandiPark")** | Handewitt, right at the A7/E45 exit, ~10 km south | **Webshop (JTL-Shop) with EAN; robots.txt allows bots**; prices shown in EUR incl. German Pfand (the Danish DKK shop is gone); store itself sells deposit-free with export declaration; offer catalogue | **Best candidate to add** - check terms first |
-| Smaller: Sonja & Wolfgang, Grenzmarkt zur Krone (Ochsenweg 85), Nielsen Scan Shop (took over two Priss shops) | Harrislee | Nothing found online | Skip for now |
+| Smaller: Sonja & Wolfgang, Grenzmarkt zur Krone (Ochsenweg 85), Nielsen Scan Shop (took over two Priss shops) | Harrislee | Nothing found online | **Not covered** (decided 2026-10-29): no online data, not worth the effort; maybe ask shops for internal price data later |
 | Otto Duborg | - | - | **Gone** - bought by Fleggaard (2026) |
+
+The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, Købmandsgården).
 
 **Tønder crossings (Süderlügum / Aventoft)**: Fleggaard and Calle stores, Süderlügumer Zentralmarkt, Købmandsgården (Süderlügum). Fleggaard newsletter prices likely apply; the independents have no online data found.
 
@@ -455,3 +457,9 @@ Grouped by crossing, since that's the trip a shopper chooses. Sources: chains' o
 - If added, the site needs a deposit rule: +EUR 0,25 per can/bottle at ordinary German shops, converted to DKK.
 
 **Suggested order:** (1) Scandinavian Park webshop, (2) BorderShop Rostock via the existing scraper, (3) a "Flensburg city" source for groceries (REWE online shop or flyers) together with the deposit rule, (4) Calle only if its prices turn out to differ from Fleggaard's.
+
+### Newsletter costs: Batch API instead of a local model (2026-10-29)
+
+- Fleggaard won't share full price files, so newsletters stay the source for it (and for Calle, if ever added). That makes newsletter reading one of the few running costs: "Oktober 2" cost $1.45 to read plus $1.00 to match (mostly one-time matching; later issues reuse the stable ids).
+- Considered a local vision model (e.g. Qwen-VL or Gemma 3 via Ollama on the M3/16 GB Mac): free per issue but slower and likely worse at tying prices and badges to the right product - a wrong price is the worst failure. **Deferred**; if tested, score it against Sonnet's checked "Oktober 2" extraction first.
+- **`flyer:extract` now uses the Batch API by default** (half price). The command waits for the result and keeps the batch id in `<pdf>.batch.json`, so rerunning it resumes instead of paying again; `--direct` uses the normal API. Test on pages 2, 6 and 26: results in ~3 minutes, the same 13 offers and prices as the earlier direct run, $0.03 (~$0.01 per page, so ~$0.70 for a 64-page issue).
