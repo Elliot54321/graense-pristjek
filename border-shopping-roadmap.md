@@ -520,3 +520,8 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
 - **Baseline before ScandiPark/Rostock matching caught up:** 99 of 120 common items linked across all shops that sell them, 15 partly, 3 not linked (Bacardi Carta Blanca 1 l, Toms Skildpadder, Ritter Sport Voll-Nuss), 2 in one shop only, 1 in none. Found/linked per shop: Poetzsch 117/113, BorderShop Puttgarden 110/107, ScandiPark 102/87, Fleggaard 45/40 (newsletter only), Rostock 2/2 (only 20 test products so far). Groceries and household are the weakest categories (2-40% comparable).
 - **To do:** run it again once Rostock's first full scrape and ScandiPark's LLM matching are done (2-3 nights from 2026-10-30), then fix the "partly"/"not linked" items.
 
+### Plan for 3 November (2026-10-30)
+
+- **Calle has its own newsletter**, separate from Fleggaard's (user, 2026-10-30); both new issues come out on 3 Nov, when Fleggaard's current issue expires. Calle needs its own shop row; its prices go through the same newsletter pipeline (`flyer:extract` -> `flyer:import --shop calle` -> `match:new`).
+- Same day: run `match:coverage` across all shops (Rostock and ScandiPark matching will have caught up by then) and fix the items that aren't fully linked.
+
