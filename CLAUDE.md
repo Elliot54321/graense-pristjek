@@ -26,7 +26,7 @@ of truth. Read it when deciding what to work on.
 **Current phase:** Phase 3 (first usable version). Phase 1 (data pipeline) finished 2026-10-25
 after 8 unattended nightly runs; Phase 2 (matching) is largely done.
 - Data: Fleggaard prices come from its newsletter (no scraping allowed), imported by hand per
-  issue (`data/newsletters/`, git-ignored). Poetzsch, BorderShop and Scandinavian Park scraped nightly on GitHub Actions
+  issue (`data/newsletters/`, git-ignored). Poetzsch, BorderShop (Puttgarden and Rostock) and Scandinavian Park scraped nightly on GitHub Actions
   (`.github/workflows/scrape.yml`: scrape -> EAN matching -> `match:new` for new products;
   scheduled 02:00 UTC, GitHub usually starts it ~06:45),
   ~9,800 products. Fleggaard/Calle sit behind Cloudflare bot protection – never try to
@@ -67,7 +67,8 @@ after 8 unattended nightly runs; Phase 2 (matching) is largely done.
 - `src/scrapers/quantity.ts` – number/quantity parsing and `unitPrice` (price ÷ content;
   shops' own unit prices are sometimes wrong, so only used when content is unknown)
 - `src/scrapers/<shop>.ts` – one module per shop; export the page parser separately
-  (`poetzsch.ts`, `bordershop.ts`, `scandipark.ts` – the last walks category pages, since product
+  (`poetzsch.ts`, `bordershop.ts` – one scraper per BorderShop store, `bordershop` = Puttgarden and
+  `bordershop-rostock`; `scandipark.ts` – the last walks category pages, since product
   pages carry no category; ~5,000 products take ~3 h, so the job timeout is 350 min)
 - `src/scrapers/save.ts` – writes to Supabase with the secret key: upserts products,
   adds a price row only when price/offer changed, warns on >50% price jumps

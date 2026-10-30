@@ -8,6 +8,15 @@ const BASE = "https://www.bordershop.com";
 // Product URLs look like /da/puttgarden/harboe/harboe-exotic-24x0-33l-daase/p/000000000001769352/
 const PRODUCT_PATH = /^\/da\/[^/]+\/.+\/p\/(\d+)\/?$/;
 
+/**
+ * BorderShop has two stores with one catalogue: Puttgarden (Rødby-Puttgarden ferry)
+ * and Rostock (Gedser-Rostock ferry). The store is the first path segment
+ * (/da/puttgarden/... or /da/rostock/...); regular prices are the same, but offers
+ * differ per store. The sitemap only lists Puttgarden URLs.
+ */
+const STORES = { bordershop: "puttgarden", "bordershop-rostock": "rostock" } as const;
+type ShopId = keyof typeof STORES;
+
 /** Less than 10 ml / 10 g in the order card is a data error on BorderShop's side. */
 const MIN_PLAUSIBLE_CONTENT = 0.01;
 
@@ -21,6 +30,9 @@ async function listProductUrls(): Promise<string[]> {
   }
   return [...new Set(urls.filter((u) => PRODUCT_PATH.test(new URL(u).pathname)))];
 }
+
+/** Same product page, another store: /da/puttgarden/... -> /da/rostock/... */
+const forStore = (url: string, store: string) => url.replace(/\/da\/[^/]+\//, `/da/${store}/`);
 
 interface JsonLdProduct {
   "@type"?: string;
@@ -49,7 +61,7 @@ function packFromName(name: string) {
 }
 
 /** Parse a BorderShop product page. Exported separately so it can be tested on saved HTML. */
-export function parseProductPage(html: string, url: string): ScrapedProduct | null {
+export function parseProductPage(html: string, url: string, shop: ShopId = "bordershop"): ScrapedProduct | null {
   const $ = cheerio.load(html);
   const id = new URL(url).pathname.match(PRODUCT_PATH)?.[1];
   const ld = readJsonLd($);
@@ -90,7 +102,7 @@ export function parseProductPage(html: string, url: string): ScrapedProduct | nu
     : null;
 
   return {
-    shop: "bordershop",
+    shop,
     shopProductId: id.replace(/^0+/, ""),
     url,
     name,
@@ -113,10 +125,17 @@ export function parseProductPage(html: string, url: string): ScrapedProduct | nu
   };
 }
 
-export const bordershop: Scraper = {
-  shop: "bordershop",
-  listProductUrls,
-  async scrapeProduct(url) {
-    return parseProductPage(await fetchText(url), url);
-  },
-};
+function storeScraper(shop: ShopId): Scraper {
+  return {
+    shop,
+    async listProductUrls() {
+      return (await listProductUrls()).map((u) => forStore(u, STORES[shop]));
+    },
+    async scrapeProduct(url) {
+      return parseProductPage(await fetchText(url), url, shop);
+    },
+  };
+}
+
+export const bordershop = storeScraper("bordershop");
+export const bordershopRostock = storeScraper("bordershop-rostock");

@@ -29,7 +29,7 @@ jobs:
     strategy:
       fail-fast: false # one broken shop must not stop the others
       matrix:
-        shop: [poetzsch, bordershop, scandipark]
+        shop: [poetzsch, bordershop, bordershop-rostock, scandipark]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5

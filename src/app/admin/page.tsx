@@ -10,7 +10,13 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-const SHOP_NAMES: Record<string, string> = { poetzsch: "Poetzsch", bordershop: "BorderShop" };
+const SHOP_NAMES: Record<string, string> = {
+  poetzsch: "Poetzsch",
+  bordershop: "BorderShop Puttgarden",
+  "bordershop-rostock": "BorderShop Rostock",
+  fleggaard: "Fleggaard",
+  scandipark: "Scandinavian Park",
+};
 
 const kr = (n: number) => n.toLocaleString("da-DK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const amount = (n: number) => n.toLocaleString("da-DK", { maximumFractionDigits: 3 });

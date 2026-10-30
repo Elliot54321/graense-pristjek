@@ -77,8 +77,8 @@ export function BasketView() {
       </ol>
       <p className="mt-4 text-xs text-zinc-500">
         Butikkerne ligger forskellige steder: Fleggaard og Poetzsch ved Padborg/Harrislee, Scandinavian Park ved motorvejen i
-        Handewitt, BorderShop i Puttgarden (færgen Rødby–Puttgarden). Fleggaards priser kommer fra deres avis og gælder til
-        avisens slutdato. Har en butik ikke en vare, tæller den ikke med i totalen.
+        Handewitt, BorderShop ved færgerne i Puttgarden (Rødby–Puttgarden) og Rostock (Gedser–Rostock). Fleggaards priser
+        kommer fra deres avis og gælder til avisens slutdato. Har en butik ikke en vare, tæller den ikke med i totalen.
       </p>
     </>
   );

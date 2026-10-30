@@ -44,6 +44,8 @@ const GROUPS: Record<string, (r: ShopRow) => string | undefined> = {
   },
   bordershop: (r) =>
     ({ Beverages: "soda", Beer: "beer", "Candy and Snacks": "candy", Spirits: "spirits", Household: "household" })[r.categories[0]],
+  // Rostock is the same BorderShop catalogue.
+  "bordershop-rostock": (r) => GROUPS.bordershop(r),
   // Scandinavian Park: category from its Danish click & collect shop (wine and "andre-varer" left out).
   scandipark: (r) => {
     const c = r.categories[0] ?? "";

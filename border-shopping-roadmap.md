@@ -127,7 +127,7 @@ created: 2026-10-16
 
 Choose based on what Phase 5 showed:
 
-- [ ] More shops and more product coverage (overview of all relevant shops and data sources: "Shop landscape", 2026-10-28; Scandinavian Park added 2026-10-29)
+- [ ] More shops and more product coverage (overview of all relevant shops and data sources: "Shop landscape", 2026-10-28; Scandinavian Park added 2026-10-29; BorderShop Rostock 2026-10-30)
 - [ ] Look at the Swedish border as well (BorderShop already has Swedish-language sitemaps and sells many Swedish beers such as Norrlands, Pripps, Mariestads)
 - [ ] Price history and "on offer now" alerts
 - [ ] Saved shopping lists and a "my usual trip" feature
@@ -449,7 +449,7 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
 
 **Ferry routes**
 - Rødby-Puttgarden: **BorderShop Puttgarden** (**in**, nightly); Calle Burg and Heiligenhafen (Fleggaard group).
-- Gedser-Rostock: **BorderShop Rostock** at the terminal - the BorderShop webshop already offers Rostock as a pickup store, so the existing scraper could probably cover it.
+- Gedser-Rostock: **BorderShop Rostock** at the terminal - **in** (nightly since 2026-10-30, shop id `bordershop-rostock`).
 
 **City supermarkets (Flensburg, ~10 km from Padborg)**: Aldi Nord, Lidl, Netto, Penny (discounters); REWE, Edeka, Kaufland, famila. CITTI Markt Flensburg is closed after a fire.
 - **Drinks: usually not worth it.** Ordinary German shops must charge Pfand of EUR 0,25 per can/bottle (24 cans = EUR 6, about 45 kr.), which can't be refunded in Denmark; border shops sell deposit-free with the export declaration (a practice the EU Court of Justice let stand in 2023). Danish brands are also mostly at border shops.
@@ -481,4 +481,13 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
 - The sitemap lists 6,811 products, but ~1,800 are marked Discontinued; walking the category pages (100 per page) finds the **~5,000 products actually on sale** and gives each a category. Product pages carry no category. A full run takes ~3 h at 2 s per page, so the scrape job's timeout is now 350 min.
 - Shop product ids are now `dk-<produktnummer>`, so the German webshop's rows aren't overwritten with different products; they stop being seen and drop out of comparisons. On 2026-10-30 their `last_seen_at` was set back to 2026-10-01 so the wrong prices left the site at once (nothing deleted); ScandiPark is missing until the next nightly run saves the Danish prices.
 - `match:new` now handles at most 20 chunks (~800 products, ~$1) per night, so a big batch of new products is spread over several nights instead of failing at once.
+
+### BorderShop Rostock added (2026-10-30)
+
+- bordershop.com serves every product page for both stores: `/da/puttgarden/...` and `/da/rostock/...` (the sitemap only lists Puttgarden). robots.txt only blocks the `/scaput` and `/scaros` store views, not these paths. The page's JSON-LD and cart form carry the store (`pointOfService=ROSTOCK`).
+- 15 products compared: **regular prices identical, offers differ** (Chivas Regal 12 189,95 on offer in Puttgarden vs 249,95 in Rostock; Anthon Berg marcipantærter 21,95 vs 24,95). So Rostock is scraped in full as its own shop, `bordershop-rostock` (`bordershop.ts` now builds one scraper per store).
+- Shops renamed so they can be told apart: "BorderShop Puttgarden" (Færgen Rødby–Puttgarden) and "BorderShop Rostock" (Færgen Gedser–Rostock). Migration `20261030000000_bordershop_rostock_shop.sql` (applied directly).
+- Test: 20/20 products parsed and saved, all with EAN, 2 on offer. Every product has an EAN, so the Rostock rows link to the Puttgarden ones by barcode and need almost no LLM matching.
+- bordershop.com is now crawled twice a night in parallel (one request every 2 s per store, ~1 per second in all), each run ~2 h.
+- Not checked: whether Rostock's assortment is smaller. Every tested product page also showed "InStock" for Rostock.
 
