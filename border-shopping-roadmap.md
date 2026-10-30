@@ -454,7 +454,7 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
 **City supermarkets (Flensburg, ~10 km from Padborg)**: Aldi Nord, Lidl, Netto, Penny (discounters); REWE, Edeka, Kaufland, famila. CITTI Markt Flensburg is closed after a fire.
 - **Drinks: usually not worth it.** Ordinary German shops must charge Pfand of EUR 0,25 per can/bottle (24 cans = EUR 6, about 45 kr.), which can't be refunded in Denmark; border shops sell deposit-free with the export declaration (a practice the EU Court of Justice let stand in 2023). Danish brands are also mostly at border shops.
 - **Groceries: possibly worth it** (meat, dairy, cheese, coffee, toiletries, cleaning) - the claim is common but no recent independent comparison was found. Worth testing with data before promising it on the site.
-- Data: discounters publish only weekly offer flyers; full shelf prices are mostly not online. REWE's Flensburg markets have an online shop (click & collect) with prices - the most complete source, terms to be checked. Flyer aggregators (kaufDA, marktguru) would need an agreement.
+- Data: discounters publish only weekly offer flyers; full shelf prices are mostly not online. REWE's Flensburg markets have an online shop (click & collect) with prices, but it sits behind a captcha bot check - **not usable** (checked 2026-10-30). Flyer aggregators (kaufDA, marktguru) would need an agreement.
 - If added, the site needs a deposit rule: +EUR 0,25 per can/bottle at ordinary German shops, converted to DKK.
 
 **Suggested order:** (1) Scandinavian Park webshop, (2) BorderShop Rostock via the existing scraper, (3) a "Flensburg city" source for groceries (REWE online shop or flyers) together with the deposit rule, (4) Calle only if its prices turn out to differ from Fleggaard's.
@@ -490,4 +490,18 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
 - Test: 20/20 products parsed and saved, all with EAN, 2 on offer. Every product has an EAN, so the Rostock rows link to the Puttgarden ones by barcode and need almost no LLM matching.
 - bordershop.com is now crawled twice a night in parallel (one request every 2 s per store, ~1 per second in all), each run ~2 h.
 - Not checked: whether Rostock's assortment is smaller. Every tested product page also showed "InStock" for Rostock.
+
+### Flensburg city: REWE blocked, Aldi Nord possible (2026-10-30)
+
+- **REWE:** the online shop moved to `www.rewe.de/shop/`. robots.txt allows product pages (it blocks search, market, sorting and paging parameters), but every request from our bot - even the sitemap - gets a **captcha "WAF Challenge"** ("Zeig uns, dass du ein Mensch bist"). Same rule as Fleggaard/Calle: never bypass bot protection, so REWE is out unless REWE gives access.
+- **Aldi Nord** (has Flensburg stores): no bot check; robots.txt allows product pages; product sitemap lists ~2,300 products (`/produkt/<name>-<id>.html`). Each product page embeds its data as JSON (`__NEXT_DATA__` -> `apiData` -> `PRODUCT_DETAIL_GET`): name, brand, pack ("450-g-Packung", "6×0,33-L-Flasche"), `currentPrice` in EUR with base price per kg/l and validity dates, `isAvailable`, and **deposit (`isDepositProduct`, `depositValue`)**. No EAN, and no store - prices look national for Aldi Nord. Examples: Milsani Gouda jung 450 g 3,79 EUR (8,42/kg); Coca-Cola 6 x 0,33 l 4,69 EUR + 1,50 EUR deposit (~46 kr., ~23 kr./l vs ~8-9 kr./l at border shops - drinks in the city aren't worth it).
+- Aldi Nord's imprint and AGB pages say nothing about automated access or text and data mining, and robots.txt allows product pages, so reading them politely looks allowed.
+- Caveats if added: mostly Aldi own brands (Milsani etc.) and no EAN, so few exact matches with border shops - comparisons would be by product type (LLM families, e.g. "Gouda, ung"), and fresh items like minced meat would have no border-shop counterpart online. Needs EUR->DKK conversion and the deposit rule (Phase 4) before drink prices are shown. Full run ~2,300 pages, ~80 min.
+- **Lidl:** robots.txt allows product pages (blocks search, offset, sort, id parameters); not examined further.
+- Any city source still needs the deposit rule (+EUR 0,25 per can/bottle) before its drink prices are shown.
+- **Is Aldi Nord worth it? Spot check of 16 products (2026-10-30)**, Aldi EUR x 7,46 vs the cheapest border-shop price per kg (any pack size):
+  - Branded candy is about level: Aldi cheaper on Raffaello (142 vs 150 kr./kg), Duplo (135 vs 145), Kinder Riegel (117 vs 126), merci lovelies (141 vs 162), Haribo bags (38 vs 43); dearer on Nutella (58 vs 50), Kinder Bueno (190 vs 153), Pringles (112 vs 79), Kinder Schokobons (149 vs 127). Within ~10% either way - not worth a detour.
+  - Drinks are clearly worse in the city because of the deposit (Coca-Cola ~23 vs ~8-9 kr./l).
+  - Own-brand staples are where Aldi wins: Barissimo ground coffee 67 kr./kg and espresso beans 75 kr./kg vs ~84 kr./kg (ja! beans, Poetzsch) and 110-150 kr./kg (JT, Merrild, Lavazza) at the border shops - though a different brand. Fresh food (meat, dairy, cheese) has no border-shop counterpart online.
+  - **Conclusion:** Aldi doesn't compete on what border shoppers mainly buy (drinks, candy, spirits). Its value would be a "groceries in Flensburg" add-on with own brands and fresh food, compared by product type. Lower priority than coverage of the existing shops.
 
