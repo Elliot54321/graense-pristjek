@@ -126,7 +126,7 @@ created: 2026-10-16
 
 Choose based on what Phase 5 showed:
 
-- [ ] More shops and more product coverage (overview of all relevant shops and data sources: "Shop landscape", 2026-10-28)
+- [ ] More shops and more product coverage (overview of all relevant shops and data sources: "Shop landscape", 2026-10-28; Scandinavian Park added 2026-10-29)
 - [ ] Look at the Swedish border as well (BorderShop already has Swedish-language sitemaps and sells many Swedish beers such as Norrlands, Pripps, Mariestads)
 - [ ] Price history and "on offer now" alerts
 - [ ] Saved shopping lists and a "my usual trip" feature
@@ -438,7 +438,7 @@ Grouped by crossing, since that's the trip a shopper chooses. Sources: chains' o
 | Fleggaard (several stores: Padborg Industrieweg 49 - the former Otto Duborg, reopened 26 Jun 2026 with a big CandyKing pick-and-mix; Harrislee Industrieweg 27; Kruså Alte Zollstr. 44; Kobbermølle and Wassersleben) | Harrislee | Newsletter only (scraping refused) | **In** (newsletter) |
 | Calle (Kruså Lykberg 1, Harrislee) | Harrislee | Same group as Fleggaard; scraping refused; tested product had the same price | Not in - probably covered by Fleggaard's prices; check if Calle has its own newsletter |
 | Poetzsch (Padborg Industrieweg 40; Kruså Lykberg 1) | Harrislee | Website, EAN | **In** (nightly) |
-| **Scandinavian Park ("ScandiPark")** | Handewitt, right at the A7/E45 exit, ~10 km south | **Webshop (JTL-Shop) with EAN; robots.txt allows bots**; prices shown in EUR incl. German Pfand (the Danish DKK shop is gone); store itself sells deposit-free with export declaration; offer catalogue | **Best candidate to add** - check terms first |
+| **Scandinavian Park ("ScandiPark")** | Handewitt, right at the A7/E45 exit, ~10 km south | **Webshop (JTL-Shop) with EAN; robots.txt allows bots**; prices shown in EUR incl. German Pfand (the Danish DKK shop is gone); store itself sells deposit-free with export declaration; offer catalogue | **In** (nightly, since 2026-10-29) |
 | Smaller: Sonja & Wolfgang, Grenzmarkt zur Krone (Ochsenweg 85), Nielsen Scan Shop (took over two Priss shops) | Harrislee | Nothing found online | **Not covered** (decided 2026-10-29): no online data, not worth the effort; maybe ask shops for internal price data later |
 | Otto Duborg | - | - | **Gone** - bought by Fleggaard (2026) |
 
@@ -463,3 +463,12 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
 - Fleggaard won't share full price files, so newsletters stay the source for it (and for Calle, if ever added). That makes newsletter reading one of the few running costs: "Oktober 2" cost $1.45 to read plus $1.00 to match (mostly one-time matching; later issues reuse the stable ids).
 - Considered a local vision model (e.g. Qwen-VL or Gemma 3 via Ollama on the M3/16 GB Mac): free per issue but slower and likely worse at tying prices and badges to the right product - a wrong price is the worst failure. **Deferred**; if tested, score it against Sonnet's checked "Oktober 2" extraction first.
 - **`flyer:extract` now uses the Batch API by default** (half price). The command waits for the result and keeps the batch id in `<pdf>.batch.json`, so rerunning it resumes instead of paying again; `--direct` uses the normal API. Test on pages 2, 6 and 26: results in ~3 minutes, the same 13 offers and prices as the earlier direct run, $0.03 (~$0.01 per page, so ~$0.70 for a 64-page issue).
+
+### Scandinavian Park added (2026-10-29)
+
+- Terms and robots.txt allow it; the webshop (JTL-Shop) has no sitemap, so `src/scrapers/scandipark.ts` walks the category pages and reads product microdata (price, EAN, base price). Names are German.
+- Prices are EUR incl. German Pfand: converted at **7.46 DKK/EUR**, Pfand left out (deposit-free with the export declaration). The site's basket note says so.
+- First full run (on GitHub, after the local run failed when the Mac slept): **2,195 products, 0 failed**, 199 without EAN, 13 without content, ~80 min. EAN matching made 1,996 new links; `match:new` handled 1,270 new products: 19 more links, 24 suggestions, 897 new families. **Cost $1.60** (one-off; later nights only see a few new products).
+- Live search shows Scandinavian Park prices (e.g. "tyrkisk peber").
+- Found: names like "4x25g" (no space after the x) were read as one 25 g item, so EAN matching flagged them as different sizes. Fixed in `packFromName`; the next nightly scrape corrects the stored content.
+- Open: no ScandiPark offers detected ("on offer: 0") - check whether the shop marks offers differently. `match:coverage` only compares Poetzsch and BorderShop; extend it to all shops.

@@ -26,10 +26,10 @@ of truth. Read it when deciding what to work on.
 **Current phase:** Phase 3 (first usable version). Phase 1 (data pipeline) finished 2026-10-25
 after 8 unattended nightly runs; Phase 2 (matching) is largely done.
 - Data: Fleggaard prices come from its newsletter (no scraping allowed), imported by hand per
-  issue (`data/newsletters/`, git-ignored). Poetzsch and BorderShop scraped nightly on GitHub Actions
+  issue (`data/newsletters/`, git-ignored). Poetzsch, BorderShop and Scandinavian Park scraped nightly on GitHub Actions
   (`.github/workflows/scrape.yml`: scrape -> EAN matching -> `match:new` for new products;
   scheduled 02:00 UTC, GitHub usually starts it ~06:45),
-  ~7,400 products. Fleggaard/Calle sit behind Cloudflare bot protection – never try to
+  ~9,800 products. Fleggaard/Calle sit behind Cloudflare bot protection – never try to
   bypass it.
   Fleggaard has said no to data scraping (2026-10-22) - don't scrape their sites at all.
 - Matching: EAN plus a full LLM run (3,697 families with search words; 101/120 common
@@ -67,6 +67,7 @@ after 8 unattended nightly runs; Phase 2 (matching) is largely done.
 - `src/scrapers/quantity.ts` – number/quantity parsing and `unitPrice` (price ÷ content;
   shops' own unit prices are sometimes wrong, so only used when content is unknown)
 - `src/scrapers/<shop>.ts` – one module per shop; export the page parser separately
+  (`poetzsch.ts`, `bordershop.ts`, `scandipark.ts` – the last walks category pages, no sitemap)
 - `src/scrapers/save.ts` – writes to Supabase with the secret key: upserts products,
   adds a price row only when price/offer changed, warns on >50% price jumps
 - `src/scrapers/run.ts` – CLI that runs a scraper, writes JSON and optionally saves
@@ -119,8 +120,9 @@ after 8 unattended nightly runs; Phase 2 (matching) is largely done.
 
 ## Domain rules (get these right)
 
-- **Prices are in DKK** at the shops researched so far (Poetzsch, Fleggaard, Calle, BorderShop).
-  Store the currency per price anyway, in case a future shop uses EUR.
+- **Prices are in DKK** at the border shops (Poetzsch, Fleggaard, Calle, BorderShop). Scandinavian
+  Park's webshop shows EUR incl. German Pfand: the scraper converts at 7.46 DKK/EUR (`EUR_TO_DKK`)
+  and leaves the Pfand out, as the store sells deposit-free with an export declaration.
 - **Pfand (deposit):** with an *eksporterklæring* (export declaration), most cans
   carry no deposit. Store any Pfand separately from the shelf price, but don't assume
   it applies. The declaration is filled out in the shop, so the user needn't prepare anything.

@@ -57,11 +57,11 @@ async function listProductUrls(): Promise<string[]> {
   return [...categoryOf.keys()];
 }
 
-/** "24x ... 0,5 L" -> 24 x 0,5 l; "160g 4er Box" -> 4 x 160 g; "5L Party Fass" -> 1 x 5 l. */
+/** "24x ... 0,5 L" -> 24 x 0,5 l; "4x25g" -> 4 x 25 g; "160g 4er Box" -> 4 x 160 g; "5L Party Fass" -> 1 x 5 l. */
 export function packFromName(name: string): { count: number | null; unitSize: Quantity | null; total: Quantity | null } {
   const unitSize = quantityFromName(name);
   const count =
-    Number(name.match(/(?:^|\s)(\d+)\s*[x×]\s/i)?.[1]) ||
+    Number(name.match(/(?:^|\s)(\d+)\s*[x×]\s*(?=\d|\s)/i)?.[1]) ||
     Number(name.match(/(?:^|\s)(\d+)er[\s-]?(?:pack|box|set|karton|kiste|tray|packung)\b/i)?.[1]) ||
     null;
   if (!unitSize) return { count, unitSize: null, total: null };
