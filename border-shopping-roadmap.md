@@ -106,6 +106,7 @@ created: 2026-10-16
 - [ ] Danish import limits for alcohol and tobacco, with warnings
 - [ ] Travel cost from the user's location to each shop
 - [ ] Optional "split across two shops" suggestion, only if saving beats extra driving
+- [ ] Show Fleggaard for items missing from its newsletter (added 2026-10-30): we only have the newsletter, but Fleggaard almost surely sells the item, so "findes ikke her" is misleading. Assume a price equal to the most expensive other shop's price, marked as an estimate with a short note that the in-store price can vary and a link to fleggaard.dk to check. An estimate must never be shown as the cheapest option.
 
 ---
 
