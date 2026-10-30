@@ -67,7 +67,8 @@ after 8 unattended nightly runs; Phase 2 (matching) is largely done.
 - `src/scrapers/quantity.ts` – number/quantity parsing and `unitPrice` (price ÷ content;
   shops' own unit prices are sometimes wrong, so only used when content is unknown)
 - `src/scrapers/<shop>.ts` – one module per shop; export the page parser separately
-  (`poetzsch.ts`, `bordershop.ts`, `scandipark.ts` – the last walks category pages, no sitemap)
+  (`poetzsch.ts`, `bordershop.ts`, `scandipark.ts` – the last walks category pages, since product
+  pages carry no category; ~5,000 products take ~3 h, so the job timeout is 350 min)
 - `src/scrapers/save.ts` – writes to Supabase with the secret key: upserts products,
   adds a price row only when price/offer changed, warns on >50% price jumps
 - `src/scrapers/run.ts` – CLI that runs a scraper, writes JSON and optionally saves
@@ -120,9 +121,10 @@ after 8 unattended nightly runs; Phase 2 (matching) is largely done.
 
 ## Domain rules (get these right)
 
-- **Prices are in DKK** at the border shops (Poetzsch, Fleggaard, Calle, BorderShop). Scandinavian
-  Park's webshop shows EUR incl. German Pfand: the scraper converts at 7.46 DKK/EUR (`EUR_TO_DKK`)
-  and leaves the Pfand out, as the store sells deposit-free with an export declaration.
+- **Prices are in DKK** at the border shops (Poetzsch, Fleggaard, Calle, BorderShop, Scandinavian Park).
+  Store the currency per price anyway, in case a future shop uses EUR. Scandinavian Park is read from
+  its Danish click & collect shop (DKK, store prices); its German webshop prices drinks for German
+  delivery and must not be used.
 - **Pfand (deposit):** with an *eksporterklæring* (export declaration), most cans
   carry no deposit. Store any Pfand separately from the shelf price, but don't assume
   it applies. The declaration is filled out in the shop, so the user needn't prepare anything.

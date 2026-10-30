@@ -44,15 +44,15 @@ const GROUPS: Record<string, (r: ShopRow) => string | undefined> = {
   },
   bordershop: (r) =>
     ({ Beverages: "soda", Beer: "beer", "Candy and Snacks": "candy", Spirits: "spirits", Household: "household" })[r.categories[0]],
-  // Scandinavian Park: category path from its German webshop (wine and "sonstiges" left out).
+  // Scandinavian Park: category from its Danish click & collect shop (wine and "andre-varer" left out).
   scandipark: (r) => {
     const c = r.categories[0] ?? "";
-    if (c === "getraenke/bier") return "beer";
-    if (/^getraenke\/(eistee|energy-drinks|weitere-getraenke)$/.test(c)) return "soda";
-    if (/^spirituosen\/(?!spirituosen-glaeser)|^skandinavische-produkte\/getraenke$/.test(c)) return "spirits";
-    if (/^suesswaren\/|^skandinavische-produkte\/suesswaren$|^lebensmittel\/(party-snacks|riegel)$/.test(c)) return "candy";
-    if (/^lebensmittel\/|^skandinavische-produkte\/(lebensmittel|essentials)$/.test(c)) return "groceries";
-    if (/^kosmetik\//.test(c)) return "household";
+    if (/^(drikkevarer\/(oel|cider)|Ol|Cider)$/.test(c)) return "beer";
+    if (/^(drikkevarer(\/(sodavand|andre-drikkevarer))?|Sodavand|Energidrik|Vand|Andre-pantfri-drikkevarer|pantfri-drikkevarer)$/.test(c)) return "soda";
+    if (c === "spiritus") return "spirits";
+    if (c === "slik") return "candy";
+    if (c === "foedevarer") return "groceries";
+    if (c === "kosmetik") return "household";
   },
   // Newsletter products carry the comparison category directly.
   fleggaard: (r) => (["soda", "beer", "candy", "spirits", "groceries", "household"].includes(r.categories[0]) ? r.categories[0] : undefined),

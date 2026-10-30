@@ -25,7 +25,7 @@ concurrency:
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 240 # a full run takes ~130 min at one request every 2 s
+    timeout-minutes: 350 # ScandiPark takes ~4 h at one request every 2 s; GitHub's limit is 360
     strategy:
       fail-fast: false # one broken shop must not stop the others
       matrix:
@@ -87,7 +87,9 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm install --no-audit --no-fund
-      - run: npm run match:new
+      # At most 20 chunks (~800 products, ~$1) a night; a big batch of new products
+      # (e.g. a new shop) is then spread over several nights instead of failing at once.
+      - run: npm run match:new -- --limit-chunks 20
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}

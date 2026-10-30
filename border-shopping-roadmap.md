@@ -472,3 +472,12 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
 - Live search shows Scandinavian Park prices (e.g. "tyrkisk peber").
 - Found: names like "4x25g" (no space after the x) were read as one 25 g item, so EAN matching flagged them as different sizes. Fixed in `packFromName`; the next nightly scrape corrects the stored content.
 - Open: no ScandiPark offers detected ("on offer: 0") - check whether the shop marks offers differently. `match:coverage` only compares Poetzsch and BorderShop; extend it to all shops.
+
+### Scandinavian Park: switched to the Danish click & collect shop (2026-10-30)
+
+- The German webshop's drink prices were wrong for Danes: Faxe Kondi 24 cans ~194 kr. there vs 59,99 kr. in the store's Danish **click & collect shop** (`clickandcollect.scandipark.dk`, found by the user via Pepsi Max). Candy and spirits differed a little too (Larsen VS 234,92 vs 229,99; Pingvin 27,53 vs 29,99).
+- Click & collect: robots.txt allows all; terms say nothing about automated access. **Prices in DKK** (no conversion), Danish names, EAN on every tested product, and **multi-buy tiers** ("2 for 64,99 each", stored as "2 for 129,98"). Offers are shown as these tiers and "Tilbud" brand collections rather than crossed-out prices.
+- The sitemap lists 6,811 products, but ~1,800 are marked Discontinued; walking the category pages (100 per page) finds the **~5,000 products actually on sale** and gives each a category. Product pages carry no category. A full run takes ~3 h at 2 s per page, so the scrape job's timeout is now 350 min.
+- Shop product ids are now `dk-<produktnummer>`, so the German webshop's rows aren't overwritten with different products; they stop being seen and drop out of comparisons.
+- `match:new` now handles at most 20 chunks (~800 products, ~$1) per night, so a big batch of new products is spread over several nights instead of failing at once.
+

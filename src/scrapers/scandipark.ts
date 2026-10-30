@@ -5,59 +5,67 @@ import type { Quantity, ScrapedProduct, Scraper } from "./types";
 
 /**
  * Scandinavian Park ("ScandiPark"), Handewitt - the border shop at the A7/E45 exit.
- * Its webshop (JTL-Shop) is German-only, has no sitemap and shows prices in EUR plus
- * German deposit; the store itself sells deposit-free to Danes with an export
- * declaration. So: walk the category pages, read the product microdata, convert
- * EUR to DKK and leave the deposit out.
+ * Its Danish click & collect shop (JTL-Shop) shows the store's prices in DKK for
+ * collection in Handewitt, with EAN and multi-buy tiers ("2 for 64,99 each"). The
+ * German webshop at shop.scandinavian-park.com prices some drinks for German delivery
+ * (Faxe Kondi 24 cans: ~194 kr. there vs 59,99 kr. here), so it isn't used.
+ *
+ * Product pages carry no category, so the category pages are walked to find every
+ * product and the most specific category it is listed in.
  */
-const BASE = "https://shop.scandinavian-park.com";
+const BASE = "https://clickandcollect.scandipark.dk";
 
-/** The krone is pegged to the euro (central rate 7.46038); the till may round differently. */
-export const EUR_TO_DKK = 7.46;
+/**
+ * Category pages to walk, most specific first: a product keeps the first one it is
+ * found under. Top-level pages come last and catch products only listed in brand
+ * collections ("Coca-Cola-Tilbud"). Wine is included; matching leaves it out.
+ */
+const SUB_CATEGORIES = [
+  "drikkevarer/oel",
+  "drikkevarer/cider",
+  "drikkevarer/sodavand",
+  "drikkevarer/andre-drikkevarer",
+  "Ol",
+  "Cider",
+  "Sodavand",
+  "Energidrik",
+  "Vand",
+  "Andre-pantfri-drikkevarer",
+];
+const TOP_CATEGORIES = ["drikkevarer", "pantfri-drikkevarer", "spiritus", "vin", "slik", "foedevarer", "kosmetik", "andre-varer"];
 
-const toDkk = (eur: number) => Math.round(eur * EUR_TO_DKK * 100) / 100;
-
-/** Category path (e.g. "getraenke/bier") each product URL was found under. */
+/** Category path (e.g. "drikkevarer/sodavand") each product URL was found under. */
 const categoryOf = new Map<string, string>();
 
-async function listProductUrls(): Promise<string[]> {
-  const home = cheerio.load(await fetchText(`${BASE}/de/`));
-  // Sub-categories look like /de/getraenke/bier (two path segments).
-  const categories = [
-    ...new Set(
-      home("a[href]")
-        .map((_, a) => home(a).attr("href") ?? "")
-        .get()
-        .map((href) => href.match(/^https:\/\/shop\.scandinavian-park\.com\/de\/([A-Za-z0-9-]+\/[A-Za-z0-9-]+)$/)?.[1])
-        .filter((c): c is string => !!c),
-    ),
-  ];
+/** Product links on one category page; 100 per page via ?af=100. */
+async function categoryPage(category: string, page: number) {
+  const path = page === 1 ? category : `${category}_s${page}`;
+  const $ = cheerio.load(await fetchText(`${BASE}/${path}?af=100`));
+  const urls = $(".productbox-title a[href]")
+    .map((_, a) => $(a).attr("href") ?? "")
+    .get()
+    .filter((href) => /^https:\/\/clickandcollect\.scandipark\.dk\/[^/?#]+$/.test(href));
+  const hasNext = $(`a[href*="/${category}_s${page + 1}"]`).length > 0;
+  return { urls, hasNext };
+}
 
-  for (const category of categories) {
-    for (let page = 1; page <= 50; page++) {
-      const url = page === 1 ? `${BASE}/de/${category}` : `${BASE}/de/${category}_s${page}`;
-      let $: cheerio.CheerioAPI;
+async function listProductUrls(): Promise<string[]> {
+  for (const category of [...SUB_CATEGORIES, ...TOP_CATEGORIES]) {
+    for (let page = 1; page <= 100; page++) {
+      let result: Awaited<ReturnType<typeof categoryPage>>;
       try {
-        $ = cheerio.load(await fetchText(url));
+        result = await categoryPage(category, page);
       } catch {
         break; // past the last page
       }
-      let added = 0;
-      $(".productbox").each((_, box) => {
-        const href = $(box).find("a[href]").first().attr("href") ?? "";
-        if (!/^https:\/\/shop\.scandinavian-park\.com\/de\/[^/?#]+$/.test(href)) return;
-        if (!categoryOf.has(href)) added++;
-        // A product listed in several categories keeps the first, most specific one found.
-        if (!categoryOf.has(href)) categoryOf.set(href, category);
-      });
-      const hasNext = $(`a[href$="/de/${category}_s${page + 1}"]`).length > 0;
-      if (!added || !hasNext) break;
+      for (const url of result.urls) if (!categoryOf.has(url)) categoryOf.set(url, category);
+      if (!result.urls.length || !result.hasNext) break;
     }
   }
   return [...categoryOf.keys()];
 }
 
-/** "24x ... 0,5 L" -> 24 x 0,5 l; "4x25g" -> 4 x 25 g; "160g 4er Box" -> 4 x 160 g; "5L Party Fass" -> 1 x 5 l. */
+/** "24x0,33l dåser" -> 24 x 0,33 l; "4x25g" -> 4 x 25 g; "160g 4er Box" -> 4 x 160 g; "5L Fad" -> 1 x 5 l. */
 export function packFromName(name: string): { count: number | null; unitSize: Quantity | null; total: Quantity | null } {
   const unitSize = quantityFromName(name);
   const count =
@@ -72,31 +80,53 @@ export function packFromName(name: string): { count: number | null; unitSize: Qu
 /** Parse a product page. Exported separately so it can be tested on saved HTML. */
 export function parseProductPage(html: string, url: string): ScrapedProduct | null {
   const $ = cheerio.load(html);
+  // Only the product itself - the page also lists related products with their own prices.
+  const offer = $("#product-offer");
   const name = $("h1").first().text().replace(/\s+/g, " ").trim();
-  const priceEur = parseDecimal($('meta[itemprop="price"]').first().attr("content") ?? "");
-  const id = $('[itemprop="sku"]').first().text().trim() || url.split("/").pop()!;
-  if (!name || priceEur === null) return null;
+  const price = parseDecimal(offer.find('meta[itemprop="price"]').first().attr("content") ?? "");
+  const currency = offer.find('[itemprop="priceCurrency"]').first().attr("content") ?? "DKK";
+  const sku = offer.find('[itemprop="sku"]').first().text().trim();
+  if (!name || price === null || !sku) return null;
+  // Old products stay reachable (and in the sitemap) after the shop stops selling them.
+  if (/Discontinued/.test(offer.find('[itemprop="availability"]').attr("href") ?? "")) return null;
+  if (currency !== "DKK") throw new Error(`Unexpected currency ${currency} on ${url}`);
 
-  // Content from the name; else from the base price ("2,80 EUR / 1 Liter": price / base).
+  // Content from the name; else from the base price ("8,84 DKK / 1 l": price / base).
   const { count, unitSize, total: totalFromName } = packFromName(name);
   let total = totalFromName;
-  const baseEur = parseDecimal($('[itemprop="priceSpecification"] meta[itemprop="price"]').attr("content") ?? "");
-  const baseText = $('[itemprop="priceSpecification"] [itemprop="referenceQuantity"]').text();
+  const spec = offer.find('[itemprop="priceSpecification"]').first();
+  const basePrice = parseDecimal(spec.find('meta[itemprop="price"]').attr("content") ?? "");
+  const baseText = spec.find('[itemprop="referenceQuantity"]').text();
   const baseUnit = /liter|\bl\b/i.test(baseText) ? "l" : /kg|kilo/i.test(baseText) ? "kg" : null;
-  if (!total && baseEur && baseUnit) {
-    total = { amount: Math.round((priceEur / baseEur) * 100) / 100, unit: baseUnit };
+  if (!total && basePrice && baseUnit) {
+    total = { amount: Math.round((price / basePrice) * 100) / 100, unit: baseUnit };
   }
-  const shopUnitPrice = baseEur && baseUnit && total?.unit === baseUnit ? toDkk(baseEur) : null;
-  const price = toDkk(priceEur);
-  const offerRegular = parseDecimal($(".old-price, .instead-of .value, del").first().text().replace(/[^\d,.]/g, ""));
+  const shopUnitPrice = basePrice && baseUnit && total?.unit === baseUnit ? basePrice : null;
+
+  // Multi-buy tiers: "fra 2 | 64,99 DKK" = each costs 64,99 when buying 2 or more.
+  // The smallest tier is stored as "2 for 129,98".
+  const tier = offer
+    .find("tr[class^='bulk-price']")
+    .map((_, tr) => {
+      const cells = $(tr).find("td");
+      return { quantity: Number(cells.eq(0).text().trim()), each: parseDecimal(cells.eq(1).text().replace(/[^\d,.]/g, "")) };
+    })
+    .get()
+    .find((t) => t.quantity > 1 && t.each !== null && t.each < price);
+  const multiBuy = tier ? { quantity: tier.quantity, price: Math.round(tier.quantity * tier.each! * 100) / 100 } : null;
+
+  const regular = parseDecimal(offer.find(".instead-of .value, .price-old, del").first().text().replace(/[^\d,.]/g, ""));
+  const onOffer = regular !== null && regular > price;
+  const brand = offer.find('[itemprop="brand"] [itemprop="name"]').first();
 
   return {
     shop: "scandipark",
-    shopProductId: id,
+    // "dk-" keeps these apart from the German webshop's ids used before 2026-10-29.
+    shopProductId: `dk-${sku}`,
     url,
     name,
-    brand: $('[itemprop="brand"] [itemprop="name"]').first().text().trim() || $('[itemprop="brand"] a').first().text().trim() || null,
-    ean: $('[itemprop="gtin13"]').first().text().trim() || null,
+    brand: (brand.attr("content") ?? brand.text()).trim() || null,
+    ean: offer.find('[itemprop="gtin13"]').first().text().trim() || null,
     categories: [categoryOf.get(url) ?? ""].filter(Boolean),
     price,
     currency: "DKK",
@@ -105,11 +135,12 @@ export function parseProductPage(html: string, url: string): ScrapedProduct | nu
     unitSize,
     totalContent: total,
     pricePerUnit: unitPrice(price, total, shopUnitPrice),
-    onOffer: offerRegular !== null && offerRegular > priceEur,
-    regularPrice: offerRegular !== null && offerRegular > priceEur ? toDkk(offerRegular) : null,
+    onOffer,
+    regularPrice: onOffer ? regular : null,
     offerEndsAt: null,
-    // German deposit ("zzgl. 6,00 EUR Pfand") isn't paid by Danes with an export declaration.
+    // Sold deposit-free with an export declaration ("Export" cans); no deposit is shown.
     pfand: null,
+    multiBuy,
     scrapedAt: new Date().toISOString(),
   };
 }
