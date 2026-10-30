@@ -513,3 +513,10 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
 - **famila (Nordost):** open WordPress site, but no shelf prices - only weekly offers per selected store.
 - **City summary:** of REWE, Aldi Nord, Lidl, Netto, Penny, Edeka, Kaufland and famila, only Aldi Nord publishes shelf prices we may read, and the spot checks show the city doesn't beat the border shops on what border shoppers mainly buy (drinks, candy, spirits); it may on own-brand groceries and fresh food. **Suggested:** park Flensburg city until groceries become a focus, and start with Aldi Nord then.
 
+### Coverage report for all shops (2026-10-30)
+
+- `npm run match:coverage` now covers all five shops (Poetzsch, Fleggaard, ScandiPark, BorderShop Puttgarden and Rostock). It only counts products on sale (same 3-day / newsletter rule as the website) and compares by **family**, which is what the basket compares. Category rules moved to `src/matching/groups.ts`, shared with `match:new`. `match:new` now also skips products that are no longer on sale (1,777 products / 46 chunks left after the first night).
+- Per common item it shows each shop as linked (✓), sold but not linked (~) or not found (·); per category, the share of each shop's products comparable with at least one other shop.
+- **Baseline before ScandiPark/Rostock matching caught up:** 99 of 120 common items linked across all shops that sell them, 15 partly, 3 not linked (Bacardi Carta Blanca 1 l, Toms Skildpadder, Ritter Sport Voll-Nuss), 2 in one shop only, 1 in none. Found/linked per shop: Poetzsch 117/113, BorderShop Puttgarden 110/107, ScandiPark 102/87, Fleggaard 45/40 (newsletter only), Rostock 2/2 (only 20 test products so far). Groceries and household are the weakest categories (2-40% comparable).
+- **To do:** run it again once Rostock's first full scrape and ScandiPark's LLM matching are done (2-3 nights from 2026-10-30), then fix the "partly"/"not linked" items.
+

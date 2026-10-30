@@ -53,8 +53,9 @@ after 8 unattended nightly runs; Phase 2 (matching) is largely done.
 - `npm run lint` – ESLint
 - `npm run match:ean` – one `products` row per EAN, links shop products to it
   (idempotent; runs nightly after scraping)
-- `npm run match:coverage [-- --names]` – category coverage plus the items in
-  `src/matching/common-items.ts`: matched, in both shops but unlinked, or one shop only
+- `npm run match:coverage [-- --names]` – for every shop: share of each category comparable with
+  another shop, and which shops sell and link each item in `src/matching/common-items.ts`
+  (only products on sale count; category rules shared with `match:new` in `src/matching/groups.ts`)
 - `npm run scrape -- <shop> [--limit N] [--save]` – run a shop scraper; saves JSON
   to `data/scrapes/` (git-ignored), and with `--save` writes to Supabase and logs
   the run in `scrape_runs`. Needs the variables in `.env.example` set in `.env.local`.

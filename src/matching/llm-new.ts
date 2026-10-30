@@ -21,6 +21,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import { adminClient, fetchAll } from "../db/admin";
+import { GROUPS, isListed } from "./groups";
 import { costUsd } from "./llm";
 import { isCatchAllFamilyName, linkDoubts } from "./safety";
 
@@ -31,35 +32,6 @@ const CONCURRENCY = 4;
 const CACHE_DIR = "data/llm-batches/cache";
 const CONFIDENCE = { high: 0.9, medium: 0.75 } as const;
 
-/** Comparison categories per shop (wine, toys and BorderShop's "More" are left out). */
-const GROUPS: Record<string, (r: ShopRow) => string | undefined> = {
-  poetzsch: (r) => {
-    const p = r.categories.join("/");
-    if (/^Vand/.test(p)) return "soda";
-    if (/^Øl/.test(p)) return "beer";
-    if (/^Slik|Chips og snacks/.test(p)) return "candy";
-    if (/^Spiritus/.test(p)) return "spirits";
-    if (/^Dagligvarer/.test(p)) return "groceries";
-    if (/^Husholdning|^Dyrefoder/.test(p)) return "household";
-  },
-  bordershop: (r) =>
-    ({ Beverages: "soda", Beer: "beer", "Candy and Snacks": "candy", Spirits: "spirits", Household: "household" })[r.categories[0]],
-  // Rostock is the same BorderShop catalogue.
-  "bordershop-rostock": (r) => GROUPS.bordershop(r),
-  // Scandinavian Park: category from its Danish click & collect shop (wine and "andre-varer" left out).
-  scandipark: (r) => {
-    const c = r.categories[0] ?? "";
-    if (/^(drikkevarer\/(oel|cider)|Ol|Cider)$/.test(c)) return "beer";
-    if (/^(drikkevarer(\/(sodavand|andre-drikkevarer))?|Sodavand|Energidrik|Vand|Andre-pantfri-drikkevarer|pantfri-drikkevarer)$/.test(c)) return "soda";
-    if (c === "spiritus") return "spirits";
-    if (c === "slik") return "candy";
-    if (c === "foedevarer") return "groceries";
-    if (c === "kosmetik") return "household";
-  },
-  // Newsletter products carry the comparison category directly.
-  fleggaard: (r) => (["soda", "beer", "candy", "spirits", "groceries", "household"].includes(r.categories[0]) ? r.categories[0] : undefined),
-};
-
 interface ShopRow {
   id: number;
   shop_id: string;
@@ -67,6 +39,8 @@ interface ShopRow {
   categories: string[];
   content_amount: number | null;
   content_unit: string | null;
+  last_seen_at: string | null;
+  listed_until: string | null;
   product_matches: MatchEmbed[] | MatchEmbed | null;
 }
 interface MatchEmbed {
@@ -142,7 +116,11 @@ async function main() {
 
   const [shopRows, products, families, prices] = await Promise.all([
     fetchAll<ShopRow>((f, t) =>
-      db.from("shop_products").select("id, shop_id, name, categories, content_amount, content_unit, product_matches(product_id, method, confidence, reviewed)").order("id").range(f, t),
+      db
+        .from("shop_products")
+        .select("id, shop_id, name, categories, content_amount, content_unit, last_seen_at, listed_until, product_matches(product_id, method, confidence, reviewed)")
+        .order("id")
+        .range(f, t),
     ),
     fetchAll<ProductRow>((f, t) => db.from("products").select("id, name, family_id, content_amount, content_unit").order("id").range(f, t)),
     fetchAll<{ id: number; name: string; category: string; search_words: string[] }>((f, t) =>
@@ -170,9 +148,10 @@ async function main() {
       return { product: p, group: groupOf(rows[0]), tokens: new Set(tokens([p.name, ...rows.map((r) => r.name)].join(" "))) };
     });
 
-  // New items: no match yet, or a product without family.
+  // New items: no match yet, or a product without family. Products no longer on
+  // sale are skipped - they never show on the site, so matching them is wasted.
   const newItems = shopRows.filter((r) => {
-    if (!groupOf(r)) return false;
+    if (!groupOf(r) || !isListed(r)) return false;
     const m = embed(r);
     return !m || productById.get(m.product_id)?.family_id == null;
   });
