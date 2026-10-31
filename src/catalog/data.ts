@@ -7,6 +7,7 @@
  */
 import { cacheLife } from "next/cache";
 import { publicClient } from "@/db/public";
+import type { FamilyInfo } from "./import-limits";
 import { finalScore, preScore } from "./ranking";
 import type { FamilyResult, Offer, Pack, Shop, Unit } from "./types";
 
@@ -160,6 +161,17 @@ export async function searchFamilies(rawQuery: string): Promise<FamilyResult[]> 
 }
 
 /** Everything the basket comparison needs: the basket's exact products and all packs of its families. */
+/** Name and category of the given families (for the import-limit check). */
+export async function familiesById(ids: number[]): Promise<FamilyInfo[]> {
+  "use cache";
+  cacheLife("hours");
+  const unique = [...new Set(ids)].sort();
+  if (!unique.length) return [];
+  const { data, error } = await publicClient().from("product_families").select("id, name, category").in("id", unique);
+  if (error) throw error;
+  return data as FamilyInfo[];
+}
+
 export async function packsForBasket(productIds: number[], familyIds: number[]): Promise<Pack[]> {
   "use cache";
   cacheLife("hours");

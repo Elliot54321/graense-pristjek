@@ -1,11 +1,14 @@
 /**
- * POST /api/compare  { items: BasketItem[] }  ->  { results: ShopResult[] }
+ * POST /api/compare  { items: BasketItem[] }  ->  { results: ShopResult[], alcohol }
  *
- * The basket lives in the browser; this prices it in every shop.
+ * The basket lives in the browser; this prices it in every shop. `alcohol` is the
+ * basket's liters of spirits / fortified wine / wine / beer, for the import-limit
+ * warning (the browser compares it with the number of adults).
  */
 import { z } from "zod";
 import { compareBasket } from "@/catalog/compare";
-import { getShops, packsForBasket } from "@/catalog/data";
+import { familiesById, getShops, packsForBasket } from "@/catalog/data";
+import { alcoholLiters } from "@/catalog/import-limits";
 
 const MAX_ITEMS = 100;
 
@@ -34,10 +37,13 @@ export async function POST(request: Request) {
   if (!parsed.success) return Response.json({ error: "Ugyldig kurv" }, { status: 400 });
 
   const { items } = parsed.data;
-  if (!items.length) return Response.json({ results: [] });
+  if (!items.length) return Response.json({ results: [], alcohol: {} });
 
   const productIds = items.flatMap((i) => (i.kind === "product" ? [i.productId] : []));
   const familyIds = items.flatMap((i) => (i.kind === "family" ? [i.familyId] : []));
   const [packs, shops] = await Promise.all([packsForBasket(productIds, familyIds), getShops()]);
-  return Response.json({ results: compareBasket(items, packs, shops) });
+  // Product items need their pack's family too, for the alcohol type.
+  const packFamilies = packs.flatMap((p) => (p.familyId ? [p.familyId] : []));
+  const families = await familiesById([...familyIds, ...packFamilies]);
+  return Response.json({ results: compareBasket(items, packs, shops), alcohol: alcoholLiters(items, packs, families) });
 }

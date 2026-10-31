@@ -103,7 +103,7 @@ created: 2026-10-16
 **Goal:** Account for what actually affects the real total cost.
 
 - [ ] Include Pfand (deposit) in the real cost
-- [ ] Danish import limits for alcohol and tobacco, with warnings
+- [x] Danish import limits for alcohol and tobacco, with warnings (alcohol done 2026-10-30 on `/kurv`; tobacco not, as the site has no tobacco)
 - [ ] Travel cost from the user's location to each shop
 - [ ] Optional "split across two shops" suggestion, only if saving beats extra driving
 - [ ] Show Fleggaard for items missing from its newsletter (added 2026-10-30): we only have the newsletter, but Fleggaard almost surely sells the item, so "findes ikke her" is misleading. Assume a price equal to the most expensive other shop's price, marked as an estimate with a short note that the in-store price can vary and a link to fleggaard.dk to check. An estimate must never be shown as the cheapest option.
@@ -524,4 +524,10 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
 
 - **Calle has its own newsletter**, separate from Fleggaard's (user, 2026-10-30); both new issues come out on 3 Nov, when Fleggaard's current issue expires. Calle needs its own shop row; its prices go through the same newsletter pipeline (`flyer:extract` -> `flyer:import --shop calle` -> `match:new`).
 - Same day: run `match:coverage` across all shops (Rostock and ScandiPark matching will have caught up by then) and fix the items that aren't fully linked.
+
+### Import-limit warning on the basket page (2026-10-30)
+
+- Source: Toldstyrelsen, "Travelling within the EU" (https://toldst.dk/en-us/individuals/travel/travelling-within-the-eu), checked 2026-10-30. Guide amounts per person aged 18+: **spirits 10 l** (above 22 % *and drinks with added alcohol*, so liqueurs and alcopops count), **fortified wine 20 l** (22 % or less: port, sherry, Madeira), **wine 90 l** (max 60 l sparkling; cider-based wine counts here), **beer 110 l** (incl. beer-based cider). 16-17-year-olds: only beer and wine up to 16.4 %. They are guide amounts: above them customs can ask you to show the goods are for your own use, otherwise Danish duty is due.
+- `src/catalog/import-limits.ts` classifies each basket item from its family category and name (alcohol-free excluded; port/sherry/Madeira/vermouth/Martini as fortified, but not whisky "Sherry Cask"/"Port Cask" finishes; cider counted as wine, the stricter limit, since shops don't say whether it is beer- or wine-based). `/api/compare` returns the basket's liters per type.
+- `/kurv` shows "Indførsel til Danmark" when the basket has alcohol: a selector for adults (18+) in the car (remembered in the browser), liters vs allowed per type, and a calm warning when over. Not checked: the 60 l sparkling-wine sub-limit (the site has almost no wine).
 

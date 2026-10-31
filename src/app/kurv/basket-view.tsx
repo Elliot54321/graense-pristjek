@@ -2,15 +2,18 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import type { AlcoholType } from "@/catalog/import-limits";
 import type { BasketItem, ShopResult } from "@/catalog/types";
 import { clearBasket, removeFromBasket, updateBasketItem, useBasket } from "@/components/basket";
 import { amount, day, kr, UNIT_LABEL } from "@/lib/format";
+import { ImportLimits } from "./import-limits";
 
-type State = { status: "idle" | "loading" | "error"; results: ShopResult[] };
+type Alcohol = Partial<Record<AlcoholType, number>>;
+type State = { status: "idle" | "loading" | "error"; results: ShopResult[]; alcohol: Alcohol };
 
 export function BasketView() {
   const items = useBasket();
-  const [state, setState] = useState<State>({ status: "idle", results: [] });
+  const [state, setState] = useState<State>({ status: "idle", results: [], alcohol: {} });
 
   // Re-price the basket whenever it changes (small delay so +/- clicks are batched).
   useEffect(() => {
@@ -26,8 +29,8 @@ export function BasketView() {
           signal: controller.signal,
         });
         if (!res.ok) throw new Error(String(res.status));
-        const { results } = (await res.json()) as { results: ShopResult[] };
-        setState({ status: "idle", results });
+        const { results, alcohol } = (await res.json()) as { results: ShopResult[]; alcohol: Alcohol };
+        setState({ status: "idle", results, alcohol });
       } catch (e) {
         if (!controller.signal.aborted) setState((s) => ({ ...s, status: "error" }));
         void e;
@@ -75,6 +78,7 @@ export function BasketView() {
           <ShopCard key={r.shop.id} result={r} cheapest={i === 0 && r.missing === 0} />
         ))}
       </ol>
+      <ImportLimits liters={state.alcohol} />
       <p className="mt-4 text-xs text-zinc-500">
         Butikkerne ligger forskellige steder: Fleggaard og Poetzsch ved Padborg/Harrislee, Scandinavian Park ved motorvejen i
         Handewitt, BorderShop ved færgerne i Puttgarden (Rødby–Puttgarden) og Rostock (Gedser–Rostock). Fleggaards priser
