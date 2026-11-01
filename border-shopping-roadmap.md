@@ -104,8 +104,8 @@ created: 2026-10-16
 
 - [ ] Include Pfand (deposit) in the real cost
 - [x] Danish import limits for alcohol and tobacco, with warnings (alcohol done 2026-10-30 on `/kurv`; tobacco not, as the site has no tobacco)
-- [ ] Travel cost from the user's location to each shop
-- [ ] Optional "split across two shops" suggestion, only if saving beats extra driving
+- [x] Travel cost from the user's location to each shop (2026-11-01: trip cards on `/kurv` with postcode, rough distance/time and fuel per car type; ferry ticket entered by the user)
+- [x] Optional "split across two shops" suggestion, only if saving beats extra driving (2026-11-01: within the Padborg area, when it covers more items or saves >= 50 kr.)
 - [ ] Show Fleggaard for items missing from its newsletter (added 2026-10-30): we only have the newsletter, but Fleggaard almost surely sells the item, so "findes ikke her" is misleading. Assume a price equal to the most expensive other shop's price, marked as an estimate with a short note that the in-store price can vary and a link to fleggaard.dk to check. An estimate must never be shown as the cheapest option.
 
 ---
@@ -530,4 +530,15 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
 - Source: Toldstyrelsen, "Travelling within the EU" (https://toldst.dk/en-us/individuals/travel/travelling-within-the-eu), checked 2026-10-30. Guide amounts per person aged 18+: **spirits 10 l** (above 22 % *and drinks with added alcohol*, so liqueurs and alcopops count), **fortified wine 20 l** (22 % or less: port, sherry, Madeira), **wine 90 l** (max 60 l sparkling; cider-based wine counts here), **beer 110 l** (incl. beer-based cider). 16-17-year-olds: only beer and wine up to 16.4 %. They are guide amounts: above them customs can ask you to show the goods are for your own use, otherwise Danish duty is due.
 - `src/catalog/import-limits.ts` classifies each basket item from its family category and name (alcohol-free excluded; port/sherry/Madeira/vermouth/Martini as fortified, but not whisky "Sherry Cask"/"Port Cask" finishes; cider counted as wine, the stricter limit, since shops don't say whether it is beer- or wine-based). `/api/compare` returns the basket's liters per type.
 - `/kurv` shows "Indførsel til Danmark" when the basket has alcohol: a selector for adults (18+) in the car (remembered in the browser), liters vs allowed per type, and a calm warning when over. Not checked: the 60 l sparkling-wine sub-limit (the site has almost no wine).
+
+### Trips, split suggestions and travel cost on the basket page (2026-11-01)
+
+- **Trips, not shops:** `src/catalog/trips.ts` groups shops by crossing: Padborg / Kruså (Poetzsch, Fleggaard, ScandiPark, later Calle - all within ~10 km), Rødby-Puttgarden (BorderShop Puttgarden) and Gedser-Rostock (BorderShop Rostock). A code constant, not a database column - shops rarely change.
+- **Split:** `src/catalog/plan.ts` buys each item where it's cheapest within a trip. A split is used when it covers items the best single shop lacks, otherwise only when it saves >= 50 kr. (an extra stop takes time).
+- **Missing items:** a trip that lacks an item counts it at the **highest price found in any other shop**, shown as "Skønnet". Without this, a trip missing an expensive item (e.g. vodka at BorderShop) looked cheapest. Same idea as the Fleggaard-estimate to-do.
+- **Distance:** postcode -> centre point from **GeoNames' Danish postcode list** (CC BY 4.0, downloaded 2026-11-01 with the user's OK, `src/catalog/postcodes.json`, credited on the page; Dataforsyningen's DAWA API is closed - HTTP 410). Loaded in the browser only when a postcode is typed, so the postcode never leaves the phone. Road km = straight lines x 1.25 over the Little Belt / Great Belt bridges; checked within ~10 % (Copenhagen-Padborg 330 vs ~310 km, Aarhus-Padborg 196 vs ~185). Bornholm is skipped. Time at ~80 km/h plus ferry crossing (Rødby-Puttgarden 45 min, Gedser-Rostock ~2 h).
+- **Cost:** nobody knows their cost per km, so users pick a car type with rough averages (petrol 0,85, diesel 0,65, electric 0,50 kr./km, all marked "ca."); distance and time are shown first.
+- **Ferry:** Scandlines prices vary too much to hard-code (season, departure, offers). A ferry trip without a ticket price never gets "Billigst"; it shows a **break-even** instead ("Billigere end Padborg / Kruså, hvis færgen koster under 198 kr. tur/retur"). Users can enter their ticket price, remembered in the browser.
+- Tested: Aarhus -> Padborg cheapest with a 3-shop split; Copenhagen -> ferry trips only pay off if the ticket is under ~180-200 kr. for that basket.
+- Found on the way (for the coverage work): BorderShop has no "Smirnoff Vodka" in the same family as Poetzsch/ScandiPark, and ScandiPark's Tuborg Grøn isn't in the Tuborg Grøn family.
 

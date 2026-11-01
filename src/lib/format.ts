@@ -11,3 +11,13 @@ export const PER_UNIT_LABEL: Record<Unit, string> = { l: "pr. liter", kg: "pr. k
 
 /** 3. november */
 export const day = (iso: string) => new Date(iso).toLocaleDateString("da-DK", { day: "numeric", month: "long" });
+
+/** 1.240 (whole kroner, for rough estimates) */
+export const krRound = (n: number) => Math.round(n).toLocaleString("da-DK");
+
+/** 2 t 30 min */
+export const duration = (minutes: number) => {
+  const rounded = Math.max(5, Math.round(minutes / 5) * 5);
+  const [h, m] = [Math.floor(rounded / 60), rounded % 60];
+  return h ? `${h} t${m ? ` ${m} min` : ""}` : `${m} min`;
+};

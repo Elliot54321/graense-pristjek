@@ -7,6 +7,7 @@ import type { BasketItem, ShopResult } from "@/catalog/types";
 import { clearBasket, removeFromBasket, updateBasketItem, useBasket } from "@/components/basket";
 import { amount, day, kr, UNIT_LABEL } from "@/lib/format";
 import { ImportLimits } from "./import-limits";
+import { TripPlanner } from "./trip-planner";
 
 type Alcohol = Partial<Record<AlcoholType, number>>;
 type State = { status: "idle" | "loading" | "error"; results: ShopResult[]; alcohol: Alcohol };
@@ -69,6 +70,8 @@ export function BasketView() {
           Tøm kurven
         </button>
       </div>
+
+      {state.results.length > 0 && <TripPlanner results={state.results} />}
 
       <h2 className="mt-8 text-xl font-semibold tracking-tight">Pris pr. butik</h2>
       {state.status === "error" && <p className="mt-2 text-red-700">Kunne ikke hente priser. Prøv igen om lidt.</p>}
