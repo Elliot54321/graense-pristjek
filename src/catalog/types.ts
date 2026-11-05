@@ -70,11 +70,17 @@ export interface LineResult {
     coupon: boolean;
   } | null;
   cost: number | null;
+  /** When the shop lacks the item: the highest price another shop charges (null if none has it). */
+  estimate: number | null;
 }
 
 export interface ShopResult {
   shop: Shop;
+  /** Sum of the items this shop has. */
   total: number;
   lines: LineResult[];
   missing: number;
+  /** Missing items counted at their estimate, and the total including them - what shops are ranked by. */
+  estimates: number;
+  totalWithEstimates: number;
 }

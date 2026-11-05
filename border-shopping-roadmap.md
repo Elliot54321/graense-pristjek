@@ -107,7 +107,7 @@ created: 2026-10-16
 - [x] Travel cost from the user's location to each shop (2026-11-01: trip cards on `/kurv` with postcode, rough distance/time and fuel per car type; ferry ticket entered by the user)
 - [x] Optional "split across two shops" suggestion, only if saving beats extra driving (2026-11-01: within the Padborg area, when it covers more items or saves >= 50 kr.)
 - [x] Mark Calle's newsletter prices as coupon prices ("kupon-tilbud") everywhere they're shown (done 2026-11-05: per-offer `coupon` flag, "Kuponpris" badge in search, basket and trip cards, rules note)
-- [ ] Show Fleggaard for items missing from its newsletter (added 2026-10-30): we only have the newsletter, but Fleggaard almost surely sells the item, so "findes ikke her" is misleading. Assume a price equal to the most expensive other shop's price, marked as an estimate with a short note that the in-store price can vary and a link to fleggaard.dk to check. An estimate must never be shown as the cheapest option.
+- [x] Show Fleggaard for items missing from its newsletter (done 2026-11-05 for every shop: a missing item counts at the highest price in any other shop, labelled "ikke i avisen" + link for Fleggaard/Calle and "ikke i webshoppen" for scraped shops; a shop can still be "Billigst", but the badge then says how many prices are estimated)
 
 ---
 
@@ -563,4 +563,11 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
 - The rest were **coverage rules matching the wrong product**: "Faxe Kondi Apelsin Zero" (ScandiPark spelling), "Marabou Oreo Bites", Toms' Christmas calendar and Chrisco's skildpadder. Rules tightened in `common-items.ts`; "Cloetta Polly" is now "Polly Original" and "DK-Nuts Mandler" is "ristede og saltede" (the shops sell many different Polly and almond products, and Calle's Polly offer covers several varieties at once).
 - **Result: 117 of 120 common items linked** across every shop that sells them (104 before), 0 partly. Left: Cult Energy and Fisk (Poetzsch only), OK Snacks Flæskesvær (no shop online).
 - Lesson: newsletter offers named after a pack ("Faxe Kondi 24 x 0,33 l.") sometimes got their own family; worth checking new newsletter families against existing ones after each import.
+
+### Estimated prices for missing items in the per-shop list (2026-11-05)
+
+- Decision (user): when a shop lacks a basket item, count it at the **highest price any other shop charges** - now in the per-shop list too, not just the trip cards. `compare.ts` adds `estimate` per missing line and `estimates` / `totalWithEstimates` per shop, and ranks shops by `totalWithEstimates`; `plan.ts` reuses these.
+- Why it's safe: the estimate can never make a shop look cheaper on that item (at best a tie), so a shop only wins on what it really sells. For Fleggaard and Calle (newsletter shops, ~750 items per issue) "missing" almost always means "not in this issue", and they are the biggest shops.
+- Labels: "ikke i avisen – skønnet (tjek fleggaard.dk / calle.dk)" for newsletter shops; "ikke i webshoppen – skønnet" for Poetzsch, BorderShop and ScandiPark, where a missing item more likely isn't sold (or wasn't matched). Items no shop has are left out everywhere ("findes ingen steder").
+- Changed from the earlier to-do ("an estimate must never be shown as the cheapest option"): a shop with estimates can be "Billigst", but the badge says "Billigst – inkl. N skønnet" and the total is shown as "ca.".
 

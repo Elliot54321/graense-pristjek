@@ -8,8 +8,18 @@
  *   7,92 l cases means 2 cases. Mixing pack sizes is not tried yet.
  * - Multi-buy deals ("3 for 174,99") are used for every full group of that size;
  *   the rest is charged at the single price.
+ * - An item a shop lacks is counted at the highest price any other shop charges
+ *   for it, marked as an estimate. This can never make a shop look cheaper on that
+ *   item, and it keeps totals comparable: otherwise a shop missing an expensive
+ *   item would look cheapest. Newsletter shops (Fleggaard, Calle) only show part of
+ *   their range, so for them "missing" mostly means "not in this issue".
  */
 import type { BasketItem, LineResult, Offer, Pack, Shop, ShopResult } from "./types";
+
+/** Shops whose prices come from a newsletter, so a missing item is likely just not in the issue. */
+export const NEWSLETTER_SHOPS = new Set(["fleggaard", "calle"]);
+
+const round = (n: number) => Math.round(n * 100) / 100;
 
 /** Cost of `quantity` packs, using a multi-buy deal for every full group when it's cheaper. */
 export function costFor(offer: Offer, quantity: number): { cost: number; usedMultiBuy: boolean } {
@@ -30,7 +40,7 @@ function priceLine(item: BasketItem, packs: Pack[], shopId: string): LineResult 
   if (item.kind === "product") {
     const pack = packs.find((p) => p.productId === item.productId);
     const offer = pack && offerAt(pack, shopId);
-    if (!pack || !offer) return { key: item.key, label: item.label, buy: null, cost: null };
+    if (!pack || !offer) return { key: item.key, label: item.label, buy: null, cost: null, estimate: null };
     const { cost, usedMultiBuy } = costFor(offer, item.quantity);
     return {
       key: item.key,
@@ -46,6 +56,7 @@ function priceLine(item: BasketItem, packs: Pack[], shopId: string): LineResult 
         coupon: offer.coupon,
       },
       cost,
+      estimate: null,
     };
   }
 
@@ -72,23 +83,34 @@ function priceLine(item: BasketItem, packs: Pack[], shopId: string): LineResult 
           coupon: offer.coupon,
         },
         cost,
+        estimate: null,
       };
     }
   }
-  return best ?? { key: item.key, label: item.label, buy: null, cost: null };
+  return best ?? { key: item.key, label: item.label, buy: null, cost: null, estimate: null };
 }
 
-/** One result per shop, cheapest complete basket first; shops missing items after that. */
+/** One result per shop, cheapest first once missing items are counted at their estimate. */
 export function compareBasket(items: BasketItem[], packs: Pack[], shops: Shop[]): ShopResult[] {
+  const linesPerShop = shops.map((shop) => items.map((item) => priceLine(item, packs, shop.id)));
+  // Highest price per item across shops; null if no shop has it (then it's left out everywhere).
+  const highest = items.map((_, i) => {
+    const costs = linesPerShop.flatMap((lines) => (lines[i].cost === null ? [] : [lines[i].cost!]));
+    return costs.length ? Math.max(...costs) : null;
+  });
   return shops
-    .map((shop) => {
-      const lines = items.map((item) => priceLine(item, packs, shop.id));
+    .map((shop, s) => {
+      const lines = linesPerShop[s].map((l, i) => (l.cost === null ? { ...l, estimate: highest[i] } : l));
+      const total = round(lines.reduce((sum, l) => sum + (l.cost ?? 0), 0));
+      const estimated = lines.filter((l) => l.estimate !== null);
       return {
         shop,
         lines,
-        total: Math.round(lines.reduce((sum, l) => sum + (l.cost ?? 0), 0) * 100) / 100,
+        total,
         missing: lines.filter((l) => l.cost === null).length,
+        estimates: estimated.length,
+        totalWithEstimates: round(total + estimated.reduce((sum, l) => sum + l.estimate!, 0)),
       };
     })
-    .sort((a, b) => a.missing - b.missing || a.total - b.total);
+    .sort((a, b) => a.totalWithEstimates - b.totalWithEstimates || a.estimates - b.estimates);
 }

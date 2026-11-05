@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { AlcoholType } from "@/catalog/import-limits";
+import { NEWSLETTER_SHOPS } from "@/catalog/compare";
 import type { BasketItem, ShopResult } from "@/catalog/types";
 import { clearBasket, removeFromBasket, updateBasketItem, useBasket } from "@/components/basket";
 import { amount, day, kr, UNIT_LABEL } from "@/lib/format";
@@ -79,7 +80,7 @@ export function BasketView() {
       {state.status === "loading" && !state.results.length && <p className="mt-2 text-zinc-500">Regner priser ud…</p>}
       <ol className={`mt-3 flex flex-col gap-4 ${state.status === "loading" ? "opacity-60" : ""}`}>
         {state.results.map((r, i) => (
-          <ShopCard key={r.shop.id} result={r} cheapest={i === 0 && r.missing === 0} />
+          <ShopCard key={r.shop.id} result={r} cheapest={i === 0 && state.results.length > 1} />
         ))}
       </ol>
       <ImportLimits liters={state.alcohol} />
@@ -87,7 +88,8 @@ export function BasketView() {
         {state.results.some((r) => r.lines.some((l) => l.buy?.coupon)) && <>{COUPON_NOTE} </>}
         Butikkerne ligger forskellige steder: Fleggaard, Calle og Poetzsch ved Padborg/Kruså, Scandinavian Park ved motorvejen i
         Handewitt, BorderShop ved færgerne i Puttgarden (Rødby–Puttgarden) og Rostock (Gedser–Rostock). Fleggaards og
-        Calles priser kommer fra deres aviser og gælder til avisens slutdato. Har en butik ikke en vare, tæller den ikke med i totalen.
+        Calles priser kommer fra deres aviser og gælder til avisens slutdato. Har en butik ikke en vare, regner vi med
+        den højeste pris i de andre butikker, så totalerne kan sammenlignes.
       </p>
     </>
   );
@@ -144,21 +146,32 @@ function Stepper({ value, onMinus, onPlus }: { value: string; onMinus: () => voi
 
 function ShopCard({ result, cheapest }: { result: ShopResult; cheapest: boolean }) {
   const { shop } = result;
+  // Newsletter shops only show part of their range, so the item is probably there.
+  const newsletter = NEWSLETTER_SHOPS.has(shop.id);
   return (
     <li className={`rounded-lg border p-4 ${cheapest ? "border-emerald-500 ring-1 ring-emerald-500" : "border-zinc-200 dark:border-zinc-800"}`}>
       <div className="flex items-baseline justify-between gap-3">
         <div>
           <h3 className="font-semibold">
             {shop.name}
-            {cheapest && <span className="ml-2 rounded bg-emerald-600 px-1.5 py-0.5 text-xs font-medium text-white">Billigst</span>}
+            {cheapest && (
+              <span className="ml-2 inline-block whitespace-nowrap rounded bg-emerald-600 px-1.5 py-0.5 text-xs font-medium text-white">
+                Billigst{result.estimates > 0 && ` – inkl. ${result.estimates} skønnet`}
+              </span>
+            )}
           </h3>
           {shop.location && <p className="text-xs text-zinc-500">{shop.location}</p>}
         </div>
-        <p className="text-xl font-semibold tabular-nums">{kr(result.total)} kr.</p>
+        <p className="shrink-0 whitespace-nowrap text-right text-xl font-semibold tabular-nums">
+          {result.estimates > 0 && "ca. "}
+          {kr(result.totalWithEstimates)} kr.
+        </p>
       </div>
-      {result.missing > 0 && (
+      {result.estimates > 0 && (
         <p className="mt-1 text-sm text-amber-700 dark:text-amber-400">
-          Mangler {result.missing} {result.missing === 1 ? "vare" : "varer"} – ikke med i totalen
+          {result.estimates} {result.estimates === 1 ? "vare" : "varer"}{" "}
+          {newsletter ? "er ikke i butikkens avis" : "findes ikke i webshoppen"} – regnet med den højeste pris i de andre
+          butikker
         </p>
       )}
       <ul className="mt-2 text-sm">
@@ -182,8 +195,25 @@ function ShopCard({ result, cheapest }: { result: ShopResult; cheapest: boolean 
                 </a>
                 <span className="tabular-nums">{kr(l.cost!)}</span>
               </>
+            ) : l.estimate !== null ? (
+              <>
+                <span className="min-w-0 flex-1 text-zinc-500">
+                  {l.label}: {newsletter ? "ikke i avisen" : "ikke i webshoppen"} – skønnet
+                  {newsletter && (
+                    <>
+                      {" "}
+                      (
+                      <a href={shop.website} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
+                        tjek {shop.website.replace(/^https?:\/\/(www\.)?/, "")}
+                      </a>
+                      )
+                    </>
+                  )}
+                </span>
+                <span className="tabular-nums text-zinc-500">~{kr(l.estimate)}</span>
+              </>
             ) : (
-              <span className="text-zinc-500">{l.label}: findes ikke her</span>
+              <span className="text-zinc-500">{l.label}: findes ingen steder</span>
             )}
           </li>
         ))}

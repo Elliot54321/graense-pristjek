@@ -5,9 +5,8 @@
  * shop lacks, or else when it saves at least MIN_SPLIT_SAVING, since every extra
  * stop takes time.
  *
- * Items a trip lacks are counted at the highest price found in any other shop and
- * marked as estimates, so trips stay comparable: otherwise a trip missing an
- * expensive item would look cheapest just because its total leaves it out.
+ * Items a trip lacks keep the estimate from compare.ts (the highest price in any
+ * other shop), so trips stay comparable.
  */
 import { AREAS, type Area } from "./trips";
 import type { ShopResult } from "./types";
@@ -39,18 +38,12 @@ export interface TripPlan {
 const round = (n: number) => Math.round(n * 100) / 100;
 
 export function planTrips(results: ShopResult[]): TripPlan[] {
-  // Highest price per basket item across all shops, for estimating missing items.
-  const highest = (results[0]?.lines ?? []).map((_, i) => {
-    const costs = results.flatMap((r) => (r.lines[i].cost === null ? [] : [r.lines[i].cost!]));
-    return costs.length ? Math.max(...costs) : null;
-  });
   const plans: TripPlan[] = [];
   for (const area of AREAS) {
     const shops = results.filter((r) => area.shops.includes(r.shop.id));
     if (!shops.length) continue;
     // Best single shop: lowest total once its missing items are counted at the estimate.
-    const shopFull = (r: ShopResult) => r.total + r.lines.reduce((sum, l, i) => sum + (l.cost === null ? (highest[i] ?? 0) : 0), 0);
-    const single = [...shops].sort((a, b) => shopFull(a) - shopFull(b))[0];
+    const single = [...shops].sort((a, b) => a.totalWithEstimates - b.totalWithEstimates)[0];
 
     // Each item from the shop where it's cheapest (lines are in basket order in every shop).
     const stops = new Map<string, SplitStop>();
@@ -60,7 +53,8 @@ export function planTrips(results: ShopResult[]): TripPlan[] {
         .map((s) => ({ shop: s.shop, cost: s.lines[i].cost }))
         .filter((o): o is { shop: ShopResult["shop"]; cost: number } => o.cost !== null)
         .sort((a, b) => a.cost - b.cost);
-      if (!offers.length) return missing.push({ label: line.label, estimate: highest[i] });
+      // No shop here has it, so the single shop lacks it too and carries its estimate.
+      if (!offers.length) return missing.push({ label: line.label, estimate: line.estimate });
       const best = offers[0];
       const stop = stops.get(best.shop.id) ?? { shopId: best.shop.id, shopName: best.shop.name, items: [], cost: 0 };
       // Coupon prices stay marked all the way to the trip card.
@@ -72,10 +66,9 @@ export function planTrips(results: ShopResult[]): TripPlan[] {
     const splitTotal = round([...stops.values()].reduce((sum, s) => sum + s.cost, 0));
 
     // Compare like with like: both sides count their missing items at the estimate.
-    const singleMissing = single.lines.flatMap((l, i) => (l.cost === null ? [{ label: l.label, estimate: highest[i] }] : []));
-    const withEstimates = (total: number, m: TripPlan["missing"]) => round(total + m.reduce((sum, x) => sum + (x.estimate ?? 0), 0));
-    const singleFull = withEstimates(single.total, singleMissing);
-    const splitFull = withEstimates(splitTotal, missing);
+    const singleMissing = single.lines.flatMap((l) => (l.cost === null ? [{ label: l.label, estimate: l.estimate }] : []));
+    const singleFull = single.totalWithEstimates;
+    const splitFull = round(splitTotal + missing.reduce((sum, x) => sum + (x.estimate ?? 0), 0));
     const saving = round(singleFull - splitFull);
     // An item another shop here sells is bought there, not estimated - so a split
     // that covers more items is always used; otherwise only when it saves enough.
