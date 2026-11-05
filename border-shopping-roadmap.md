@@ -106,6 +106,7 @@ created: 2026-10-16
 - [x] Danish import limits for alcohol and tobacco, with warnings (alcohol done 2026-10-30 on `/kurv`; tobacco not, as the site has no tobacco)
 - [x] Travel cost from the user's location to each shop (2026-11-01: trip cards on `/kurv` with postcode, rough distance/time and fuel per car type; ferry ticket entered by the user)
 - [x] Optional "split across two shops" suggestion, only if saving beats extra driving (2026-11-01: within the Padborg area, when it covers more items or saves >= 50 kr.)
+- [ ] Mark Calle's newsletter prices as coupon prices ("kupon-tilbud") everywhere they're shown (added 2026-11-05; see "Plan for 3 November")
 - [ ] Show Fleggaard for items missing from its newsletter (added 2026-10-30): we only have the newsletter, but Fleggaard almost surely sells the item, so "findes ikke her" is misleading. Assume a price equal to the most expensive other shop's price, marked as an estimate with a short note that the in-store price can vary and a link to fleggaard.dk to check. An estimate must never be shown as the cheapest option.
 
 ---
@@ -523,6 +524,7 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
 ### Plan for 3 November (2026-10-30)
 
 - **Calle has its own newsletter**, separate from Fleggaard's (user, 2026-10-30); both new issues come out on 3 Nov, when Fleggaard's current issue expires. Calle needs its own shop row; its prices go through the same newsletter pipeline (`flyer:extract` -> `flyer:import --shop calle` -> `match:new`).
+- **Calle's newsletter is a "kupon-tilbud" newsletter** (user, 2026-11-05): its prices need a coupon from the newsletter. Wherever the site shows a Calle price (search, basket, trip cards), it must **disclose that it's a coupon price** (e.g. a "kupon" badge and a short note on how to get the coupon). Store this per price when importing (like multi-buy), so it's never shown as an ordinary shelf price.
 - Same day: run `match:coverage` across all shops (Rostock and ScandiPark matching will have caught up by then) and fix the items that aren't fully linked.
 
 ### Import-limit warning on the basket page (2026-10-30)
