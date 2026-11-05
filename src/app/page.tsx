@@ -3,6 +3,7 @@ import { getShops, searchFamilies } from "@/catalog/data";
 import type { FamilyResult, Pack, Shop } from "@/catalog/types";
 import { AddToBasket } from "@/components/add-to-basket";
 import { amount, day, kr, PER_UNIT_LABEL, UNIT_LABEL } from "@/lib/format";
+import { CouponBadge, COUPON_NOTE } from "@/components/coupon-badge";
 
 const EXAMPLES = ["cola", "øl", "haribo", "gin", "chips"];
 
@@ -73,12 +74,16 @@ async function Results({ query }: { query: string }) {
     return <p className="mt-6 text-zinc-600 dark:text-zinc-400">Ingen varer fundet for “{query}”. Prøv et andet ord.</p>;
   }
   const shopById = new Map(shops.map((s) => [s.id, s]));
+  const hasCoupon = families.some((f) => f.packs.some((p) => p.offers.some((o) => o.coupon)));
   return (
-    <ul className="mt-6 flex flex-col gap-4">
-      {families.map((f) => (
-        <FamilyCard key={f.id} family={f} shops={shopById} />
-      ))}
-    </ul>
+    <>
+      <ul className="mt-6 flex flex-col gap-4">
+        {families.map((f) => (
+          <FamilyCard key={f.id} family={f} shops={shopById} />
+        ))}
+      </ul>
+      {hasCoupon && <p className="mt-4 text-xs text-zinc-500">{COUPON_NOTE}</p>}
+    </>
   );
 }
 
@@ -98,6 +103,7 @@ function FamilyCard({ family, shops }: { family: FamilyResult; shops: Map<string
             <p className="text-sm text-zinc-700 dark:text-zinc-300">
               Billigst: <strong>{kr(family.best.pricePerUnit)} kr. {PER_UNIT_LABEL[family.best.unit]}</strong> hos{" "}
               {shopLabel(shops, family.best.shopId)}
+              {family.best.coupon && <CouponBadge />}
             </p>
           )}
         </div>
@@ -155,6 +161,7 @@ function PackRow({ pack, shops }: { pack: Pack; shops: Map<string, Shop> }) {
                   {o.multiBuy.quantity} for {kr(o.multiBuy.price)}
                 </span>
               )}
+              {o.coupon && <CouponBadge />}
               {o.savingVsDkPercent !== null && (
                 <span className="ml-1 text-xs text-zinc-500">(butikken: spar {o.savingVsDkPercent}% ift. DK)</span>
               )}

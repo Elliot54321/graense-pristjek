@@ -15,6 +15,7 @@ const SHOP_NAMES: Record<string, string> = {
   bordershop: "BorderShop Puttgarden",
   "bordershop-rostock": "BorderShop Rostock",
   fleggaard: "Fleggaard",
+  calle: "Calle",
   scandipark: "Scandinavian Park",
 };
 

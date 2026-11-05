@@ -33,6 +33,7 @@ export const GROUPS: Record<string, (r: GroupRow) => string | undefined> = {
   },
   // Newsletter products carry the comparison category directly.
   fleggaard: (r) => (["soda", "beer", "candy", "spirits", "groceries", "household"].includes(r.categories[0]) ? r.categories[0] : undefined),
+  calle: (r) => GROUPS.fleggaard(r),
 };
 
 /**

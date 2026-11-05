@@ -25,6 +25,8 @@ export interface Offer {
   multiBuy: { quantity: number; price: number } | null;
   /** The shop's own "SPAR x% ift. DK" claim. */
   savingVsDkPercent: number | null;
+  /** Calle "KUPONTILBUD": only with the newsletter's coupon - always say so. */
+  coupon: boolean;
 }
 
 /** An exact product (one pack), with every shop's price. */
@@ -42,7 +44,7 @@ export interface FamilyResult {
   name: string;
   category: string;
   /** Cheapest price per liter/kg/piece across all packs and shops. */
-  best: { pricePerUnit: number; unit: Unit; shopId: string; productName: string } | null;
+  best: { pricePerUnit: number; unit: Unit; shopId: string; productName: string; coupon: boolean } | null;
   packs: Pack[];
 }
 
@@ -65,6 +67,7 @@ export interface LineResult {
     offerEndsAt: string | null;
     /** Set when a multi-buy deal was used for (part of) the quantity. */
     multiBuy: { quantity: number; price: number } | null;
+    coupon: boolean;
   } | null;
   cost: number | null;
 }

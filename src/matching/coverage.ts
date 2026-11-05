@@ -23,6 +23,7 @@ const BOTTLES = /flask|\bfl\b|\bpet\b/i;
 const SHOPS: { id: string; label: string; short: string }[] = [
   { id: "poetzsch", label: "Poetzsch", short: "P" },
   { id: "fleggaard", label: "Fleggaard", short: "F" },
+  { id: "calle", label: "Calle", short: "C" },
   { id: "scandipark", label: "ScandiPark", short: "S" },
   { id: "bordershop", label: "BorderShop Puttgarden", short: "B" },
   { id: "bordershop-rostock", label: "BorderShop Rostock", short: "R" },

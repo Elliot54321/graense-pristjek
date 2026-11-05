@@ -44,6 +44,8 @@ export interface ScrapedProduct {
   multiBuy?: { quantity: number; price: number } | null;
   /** The shop's own "SPAR x% ift. DK" claim. */
   savingVsDkPercent?: number | null;
+  /** Newsletter "KUPONTILBUD": the price needs the newsletter's coupon (Calle). */
+  coupon?: boolean;
   scrapedAt: string;
 }
 

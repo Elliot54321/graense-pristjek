@@ -6,6 +6,7 @@ import type { AlcoholType } from "@/catalog/import-limits";
 import type { BasketItem, ShopResult } from "@/catalog/types";
 import { clearBasket, removeFromBasket, updateBasketItem, useBasket } from "@/components/basket";
 import { amount, day, kr, UNIT_LABEL } from "@/lib/format";
+import { CouponBadge, COUPON_NOTE } from "@/components/coupon-badge";
 import { ImportLimits } from "./import-limits";
 import { TripPlanner } from "./trip-planner";
 
@@ -83,9 +84,10 @@ export function BasketView() {
       </ol>
       <ImportLimits liters={state.alcohol} />
       <p className="mt-4 text-xs text-zinc-500">
-        Butikkerne ligger forskellige steder: Fleggaard og Poetzsch ved Padborg/Harrislee, Scandinavian Park ved motorvejen i
-        Handewitt, BorderShop ved færgerne i Puttgarden (Rødby–Puttgarden) og Rostock (Gedser–Rostock). Fleggaards priser
-        kommer fra deres avis og gælder til avisens slutdato. Har en butik ikke en vare, tæller den ikke med i totalen.
+        {state.results.some((r) => r.lines.some((l) => l.buy?.coupon)) && <>{COUPON_NOTE} </>}
+        Butikkerne ligger forskellige steder: Fleggaard, Calle og Poetzsch ved Padborg/Kruså, Scandinavian Park ved motorvejen i
+        Handewitt, BorderShop ved færgerne i Puttgarden (Rødby–Puttgarden) og Rostock (Gedser–Rostock). Fleggaards og
+        Calles priser kommer fra deres aviser og gælder til avisens slutdato. Har en butik ikke en vare, tæller den ikke med i totalen.
       </p>
     </>
   );
@@ -171,6 +173,7 @@ function ShopCard({ result, cheapest }: { result: ShopResult; cheapest: boolean 
                       ({l.buy.multiBuy.quantity} for {kr(l.buy.multiBuy.price)})
                     </span>
                   )}
+                  {l.buy.coupon && <CouponBadge />}
                   {l.buy.onOffer && (
                     <span className="ml-1 text-xs text-amber-700 dark:text-amber-400">
                       tilbud{l.buy.offerEndsAt ? ` til ${day(l.buy.offerEndsAt)}` : ""}

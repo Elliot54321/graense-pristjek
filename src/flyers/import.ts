@@ -17,7 +17,7 @@ import { unitPrice } from "../scrapers/quantity";
 import { adminClient, finishRun, saveProducts, startRun, type RunSummary } from "../scrapers/save";
 import type { BaseUnit, ScrapedProduct } from "../scrapers/types";
 
-const SHOP_WEBSITES: Record<string, string> = { fleggaard: "https://www.fleggaard.dk" };
+const SHOP_WEBSITES: Record<string, string> = { fleggaard: "https://www.fleggaard.dk", calle: "https://www.calle.dk" };
 
 interface Offer {
   products: string[];
@@ -33,6 +33,8 @@ interface Offer {
   multi_buy: { quantity: number; total_price: number } | null;
   always_low_price: boolean;
   saving_vs_dk_percent: number | null;
+  /** Missing in extractions made before coupons were read (2026-11-05). */
+  coupon?: boolean;
 }
 interface Extracted {
   pdf: string;
@@ -50,7 +52,9 @@ function parseSections(args: string[]): { from: number; to: number; validTo: str
 
 /** Content of the whole sellable unit in liters/kg; null for ranges ("18-24 x") or pieces. */
 function content(o: Offer): { amount: number; unit: BaseUnit } | null {
-  if ((o.unit !== "l" && o.unit !== "kg") || !o.unit_size || /\d\s*-\s*\d/.test(o.pack.split("x")[0])) return null;
+  // A range like "250-375 g." means several sizes; an alcohol range like "17-37,5%" doesn't.
+  const pack = o.pack.replace(/\d+(?:[,.]\d+)?\s*-\s*\d+(?:[,.]\d+)?\s*%/g, "");
+  if ((o.unit !== "l" && o.unit !== "kg") || !o.unit_size || /\d\s*-\s*\d/.test(pack.split("x")[0])) return null;
   return { amount: Math.round((o.unit_count ?? 1) * o.unit_size * 1e6) / 1e6, unit: o.unit };
 }
 
@@ -90,6 +94,7 @@ export function offersToProducts(data: Extracted, shop: string, validTo: string,
           listedUntil: until,
           multiBuy: o.multi_buy ? { quantity: o.multi_buy.quantity, price: o.multi_buy.total_price } : null,
           savingVsDkPercent: o.saving_vs_dk_percent,
+          coupon: o.coupon ?? false,
           scrapedAt: now,
         };
         // The same product on two pages: keep the cheaper listing.
@@ -118,6 +123,7 @@ async function main() {
   for (const p of products) cats[p.categories[0]] = (cats[p.categories[0]] ?? 0) + 1;
   console.log(`${products.length} ${shop} products from ${data.pdf}: ${JSON.stringify(cats)}`);
   console.log(`  without content (ranges, pieces): ${products.filter((p) => !p.totalContent).length}`);
+  console.log(`  coupon prices: ${products.filter((p) => p.coupon).length}`);
   console.log(`  valid until: ${JSON.stringify(Object.fromEntries([...new Set(products.map((p) => p.listedUntil))].map((d) => [d, products.filter((p) => p.listedUntil === d).length])))}`);
   for (const p of products.slice(0, 12)) {
     console.log(`  ${p.name.slice(0, 55).padEnd(55)} ${String(p.price).padStart(7)}  ${p.totalContent ? `${p.totalContent.amount} ${p.totalContent.unit}` : "-"}  ${p.pricePerUnit ?? "-"}/unit${p.multiBuy ? `  ${p.multiBuy.quantity} for ${p.multiBuy.price}` : ""}`);

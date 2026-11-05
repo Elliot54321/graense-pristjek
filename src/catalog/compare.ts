@@ -43,6 +43,7 @@ function priceLine(item: BasketItem, packs: Pack[], shopId: string): LineResult 
         onOffer: offer.onOffer,
         offerEndsAt: offer.offerEndsAt,
         multiBuy: usedMultiBuy ? offer.multiBuy : null,
+        coupon: offer.coupon,
       },
       cost,
     };
@@ -68,6 +69,7 @@ function priceLine(item: BasketItem, packs: Pack[], shopId: string): LineResult 
           onOffer: offer.onOffer,
           offerEndsAt: offer.offerEndsAt,
           multiBuy: usedMultiBuy ? offer.multiBuy : null,
+          coupon: offer.coupon,
         },
         cost,
       };

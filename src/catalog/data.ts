@@ -37,6 +37,7 @@ interface PriceRow {
   multi_buy_quantity: number | null;
   multi_buy_price: number | null;
   saving_vs_dk_percent: number | null;
+  coupon: boolean;
 }
 
 export async function getShops(): Promise<Shop[]> {
@@ -69,7 +70,7 @@ async function loadPacks(productIds: number[], familyIds: number[]): Promise<Pac
   const { data: prices, error: priceError } = await db
     .from("matched_prices")
     .select(
-      "product_id, shop_id, name, price, price_per_unit, on_offer, regular_price, offer_ends_at, url, observed_at, multi_buy_quantity, multi_buy_price, saving_vs_dk_percent",
+      "product_id, shop_id, name, price, price_per_unit, on_offer, regular_price, offer_ends_at, url, observed_at, multi_buy_quantity, multi_buy_price, saving_vs_dk_percent, coupon",
     )
     .in("product_id", products.map((p) => p.id));
   if (priceError) throw priceError;
@@ -92,6 +93,7 @@ async function loadPacks(productIds: number[], familyIds: number[]): Promise<Pac
           ? { quantity: r.multi_buy_quantity, price: Number(r.multi_buy_price) }
           : null,
       savingVsDkPercent: r.saving_vs_dk_percent === null ? null : Number(r.saving_vs_dk_percent),
+      coupon: r.coupon,
     };
     offersByProduct.set(r.product_id, [...(offersByProduct.get(r.product_id) ?? []), offer]);
   }
@@ -143,7 +145,7 @@ export async function searchFamilies(rawQuery: string): Promise<FamilyResult[]> 
       for (const o of pack.offers) {
         if (o.pricePerUnit === null || !pack.contentUnit) continue;
         if (!best || o.pricePerUnit < best.pricePerUnit) {
-          best = { pricePerUnit: o.pricePerUnit, unit: pack.contentUnit, shopId: o.shopId, productName: pack.name };
+          best = { pricePerUnit: o.pricePerUnit, unit: pack.contentUnit, shopId: o.shopId, productName: pack.name, coupon: o.coupon };
         }
       }
     }

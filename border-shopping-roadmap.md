@@ -106,7 +106,7 @@ created: 2026-10-16
 - [x] Danish import limits for alcohol and tobacco, with warnings (alcohol done 2026-10-30 on `/kurv`; tobacco not, as the site has no tobacco)
 - [x] Travel cost from the user's location to each shop (2026-11-01: trip cards on `/kurv` with postcode, rough distance/time and fuel per car type; ferry ticket entered by the user)
 - [x] Optional "split across two shops" suggestion, only if saving beats extra driving (2026-11-01: within the Padborg area, when it covers more items or saves >= 50 kr.)
-- [ ] Mark Calle's newsletter prices as coupon prices ("kupon-tilbud") everywhere they're shown (added 2026-11-05; see "Plan for 3 November")
+- [x] Mark Calle's newsletter prices as coupon prices ("kupon-tilbud") everywhere they're shown (done 2026-11-05: per-offer `coupon` flag, "Kuponpris" badge in search, basket and trip cards, rules note)
 - [ ] Show Fleggaard for items missing from its newsletter (added 2026-10-30): we only have the newsletter, but Fleggaard almost surely sells the item, so "findes ikke her" is misleading. Assume a price equal to the most expensive other shop's price, marked as an estimate with a short note that the in-store price can vary and a link to fleggaard.dk to check. An estimate must never be shown as the cheapest option.
 
 ---
@@ -543,4 +543,14 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
 - **Ferry:** Scandlines prices vary too much to hard-code (season, departure, offers). A ferry trip without a ticket price never gets "Billigst"; it shows a **break-even** instead ("Billigere end Padborg / Kruså, hvis færgen koster under 198 kr. tur/retur"). Users can enter their ticket price, remembered in the browser.
 - Tested: Aarhus -> Padborg cheapest with a 3-shop split; Copenhagen -> ferry trips only pay off if the ticket is under ~180-200 kr. for that basket.
 - Found on the way (for the coverage work): BorderShop has no "Smirnoff Vodka" in the same family as Poetzsch/ScandiPark, and ScandiPark's Tuborg Grøn isn't in the Tuborg Grøn family.
+
+### November newsletters: Fleggaard and Calle imported (2026-11-05)
+
+- **Fleggaard "November 1"** (60 pages) and **Calle "November 1-2"** (32 pages), both valid **4-24 Nov 2026**, read with the Batch API: 336 + 192 offers for **$1.10** in all ($0.71 + $0.39). Imported as 734 Fleggaard and 480 Calle shop products (`--valid-to 2026-11-24`).
+- **Calle coupons:** only some Calle offers are "KUPONTILBUD" (bring the coupon or show it on the phone, max 1 per household per day) - 3 offers / 6 products this issue (Daim Minis, Pama Grødris, Fever-Tree Tonic). So the flag is **per offer**, not per shop: extraction reads `coupon`, `prices.coupon` stores it (migration `20261105000000_calle_coupon_prices.sql`, which also adds the `calle` shop), and the site shows a "Kuponpris" badge plus the rules wherever such a price appears (search, basket, trip-card split lines).
+- Fixed on the way: a pack like "1 l. 17-37,5%" (one price for several spirits) was read as a size range and got no content; alcohol-percent ranges are now ignored (26 products gained a price per liter).
+- `match:new`: 847 new products in 24 chunks, **$1.01**: 343 links to existing products, 55 suggestions, 308 new families. Calle and Fleggaard prices are mostly identical, as expected. Nothing left unmatched - the ScandiPark backlog is done too.
+- **Coverage after the import** (all six shops): 104 of 120 common items linked across every shop that sells them (99 on 2026-10-30), 13 partly, **0 not linked**, 2 in one shop, 1 in none. Found/linked: Poetzsch 117/114, BorderShop Puttgarden 110/109, BorderShop Rostock 110/109, ScandiPark 102/95, Calle 43/37, Fleggaard 41/40. Partly linked: Coca-Cola, Faxe Kondi (+0 kalorier), Sprite, Tuborg Grøn (BorderShop), Somersby Apple, Smirnoff 1 l, Toms Skildpadder, Anthon Berg Marcipanbrød, Cloetta Polly, Marabou Oreo, Kims Snack Chips, DK-Nuts Mandler - next to fix.
+- Calle also has stores on the Puttgarden route (Burg, Heiligenhafen); the trip cards only count Calle in the Padborg area for now.
+- Note: SQL copied to the clipboard with `pbcopy` lost its UTF-8 ("Kruså" -> "Krus√•" in Calle's location; fixed directly). Use `LANG=en_US.UTF-8 pbcopy` next time.
 

@@ -25,8 +25,9 @@ of truth. Read it when deciding what to work on.
 
 **Current phase:** Phase 3 (first usable version). Phase 1 (data pipeline) finished 2026-10-25
 after 8 unattended nightly runs; Phase 2 (matching) is largely done.
-- Data: Fleggaard prices come from its newsletter (no scraping allowed), imported by hand per
-  issue (`data/newsletters/`, git-ignored). Poetzsch, BorderShop (Puttgarden and Rostock) and Scandinavian Park scraped nightly on GitHub Actions
+- Data: Fleggaard and Calle prices come from their newsletters (no scraping allowed), imported by
+  hand per issue (`data/newsletters/`, git-ignored; current issues valid until 2026-11-24). Some
+  Calle offers are coupon prices ("KUPONTILBUD") - always shown with a "Kuponpris" badge. Poetzsch, BorderShop (Puttgarden and Rostock) and Scandinavian Park scraped nightly on GitHub Actions
   (`.github/workflows/scrape.yml`: scrape -> EAN matching -> `match:new` for new products;
   scheduled 02:00 UTC, GitHub usually starts it ~06:45),
   ~9,800 products. Fleggaard/Calle sit behind Cloudflare bot protection – never try to
@@ -135,6 +136,8 @@ after 8 unattended nightly runs; Phase 2 (matching) is largely done.
   it applies. The declaration is filled out in the shop, so the user needn't prepare anything.
 - **Multi-buy offers** ("Ta' 5 for 99,99") are common – store them separately from
   the single-unit price.
+- **Coupon prices** (Calle's "KUPONTILBUD": needs the newsletter coupon, max 1 per household
+  per day) are stored per price (`prices.coupon`) and must be disclosed wherever shown.
 - **Compare per unit** (per liter / per kg) – pack sizes differ between shops.
 - **Match by EAN first.** Fuzzy/LLM matches need a confidence score, and uncertain
   matches must be reviewable. Matches are stored and reused: matching steps only

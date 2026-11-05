@@ -53,6 +53,9 @@ const Offer = z.object({
   always_low_price: z.boolean().describe('"ALTID LAV PRIS" badge - a regular price, not a temporary offer'),
   saving_vs_dk_percent: z.number().nullable().describe('From "SPAR 33% ift. DK*"'),
   no_deposit: z.boolean().describe('"Ingen pant" printed for this item'),
+  coupon: z
+    .boolean()
+    .describe('True if this price needs a coupon from the newsletter, e.g. marked "KUPONTILBUD" or "Medbring kuponen"'),
   limit_note: z.string().nullable().describe('Purchase limits or conditions, e.g. "Max 5 kg pr. kunde."'),
 });
 
@@ -63,7 +66,7 @@ const PageResult = z.object({
 });
 type PageResult = z.infer<typeof PageResult>;
 
-const INSTRUCTIONS = `You read one page of a Danish border shop's printed newsletter (Fleggaard,
+const INSTRUCTIONS = `You read one page of a Danish border shop's printed newsletter (Fleggaard or Calle,
 German side of the border, prices in DKK) and list every priced product on it.
 
 - The page image is the truth. A text layer from the PDF follows as a hint for exact
@@ -77,6 +80,8 @@ German side of the border, prices in DKK) and list every priced product on it.
   "Royal IPA"). If it also says "Flere varianter", set more_variants.
 - When the pictured packs show varieties the text doesn't name (e.g. a "Flere varianter" block
   with several bags), list those you can clearly read in visible_variants. Don't guess.
+- Coupon offers ("KUPONTILBUD", "Medbring kuponen ...") are listed like other offers with
+  coupon = true; their price only applies with the coupon.
 - Only list items with a price. Skip pure images, recipes, headings and store adverts.
 - Dates: only when this page prints a validity period ("Priserne gælder fra ... til og
   med ..."), and only from the image.`;
@@ -248,6 +253,7 @@ async function main() {
           o.always_low_price && "ALTID LAV PRIS",
           o.saving_vs_dk_percent !== null && `spar ${o.saving_vs_dk_percent}%`,
           o.no_deposit && "ingen pant",
+          o.coupon && "KUPON",
           o.more_variants && "flere varianter",
           o.visible_variants.length && `+ ${o.visible_variants.join(" / ")}`,
           o.limit_note,

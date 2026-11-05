@@ -56,6 +56,7 @@ interface PriceRow {
   multi_buy_quantity: number | null;
   multi_buy_price: number | null;
   saving_vs_dk_percent: number | null;
+  coupon: boolean;
 }
 
 /** Latest price of every product in a shop, keyed by shop_products.id. */
@@ -64,7 +65,7 @@ async function currentPrices(db: SupabaseClient, shop: string): Promise<Map<numb
     db
       .from("current_prices")
       .select(
-        "shop_product_id, price, price_per_unit, on_offer, regular_price, offer_ends_at, pfand, multi_buy_quantity, multi_buy_price, saving_vs_dk_percent",
+        "shop_product_id, price, price_per_unit, on_offer, regular_price, offer_ends_at, pfand, multi_buy_quantity, multi_buy_price, saving_vs_dk_percent, coupon",
       )
       .eq("shop_id", shop)
       .order("shop_product_id")
@@ -88,6 +89,7 @@ function priceRow(id: number, p: ScrapedProduct): PriceRow {
     multi_buy_quantity: p.multiBuy?.quantity ?? null,
     multi_buy_price: p.multiBuy?.price ?? null,
     saving_vs_dk_percent: p.savingVsDkPercent ?? null,
+    coupon: p.coupon ?? false,
   };
 }
 
@@ -101,7 +103,8 @@ function hasChanged(prev: PriceRow, next: PriceRow): boolean {
     money(prev.pfand) !== money(next.pfand) ||
     (prev.multi_buy_quantity ?? null) !== (next.multi_buy_quantity ?? null) ||
     money(prev.multi_buy_price) !== money(next.multi_buy_price) ||
-    money(prev.saving_vs_dk_percent) !== money(next.saving_vs_dk_percent)
+    money(prev.saving_vs_dk_percent) !== money(next.saving_vs_dk_percent) ||
+    (prev.coupon ?? false) !== next.coupon
   );
 }
 

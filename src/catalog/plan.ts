@@ -63,7 +63,9 @@ export function planTrips(results: ShopResult[]): TripPlan[] {
       if (!offers.length) return missing.push({ label: line.label, estimate: highest[i] });
       const best = offers[0];
       const stop = stops.get(best.shop.id) ?? { shopId: best.shop.id, shopName: best.shop.name, items: [], cost: 0 };
-      stop.items.push(line.label);
+      // Coupon prices stay marked all the way to the trip card.
+      const coupon = shops.find((s) => s.shop.id === best.shop.id)?.lines[i].buy?.coupon;
+      stop.items.push(coupon ? `${line.label} (kuponpris)` : line.label);
       stop.cost = round(stop.cost + best.cost);
       stops.set(best.shop.id, stop);
     });
