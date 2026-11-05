@@ -54,7 +54,7 @@ export const COMMON_ITEMS: CommonItem[] = [
   can24("Pepsi Max Mango", /pepsi max mango/i),
   can24("Pepsi Max Lemon", /pepsi max lemon/i),
   best(can24("Faxe Kondi", /faxe kondi/i, /\b0 ?(kal|cal|kcal)|zero|kalorie|sukkerfri|appelsin|eksotisk|pink|lemon|jordbær|energy|julekalender/i)),
-  can24("Faxe Kondi 0 kalorier", /faxe kondi.*(\b0 ?(kal|cal|kcal)|zero|sukkerfri)/i, /appelsin|eksotisk|pink|lemon|jordbær|energy/i),
+  can24("Faxe Kondi 0 kalorier", /faxe kondi.*(\b0 ?(kal|cal|kcal)|zero|sukkerfri|free)/i, /appelsin|apelsin|eksotisk|pink|lemon|jordbær|energy/i),
   can24("Faxe Kondi Appelsin", /faxe kondi appelsin/i, /\b0 ?(kal|cal|kcal)|kalorie/i),
   best(can24("Fanta Orange", /^fanta( orange)?\b/i, /zero|exotic|lemon|grape|pineapple|mango/i)),
   can24("Fanta Orange Zero", /^fanta( orange)? zero/i),
@@ -141,7 +141,7 @@ export const COMMON_ITEMS: CommonItem[] = [
   { label: "Haribo I Like Mix", include: /i like mix/i },
   { label: "Haribo Skipper Mix", include: /skipper ?mix/i },
   { label: "Haribo Guldbamser", include: /guldbamse|guldbjørn|goldbears|gold-?b(ä|ae)ren/i },
-  { label: "Toms Skildpadder", include: /skildpadde/i, exclude: /mini|kæmpe/i },
+  { label: "Toms Skildpadder", include: /toms.*skildpadde/i, exclude: /mini|kæmpe|kalender/i },
   { label: "Toms Mini Skildpadder", include: /mini skildpadde/i },
   best({ label: "Toms Guldkarameller", include: /guldkaramel/i }),
   { label: "Toms Guld Barre", include: /guld ?barre/i },
@@ -152,14 +152,15 @@ export const COMMON_ITEMS: CommonItem[] = [
   { label: "Ga-Jol pastiller", include: /ga-jol.*(original|sort|pakke)/i, exclude: /vodka|likør|\d+ ?%/i },
   { label: "Spunk", include: /spunk/i },
   { label: "Ahlgrens Bilar", include: /ahlgrens bilar/i, exclude: /sour|salt|limousine/i },
-  { label: "Cloetta Polly", include: /polly/i, exclude: /milk/i },
+  // Polly's standard bag ("Original", BorderShop calls it "Blue").
+  { label: "Cloetta Polly Original", include: /polly (original|blue)|polly.*original/i, exclude: /milk/i },
   { label: "Fazer Tyrkisk Peber", include: /tyrkisk peber/i },
   { label: "Malaco Lagerman Konfekt", include: /lagerman/i },
 
   // Chocolate and spreads
   best({ label: "Marabou Mælkechokolade", include: /marabou (milk|mælkechokolade|mjölkchoklad)/i }),
   { label: "Marabou Daim", include: /marabou daim/i },
-  { label: "Marabou Oreo", include: /marabou oreo/i },
+  { label: "Marabou Oreo", include: /marabou oreo/i, exclude: /bites/i },
   { label: "Marabou Mintkrokant", include: /marabou mintkrokant/i },
   { label: "Toblerone Milk 340 g", include: /toblerone milk/i, exclude: /tiny|mini/i, content: kg(0.34) },
   { label: "Kinder Bueno", include: /kinder bueno/i, exclude: /mini|white/i },
@@ -175,6 +176,6 @@ export const COMMON_ITEMS: CommonItem[] = [
   { label: "Kims Snack Chips Original", include: /kims.*snack ?chips/i, exclude: /sour|onion|havsalt|paprika|chili|dild/i },
   { label: "Pringles Original", include: /pringles original/i },
   { label: "Kims Peanuts", include: /kims.*(peanut|jordnød)/i },
-  { label: "DK-Nuts Mandler", include: /dk-?nuts mandler/i },
+  { label: "DK-Nuts Mandler ristede og saltede", include: /dk-?nuts mandler.*ristede (&|og) saltede/i, exclude: /honning|røgede/i },
   { label: "OK Snacks Flæskesvær", include: /flæskesvær/i },
 ];

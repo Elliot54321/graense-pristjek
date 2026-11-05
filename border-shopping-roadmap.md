@@ -554,3 +554,13 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
 - Calle also has stores on the Puttgarden route (Burg, Heiligenhafen); the trip cards only count Calle in the Padborg area for now.
 - Note: SQL copied to the clipboard with `pbcopy` lost its UTF-8 ("Kruså" -> "Krus√•" in Calle's location; fixed directly). Use `LANG=en_US.UTF-8 pbcopy` next time.
 
+### Fixing the partly linked common items (2026-11-05)
+
+- Of the 13 partly linked items, most were **the same product split across two families**. Fixed directly in the database (a one-off script, dry run first; nothing human-reviewed touched):
+  - Family moves: ScandiPark "Coca Cola 24x0,33 Export" -> Coca-Cola; Sprite 24x0,33 (Calle/ScandiPark) -> Sprite Lemon Lime; Tuborg Pilsner 24x0,33 (Poetzsch, ScandiPark) -> **Tuborg Grøn** (same beer; "pilsner" added to its search words - the German "Tuborg Pilsener 4,9 %" stays apart); Somersby Apple 18x33cl (BorderShop/Poetzsch - had no family at all) -> Somersby Apple; Smirnoff Vodka 0,7 l -> Smirnoff Vodka Red Label; Anthon Berg marcipanbrød 4x25g (ScandiPark) -> Marcipanbrød Original; Kims Snack Chips 210-255 g (Calle) -> Kims Snack Chips Original.
+  - Relinks (method `manual`, confidence 0.95): Fleggaard/Calle "Faxe Kondi 24 x 0,33 l." -> the Faxe Kondi EAN product; Fleggaard/Calle "Smirnoff 1 l" -> Smirnoff Red Label 1 l.
+  - `match:ean` never touches families and `match:new` only handles products without a family, so these stick.
+- The rest were **coverage rules matching the wrong product**: "Faxe Kondi Apelsin Zero" (ScandiPark spelling), "Marabou Oreo Bites", Toms' Christmas calendar and Chrisco's skildpadder. Rules tightened in `common-items.ts`; "Cloetta Polly" is now "Polly Original" and "DK-Nuts Mandler" is "ristede og saltede" (the shops sell many different Polly and almond products, and Calle's Polly offer covers several varieties at once).
+- **Result: 117 of 120 common items linked** across every shop that sells them (104 before), 0 partly. Left: Cult Energy and Fisk (Poetzsch only), OK Snacks Flæskesvær (no shop online).
+- Lesson: newsletter offers named after a pack ("Faxe Kondi 24 x 0,33 l.") sometimes got their own family; worth checking new newsletter families against existing ones after each import.
+

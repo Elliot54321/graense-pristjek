@@ -33,8 +33,8 @@ after 8 unattended nightly runs; Phase 2 (matching) is largely done.
   ~9,800 products. Fleggaard/Calle sit behind Cloudflare bot protection – never try to
   bypass it.
   Fleggaard has said no to data scraping (2026-10-22) - don't scrape their sites at all.
-- Matching: EAN plus a full LLM run (3,697 families with search words; 101/120 common
-  items matched; categories 32–63% linked). Review page at `/admin`; going through it is
+- Matching: EAN plus a full LLM run (families with search words; 117/120 common
+  items linked across all shops on 2026-11-05). Review page at `/admin`; going through it is
   deferred to the final stages – don't push the user to review matches before then.
 - Phase 3 started: search (`/`) and basket comparison (`/kurv`) are live at
   https://graense-pristjek.vercel.app (Vercel, deploys on every push to `main`). Also next: LLM matching for new products in the nightly run. Broad coverage is the goal – comparing
