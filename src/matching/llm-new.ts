@@ -14,6 +14,10 @@
  * its own product (in the family, if the model is sure) and a suggestion note for
  * the review page. Answers are cached in data/llm-batches/cache, so re-runs and
  * dry runs of the same input cost nothing.
+ *
+ * Some shop products have no category on the shop's own site (713 at Poetzsch in
+ * Nov 2026), so no comparison group either. Haiku sorts those into a group by name
+ * first - cheap, and only once per product, since matched products aren't "new".
  */
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -26,6 +30,8 @@ import { costUsd } from "./llm";
 import { isCatchAllFamilyName, linkDoubts } from "./safety";
 
 const MODEL = "claude-sonnet-5-5";
+const CLASSIFY_MODEL = "claude-haiku-5-5";
+const CLASSIFY_BATCH = 150;
 const CHUNK_SIZE = 40;
 const CANDIDATES_PER_ITEM = 6;
 const CONCURRENCY = 4;
@@ -102,6 +108,44 @@ only if the shops don't show the year.
 Shops name the same thing differently (languages, local names, with or without pack
 details); use your knowledge of the brands. When unsure, don't link.`;
 
+const Classified = z.object({
+  items: z.array(z.object({ id: z.number(), group: z.enum([...GROUP_IDS, "other"]) })),
+});
+
+const CLASSIFY_INSTRUCTIONS = `Sort each product from a Danish border shop into one comparison category, by its name:
+soda (incl. water, juice, iced tea, energy drinks), beer (incl. cider), candy (incl. chocolate,
+chips, nuts, cookies), spirits (incl. liqueurs, shots, alcopops), wine (incl. sparkling wine,
+port and sherry), groceries (other food, coffee, tea), household (cleaning, toiletries, pet
+food), other (anything else: toys, gifts, glasses, electronics, gift boxes of mixed goods).`;
+
+/** Comparison group for shop products the shop itself doesn't categorise. */
+async function classifyUncategorised(client: Anthropic, rows: { id: number; name: string }[]) {
+  const groups = new Map<number, string>();
+  let cost = 0;
+  for (let i = 0; i < rows.length; i += CLASSIFY_BATCH) {
+    const batch = rows.slice(i, i + CLASSIFY_BATCH);
+    const prompt = batch.map((r) => `${r.id} | ${r.name}`).join("\n");
+    const cacheFile = `${CACHE_DIR}/classify-${CLASSIFY_MODEL}-${createHash("sha1").update(prompt).digest("hex")}.json`;
+    let items: z.infer<typeof Classified>["items"];
+    if (existsSync(cacheFile)) items = JSON.parse(readFileSync(cacheFile, "utf8"));
+    else {
+      const response = await client.messages.parse({
+        model: CLASSIFY_MODEL,
+        max_tokens: 16000,
+        output_config: { format: zodOutputFormat(Classified) },
+        system: CLASSIFY_INSTRUCTIONS,
+        messages: [{ role: "user", content: `id | name\n${prompt}` }],
+      });
+      if (!response.parsed_output) continue;
+      items = response.parsed_output.items;
+      cost += costUsd(CLASSIFY_MODEL, response.usage.input_tokens, response.usage.output_tokens);
+      writeFileSync(cacheFile, JSON.stringify(items));
+    }
+    for (const it of items) if (it.group !== "other") groups.set(it.id, it.group);
+  }
+  return { groups, cost };
+}
+
 function tokens(text: string): string[] {
   return text
     .toLowerCase()
@@ -138,7 +182,20 @@ async function main() {
   const productById = new Map(products.map((p) => [p.id, p]));
   const familyById = new Map(families.map((f) => [f.id, f]));
   const priceOf = new Map(prices.map((p) => [p.shop_product_id, Number(p.price)]));
-  const groupOf = (r: ShopRow) => GROUPS[r.shop_id]?.(r);
+  const needsMatch = (r: ShopRow) => {
+    const m = embed(r);
+    return !m || productById.get(m.product_id)?.family_id == null;
+  };
+
+  // Products the shop gives no category: let the model pick the group.
+  mkdirSync(CACHE_DIR, { recursive: true });
+  const client = new Anthropic();
+  const uncategorised = shopRows.filter((r) => !r.categories?.length && isListed(r) && needsMatch(r));
+  const { groups: guessed, cost: classifyCost } = await classifyUncategorised(client, uncategorised);
+  if (uncategorised.length) {
+    console.log(`Sorted ${guessed.size} of ${uncategorised.length} uncategorised products into a group ($${classifyCost.toFixed(4)}).`);
+  }
+  const groupOf = (r: ShopRow) => GROUPS[r.shop_id]?.(r) ?? guessed.get(r.id);
 
   // Existing products with a family, described by their shop listings, as candidates.
   const listings = new Map<number, ShopRow[]>();
@@ -150,16 +207,14 @@ async function main() {
     .filter((p) => p.family_id !== null && listings.has(p.id))
     .map((p) => {
       const rows = listings.get(p.id)!;
-      return { product: p, group: groupOf(rows[0]), tokens: new Set(tokens([p.name, ...rows.map((r) => r.name)].join(" "))) };
+      // The family's category, so products whose shop gives no category are candidates too.
+      const group = familyById.get(p.family_id!)?.category ?? groupOf(rows[0]);
+      return { product: p, group, tokens: new Set(tokens([p.name, ...rows.map((r) => r.name)].join(" "))) };
     });
 
   // New items: no match yet, or a product without family. Products no longer on
   // sale are skipped - they never show on the site, so matching them is wasted.
-  const newItems = shopRows.filter((r) => {
-    if (!groupOf(r) || !isListed(r)) return false;
-    const m = embed(r);
-    return !m || productById.get(m.product_id)?.family_id == null;
-  });
+  const newItems = shopRows.filter((r) => groupOf(r) && isListed(r) && needsMatch(r));
   console.log(`${newItems.length} new shop products to match against ${candidates.length} existing products.`);
   if (!newItems.length) return console.log("Nothing to match - no API calls made.");
 
@@ -188,9 +243,7 @@ async function main() {
   console.log(`${todo.length} chunks (of ${chunks.length}).`);
 
   // Ask the model (cached per chunk input).
-  const client = new Anthropic();
-  mkdirSync(CACHE_DIR, { recursive: true });
-  let cost = 0;
+  let cost = classifyCost;
   const answers: { chunk: (typeof chunks)[number]; decisions: Decision[] }[] = [];
   const ask = async (chunk: (typeof chunks)[number]) => {
     const existing = chunk.candidateIds.map((id) => {
