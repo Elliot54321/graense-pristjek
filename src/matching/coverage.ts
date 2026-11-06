@@ -33,6 +33,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   beer: "Beer and cider",
   candy: "Candy, chocolate, snacks",
   spirits: "Spirits",
+  wine: "Wine",
   groceries: "Groceries",
   household: "Household, toiletries",
 };

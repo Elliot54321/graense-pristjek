@@ -21,7 +21,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import { adminClient, fetchAll } from "../db/admin";
-import { GROUPS, isListed } from "./groups";
+import { GROUP_IDS, GROUPS, isListed } from "./groups";
 import { costUsd } from "./llm";
 import { isCatchAllFamilyName, linkDoubts } from "./safety";
 
@@ -94,6 +94,11 @@ For every NEW product decide:
   Bourbon"), never a catch-all like "Andre spiritus" or "Diverse slik".
 - confidence: high when sure, medium when very likely, low when plausible but uncertain.
 
+Wine: a family is one wine - producer, wine name, grape and colour - whatever the vintage
+or bottle size (e.g. "Villa Antinori Rosso"). Different colours, grapes or quality levels
+(Reserva vs Crianza) are different families. A different vintage is still the same product
+only if the shops don't show the year.
+
 Shops name the same thing differently (languages, local names, with or without pack
 details); use your knowledge of the brands. When unsure, don't link.`;
 
@@ -160,7 +165,7 @@ async function main() {
 
   // Chunks per category, alphabetical so the same brand lands together.
   const chunks: { group: string; items: ShopRow[]; candidateIds: number[] }[] = [];
-  for (const group of ["soda", "beer", "candy", "spirits", "groceries", "household"]) {
+  for (const group of GROUP_IDS) {
     const items = newItems.filter((r) => groupOf(r) === group).sort((a, b) => a.name.localeCompare(b.name));
     const pool = candidates.filter((c) => c.group === group);
     for (let i = 0; i < items.length; i += CHUNK_SIZE) {

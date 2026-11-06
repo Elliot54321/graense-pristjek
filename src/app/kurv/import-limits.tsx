@@ -6,8 +6,18 @@ import { amount } from "@/lib/format";
 const LABELS: Record<AlcoholType, string> = {
   spirits: "Spiritus og likør",
   fortified: "Hedvin (portvin, sherry …)",
-  wine: "Vin og cider",
+  wine: "Vin og cider (inkl. mousserende)",
+  sparkling: "Heraf mousserende (champagne, cava …)",
   beer: "Øl",
+};
+
+/** For the warning sentence ("mere end de vejledende mængder for spiritus og øl"). */
+const SHORT: Record<AlcoholType, string> = {
+  spirits: "spiritus",
+  fortified: "hedvin",
+  wine: "vin",
+  sparkling: "mousserende vin",
+  beer: "øl",
 };
 
 const ADULTS_KEY = "graense-pris-voksne";
@@ -69,7 +79,7 @@ export function ImportLimits({ liters }: { liters: Partial<Record<AlcoholType, n
 
       {over.length > 0 && (
         <p className="mt-3 rounded-lg border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-600 dark:bg-amber-950 dark:text-amber-200">
-          Kurven har mere end de vejledende mængder for {over.map((c) => LABELS[c.type].toLowerCase()).join(" og ")}. Det
+          Kurven har mere end de vejledende mængder for {over.map((c) => SHORT[c.type]).join(" og ")}. Det
           er tilladt, hvis det er til jeres eget forbrug, men tolden kan bede jer dokumentere det – ellers skal der betales
           dansk afgift.
         </p>

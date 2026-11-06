@@ -1,12 +1,18 @@
 /** Comparison categories shared by matching and the coverage report. */
 
+export const GROUP_IDS = ["soda", "beer", "candy", "spirits", "wine", "groceries", "household"] as const;
+
 /** The fields of a shop product the rules below need. */
 export interface GroupRow {
   shop_id: string;
+  name: string;
   categories: string[];
 }
 
-/** Comparison categories per shop (wine, toys and BorderShop's "More" are left out). */
+/** Cider is compared with beer (ScandiPark files it there), though some shops list it under wine. */
+const CIDER = /cider|somersby|rekorderlig|mokai|kopparberg/i;
+
+/** Comparison categories per shop (toys and BorderShop's "More" are left out). */
 export const GROUPS: Record<string, (r: GroupRow) => string | undefined> = {
   poetzsch: (r) => {
     const p = r.categories.join("/");
@@ -14,25 +20,32 @@ export const GROUPS: Record<string, (r: GroupRow) => string | undefined> = {
     if (/^Øl/.test(p)) return "beer";
     if (/^Slik|Chips og snacks/.test(p)) return "candy";
     if (/^Spiritus/.test(p)) return "spirits";
+    if (/^Vin\/Cider/.test(p)) return "beer";
+    if (/^Vin/.test(p)) return "wine";
     if (/^Dagligvarer/.test(p)) return "groceries";
     if (/^Husholdning|^Dyrefoder/.test(p)) return "household";
   },
   bordershop: (r) =>
-    ({ Beverages: "soda", Beer: "beer", "Candy and Snacks": "candy", Spirits: "spirits", Household: "household" })[r.categories[0]],
+    r.categories[0] === "Wine and Cider"
+      ? CIDER.test(r.name)
+        ? "beer"
+        : "wine"
+      : ({ Beverages: "soda", Beer: "beer", "Candy and Snacks": "candy", Spirits: "spirits", Household: "household" })[r.categories[0]],
   // Rostock is the same BorderShop catalogue.
   "bordershop-rostock": (r) => GROUPS.bordershop(r),
-  // Scandinavian Park: category from its Danish click & collect shop (wine and "andre-varer" left out).
+  // Scandinavian Park: category from its Danish click & collect shop ("andre-varer" left out).
   scandipark: (r) => {
     const c = r.categories[0] ?? "";
     if (/^(drikkevarer\/(oel|cider)|Ol|Cider)$/.test(c)) return "beer";
     if (/^(drikkevarer(\/(sodavand|andre-drikkevarer))?|Sodavand|Energidrik|Vand|Andre-pantfri-drikkevarer|pantfri-drikkevarer)$/.test(c)) return "soda";
     if (c === "spiritus") return "spirits";
+    if (c === "vin") return "wine";
     if (c === "slik") return "candy";
     if (c === "foedevarer") return "groceries";
     if (c === "kosmetik") return "household";
   },
   // Newsletter products carry the comparison category directly.
-  fleggaard: (r) => (["soda", "beer", "candy", "spirits", "groceries", "household"].includes(r.categories[0]) ? r.categories[0] : undefined),
+  fleggaard: (r) => ((GROUP_IDS as readonly string[]).includes(r.categories[0]) ? r.categories[0] : undefined),
   calle: (r) => GROUPS.fleggaard(r),
 };
 
