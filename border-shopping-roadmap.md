@@ -620,3 +620,9 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
 - GitHub emails failures of scheduled workflows to the account that last changed the workflow's schedule (the repo owner here); the GitHub notification setting for failed Actions runs must be on.
 - The site footer now says when prices were last updated ("Priser opdateret 6. november kl. 09.45"), names any scraped shop that's behind, and gives the newsletters' end date ("Calle og Fleggaard: avispriser gældende til 24. november", or "ingen gældende avis lige nu"). `getFreshness()` in `data.ts`, cached for an hour.
 
+
+### "Om siden" page (2026-11-06)
+
+- `/om` (linked from every page's footer): what the site does; that it's independent and not affiliated with the shops; where prices come from (webshops nightly; Fleggaard/Calle newsletters, coupon prices marked); how precise the numbers are (per liter/kg, EAN vs model matching, "estimeret pris" = highest price elsewhere, ferry from-price, rough distances); the import guide amounts (Toldstyrelsen); privacy (no login, no tracking cookies; basket, postcode and settings stay in the browser; the basket is sent to price it but not stored; Vercel may log IPs); sources (GeoNames, Toldstyrelsen, Scandlines).
+- **No name and no personal email on the site** (user decision): `CONTACT_EMAIL` in `src/lib/site.ts` is empty, and the page says "Kontaktoplysninger følger snart" until it's set.
+- **To do when the domain is ready:** create a professional address on it, set `CONTACT_EMAIL`, and switch the scrapers' User-Agent contact (`SCRAPER_CONTACT_EMAIL`, a GitHub secret and `.env.local`) from the personal Gmail to it.

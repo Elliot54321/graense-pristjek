@@ -39,6 +39,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <Suspense>
             <Freshness />
           </Suspense>
+          <p className="mt-2">
+            <Link href="/om" className="underline underline-offset-2">
+              Om siden
+            </Link>{" "}
+            – hvor priserne kommer fra, og hvordan vi håndterer dine data.
+          </p>
         </footer>
       </body>
     </html>
