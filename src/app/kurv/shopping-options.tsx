@@ -120,7 +120,7 @@ export function ShoppingOptions({ results, loading }: { results: ShopResult[]; l
         Prisen er varerne plus kørsel mellem butikkerne (ca. {kr(CAR_TYPES[carType].krPerKm)} kr./km for en gennemsnitlig{" "}
         {CAR_TYPES[carType].label.toLowerCase()}) og færgen, hvis turen kræver en – færgeprisen er Scandlines&apos; laveste
         pris for en dagsbillet, og den rigtige pris afhænger af afgangen. Turen hjemmefra er ikke med, da den afhænger af,
-        hvor du bor – afstand og tid er skøn. Vi foreslår kun flere butikker, når det sparer mindst{" "}
+        hvor du bor – afstand og tid er estimater. Vi foreslår kun flere butikker, når det sparer mindst{" "}
         {MIN_SAVING_PER_EXTRA_STORE} kr. pr. ekstra butik. Postnumre:{" "}
         <a href="https://www.geonames.org" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
           GeoNames
@@ -158,7 +158,7 @@ function OptionCard({
             {o.stops.map((s) => s.name).join(" + ")}
             {best && (
               <span className="ml-2 inline-block whitespace-nowrap rounded bg-emerald-600 px-1.5 py-0.5 text-xs font-medium text-white">
-                Billigst{estimated > 0 && ` – inkl. ${estimated} skønnet`}
+                Billigst{estimated > 0 && ` – inkl. ${estimated} ${estimated === 1 ? "estimeret pris" : "estimerede priser"}`}
               </span>
             )}
           </h3>
@@ -206,7 +206,10 @@ function OptionCard({
           <ul className="mt-2">
             {o.missing.map((m) => (
               <li key={m.label} className="flex justify-between gap-3 py-0.5 text-zinc-500">
-                <span>{m.label}: findes ikke i disse butikker – skønnet</span>
+                <span className="min-w-0 flex-1">
+                  {m.label}: ikke fundet i disse butikker – estimeret pris{" "}
+                  <CheckLinks shops={o.stops.flatMap((st) => shops.get(st.shopId) ?? [])} />
+                </span>
                 <span className="tabular-nums">{m.estimate === null ? "–" : `~${kr(m.estimate)}`}</span>
               </li>
             ))}
@@ -222,6 +225,24 @@ function OptionCard({
         )}
       </details>
     </li>
+  );
+}
+
+/** "(tjek calle.dk, poetzsch-padborg.dk)" - where to double-check an estimated price. */
+function CheckLinks({ shops }: { shops: Shop[] }) {
+  return (
+    <>
+      (tjek{" "}
+      {shops.map((shop, i) => (
+        <span key={shop.id}>
+          {i > 0 && ", "}
+          <a href={shop.website} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
+            {shop.website.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "")}
+          </a>
+        </span>
+      ))}
+      )
+    </>
   );
 }
 
@@ -252,17 +273,8 @@ function LineRow({ line: l, shop }: { line: LineResult; shop: Shop | undefined }
       ) : l.estimate !== null ? (
         <>
           <span className="min-w-0 flex-1 text-zinc-500">
-            {l.label}: {newsletter ? "ikke i avisen" : "ikke i webshoppen"} – skønnet
-            {newsletter && shop && (
-              <>
-                {" "}
-                (
-                <a href={shop.website} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
-                  tjek {shop.website.replace(/^https?:\/\/(www\.)?/, "")}
-                </a>
-                )
-              </>
-            )}
+            {l.label}: {newsletter ? "ikke i avisen" : "ikke i webshoppen"} – estimeret pris{" "}
+            {shop && <CheckLinks shops={[shop]} />}
           </span>
           <span className="tabular-nums text-zinc-500">~{kr(l.estimate)}</span>
         </>

@@ -82,7 +82,7 @@ export function BasketView() {
         Handewitt, BorderShop ved færgerne i Puttgarden (Rødby–Puttgarden) og Rostock (Gedser–Rostock). Calle har også
         butik i Burg på Fehmarn, få km fra færgen i Puttgarden. Fleggaards og
         Calles priser kommer fra deres aviser og gælder til avisens slutdato. Har en butik ikke en vare, regner vi med
-        den højeste pris i de andre butikker, så totalerne kan sammenlignes.
+        en estimeret pris: den højeste pris i de andre butikker, så totalerne kan sammenlignes.
       </p>
     </>
   );

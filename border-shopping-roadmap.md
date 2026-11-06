@@ -599,3 +599,9 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
 - Decision (user): include an estimated ferry price. It fits the rule above: the ferry costs the same wherever you live (unlike the drive from home), so it can be one fixed estimate per route.
 - Estimate = Scandlines' **1-day ticket** (same-day return, car) "from" price, checked 2026-11-06 on scandlines.com: **Rødby-Puttgarden from 72 EUR (~537 kr.)**, **Gedser-Rostock from 86 EUR (~642 kr.)**, converted at 7,46. For comparison: one-way Low Price 48 / 65,30 EUR, Standard 61,10 / 82,70 EUR, weekend return 93 / 119 EUR. Real fares depend on the departure and season, so the page says "fra" and links to Scandlines. Stored as `returnEur` on each ferry in `trips.ts` - **recheck now and then**.
 - Effect (Copenhagen test basket): the ferry options move from ~1,346-1,391 kr. to ~1,883-2,033 kr., behind all four Padborg-area shops. Note the asymmetry: the ferry is priced but the drive from home isn't, which favours the land crossing for people living close to a ferry (Copenhagen: ~155 km further to Padborg each way, ~265 kr. of fuel - still less than the ferry in this case).
+
+### "Estimeret" instead of "skønnet"; check links for every store (2026-11-06)
+
+- Wording (user): "skønnet" -> **"estimeret pris"** everywhere on the site ("Billigst – inkl. 2 estimerede priser", "afstand og tid er estimater").
+- Every estimated line now links to where it can be double-checked: one shop -> that shop's site (also the scraped shops, not just newsletter shops); a split option -> **every store in the option** ("ikke fundet i disse butikker – estimeret pris (tjek calle.dk, poetzsch-padborg.dk)").
+- ScandiPark's website in `shops` now points to its Danish click & collect shop (migration `20261106000000_scandipark_website.sql`, applied directly), so its links match where its prices come from.
