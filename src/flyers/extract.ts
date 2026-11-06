@@ -45,7 +45,7 @@ const Offer = z.object({
   price: z
     .number()
     .describe(
-      'Price in DKK for ONE unit; "5999" printed large = 59.99, "22,-" = 22. If the big price is for several ("6 stk. 100,-"), use the single price from the small print ("Pr. stk. 22,22") and put the deal in multi_buy; if no single price is printed, use total / quantity',
+      'Price in DKK for ONE unit; "5999" printed large = 59.99, "22,-" = 22. If the big price is for several ("6 stk. 100,-"), use the single price from the small print ("Pr. stk. 22,22") and put the deal in multi_buy; if no single price is printed, use total / quantity. The price is for the whole pack in `pack`: for "6 x 1,25 l. 6,66 pr. fl. (Pr. pk. 39,99)" it is 39,99',
     ),
   price_unit: z.string().describe('As printed: "Pr. ks.", "Pr. fl.", "Pr. ps." ...'),
   price_per_liter_or_kg: z.number().nullable().describe('From "Pr. liter 10,10." / "Pr. kg 49,95."; null if absent'),

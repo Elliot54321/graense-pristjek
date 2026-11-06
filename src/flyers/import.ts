@@ -14,7 +14,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { unitPrice } from "../scrapers/quantity";
-import { singlePrice } from "./prices";
+import { packPrice, singlePrice } from "./prices";
 import { adminClient, finishRun, saveProducts, startRun, type RunSummary } from "../scrapers/save";
 import type { BaseUnit, ScrapedProduct } from "../scrapers/types";
 
@@ -72,7 +72,8 @@ export function offersToProducts(data: Extracted, shop: string, validTo: string,
     const until = sections.find((s) => page >= s.from && page <= s.to)?.validTo ?? validTo;
     for (const o of result.offers) {
       const total = content(o);
-      const price = singlePrice(o);
+      // One unit's price, for the whole pack (see prices.ts).
+      const price = packPrice(o, singlePrice(o));
       const names = [...new Set([...o.products, ...o.visible_variants].map((n) => n.trim()).filter(Boolean))];
       for (const name of names) {
         const key = productKey(name, o.pack);
