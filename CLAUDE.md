@@ -57,6 +57,8 @@ after 8 unattended nightly runs; Phase 2 (matching) is largely done.
 - `npm run match:coverage [-- --names]` – for every shop: share of each category comparable with
   another shop, and which shops sell and link each item in `src/matching/common-items.ts`
   (only products on sale count; category rules shared with `match:new` in `src/matching/groups.ts`)
+- `npm run check:data` – nightly data check (last workflow job): fails, so GitHub emails, when a shop
+  run is missing/broken/shrunk or a newsletter expires within 3 days (`src/monitoring/check.ts`)
 - `npm run scrape -- <shop> [--limit N] [--save]` – run a shop scraper; saves JSON
   to `data/scrapes/` (git-ignored), and with `--save` writes to Supabase and logs
   the run in `scrape_runs`. Needs the variables in `.env.example` set in `.env.local`.

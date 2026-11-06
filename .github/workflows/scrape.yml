@@ -102,3 +102,23 @@ jobs:
           path: data/llm-batches/last-new-links.txt
           retention-days: 7
           if-no-files-found: ignore
+
+  # Look over the night's data and fail when a human is needed (missing or broken
+  # shop runs, a newsletter about to expire), so GitHub emails the failure. The
+  # report is shown on the run's summary page; see src/monitoring/check.ts.
+  check:
+    needs: [scrape, match, match-new]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm install --no-audit --no-fund
+      - run: npm run check:data
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}

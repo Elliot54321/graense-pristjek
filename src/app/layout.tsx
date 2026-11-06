@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
+import { Suspense } from "react";
 import { BasketLink } from "@/components/basket-link";
+import { Freshness } from "@/components/freshness";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -34,6 +36,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 py-5">{children}</div>
         <footer className="mx-auto w-full max-w-3xl px-4 py-6 text-xs text-zinc-500">
           Priserne er hentet fra butikkernes hjemmesider hver nat og kan afvige fra priserne i butikken.
+          <Suspense>
+            <Freshness />
+          </Suspense>
         </footer>
       </body>
     </html>

@@ -7,6 +7,7 @@
  */
 import { cacheLife } from "next/cache";
 import { publicClient } from "@/db/public";
+import { NEWSLETTER_SHOPS } from "./compare";
 import type { FamilyInfo } from "./import-limits";
 import { finalScore, preScore } from "./ranking";
 import { packLabel } from "@/lib/format";
@@ -55,6 +56,54 @@ export async function getShops(): Promise<Shop[]> {
   const { data, error } = await publicClient().from("shops").select("id, name, location, website").order("id");
   if (error) throw error;
   return data;
+}
+
+/** How fresh each shop's prices are: last nightly scrape, or the newsletter's end date. */
+export interface Freshness {
+  shop: Shop;
+  /** Scraped shops: when the products were last seen. */
+  lastSeen: string | null;
+  /** Scraped shops not seen for a day and a half - the nightly run missed them. */
+  stale: boolean;
+  /** Newsletter shops: the end date most of the current issue shares (null if expired). */
+  listedUntil: string | null;
+}
+
+const STALE_HOURS = 36;
+
+export async function getFreshness(): Promise<Freshness[]> {
+  "use cache";
+  cacheLife("hours");
+  const db = publicClient();
+  const today = new Date().toISOString().slice(0, 10);
+  const shops = await getShops();
+  return Promise.all(
+    shops.map(async (shop): Promise<Freshness> => {
+      if (NEWSLETTER_SHOPS.has(shop.id)) {
+        const { data, error } = await db
+          .from("shop_products")
+          .select("listed_until")
+          .eq("shop_id", shop.id)
+          .gte("listed_until", today)
+          .limit(2000);
+        if (error) throw error;
+        const counts = new Map<string, number>();
+        for (const r of data) counts.set(r.listed_until, (counts.get(r.listed_until) ?? 0) + 1);
+        const main = [...counts].sort((x, y) => y[1] - x[1])[0]?.[0] ?? null;
+        return { shop, lastSeen: null, stale: false, listedUntil: main };
+      }
+      const { data, error } = await db
+        .from("shop_products")
+        .select("last_seen_at")
+        .eq("shop_id", shop.id)
+        .order("last_seen_at", { ascending: false })
+        .limit(1);
+      if (error) throw error;
+      const lastSeen: string | null = data[0]?.last_seen_at ?? null;
+      const stale = !lastSeen || Date.now() - Date.parse(lastSeen) > STALE_HOURS * 3600 * 1000;
+      return { shop, lastSeen, stale, listedUntil: null };
+    }),
+  );
 }
 
 /** Characters with a meaning in PostgREST filters are removed from user input. */

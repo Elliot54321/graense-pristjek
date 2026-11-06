@@ -60,7 +60,7 @@ created: 2026-10-16
 
 - [x] Design schema: `shops`, `products`, `prices` (with timestamps for history), `product_matches` (plus `shop_products` and `scrape_runs`; see `supabase/migrations/`)
 - [x] Write one scraper module per shop (name, EAN, price, pack size, Pfand, URL, timestamp) (Poetzsch and BorderShop in `src/scrapers/`; Fleggaard comes from its newsletter instead)
-- [ ] Add validation and alerts (zero products returned, price change over 50%) (checks done and logged in `scrape_runs`; no notification yet)
+- [x] Add validation and alerts (zero products returned, price change over 50%) (2026-11-06: nightly `check` job emails via a failed GitHub run - see notes)
 - [x] Schedule scrapers (GitHub Actions or Vercel Cron) (GitHub Actions, daily 02:00 UTC; first scheduled run 2026-10-18)
 
 **Done when:** Two shops update by themselves for a week without intervention.
@@ -612,3 +612,11 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
 - **28 offers were affected** (20 Fleggaard, 8 Calle; e.g. Marabou, Nutella, Finish, Barebells, Omo). It also inflated the "estimeret pris" for other shops, since those use the highest price found anywhere.
 - Fix: `singlePrice()` in `src/flyers/prices.ts` - when the price equals the multi-buy total, use the printed single price ("Pr. stk./ks./gl./pk./ds./rl. ...", not the "v/merkøb" per-kg one), else total / quantity (12 offers had no printed single price). The printed per-kg figure is then ignored, since it may be the multi-buy one. The extraction prompt now asks for the single price directly, for future issues. Both November issues re-imported from the existing extraction (no API cost): 64 + 16 price rows changed; Marabou now 22,22 kr. (130,71 kr./kg), 6 for 100 kept as the deal.
 - Note: "Billigst pr. kg" in search uses the single price; a multi-buy's per-kg price (Marabou 6 for 100 = 98 kr./kg) only counts in the basket when you buy enough.
+
+### Failure alerts and "Priser opdateret" on the site (2026-11-06)
+
+- **`npm run check:data`** (`src/monitoring/check.ts`) runs as the last job of the nightly workflow, even when earlier jobs failed, and **fails - so GitHub emails - when a human is needed**: a scraped shop without a finished run in 30 h, a failed or stuck (> 6 h) run, products down > 20 % against the past week's median, > 10 % failed pages, > 15 price jumps in one run, or a newsletter that expires within 3 days or already has. The report is on the run's summary page on GitHub.
+- Single price jumps (> 50 %) happen most nights (1-3 per shop, mostly offers ending) and are only listed as notes - failing on them would be noise. One of them did catch the Marabou multi-buy error ("22,22 -> 100" on 5 Nov), so they're worth a glance.
+- GitHub emails failures of scheduled workflows to the account that last changed the workflow's schedule (the repo owner here); the GitHub notification setting for failed Actions runs must be on.
+- The site footer now says when prices were last updated ("Priser opdateret 6. november kl. 09.45"), names any scraped shop that's behind, and gives the newsletters' end date ("Calle og Fleggaard: avispriser gældende til 24. november", or "ingen gældende avis lige nu"). `getFreshness()` in `data.ts`, cached for an hour.
+
