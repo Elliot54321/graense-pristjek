@@ -25,8 +25,25 @@ export interface Area {
   storePoints: Record<string, Point>;
   /** Where the drive in Denmark ends: the border, or the ferry port. */
   destination: { name: string; point: Point; region: Region };
-  ferry: { route: string; minutes: number; url: string } | null;
+  ferry: Ferry | null;
 }
+
+/**
+ * A ferry crossing and an estimate of a same-day return for a car: Scandlines'
+ * "1-day ticket" from-price (checked 2026-11-06 on scandlines.com; real fares depend on
+ * the departure and season - recheck now and then). Unlike the drive from home, the
+ * ferry costs the same wherever you live, so it's part of an option's price.
+ */
+export interface Ferry {
+  route: string;
+  minutes: number;
+  url: string;
+  returnEur: number;
+}
+
+export const EUR_TO_DKK = 7.46;
+
+export const ferryReturnDkk = (ferry: Ferry) => Math.round(ferry.returnEur * EUR_TO_DKK);
 
 export const AREAS: Area[] = [
   {
@@ -52,7 +69,7 @@ export const AREAS: Area[] = [
       calle: [54.44, 11.19], // Burg auf Fehmarn
     },
     destination: { name: "Rødby Færgehavn", point: [54.655, 11.35], region: "zealand" },
-    ferry: { route: "Rødby–Puttgarden", minutes: 45, url: "https://www.scandlines.dk" },
+    ferry: { route: "Rødby–Puttgarden", minutes: 45, url: "https://www.scandlines.com/tickets/puttgarden-rodby/", returnEur: 72 },
   },
   {
     id: "rostock",
@@ -60,7 +77,7 @@ export const AREAS: Area[] = [
     shops: ["bordershop-rostock"],
     storePoints: { "bordershop-rostock": [54.153, 12.097] }, // at the Rostock ferry terminal
     destination: { name: "Gedser Færgehavn", point: [54.575, 11.928], region: "zealand" },
-    ferry: { route: "Gedser–Rostock", minutes: 120, url: "https://www.scandlines.dk" },
+    ferry: { route: "Gedser–Rostock", minutes: 120, url: "https://www.scandlines.com/tickets/rostock-gedser/", returnEur: 86 },
   },
 ];
 

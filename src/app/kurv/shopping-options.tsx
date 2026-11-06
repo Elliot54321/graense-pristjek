@@ -56,7 +56,7 @@ function useHome(postcode: string): Home | "unknown" | "bornholm" | null {
 
 /**
  * Every shop on its own and the best split per trip, ranked by basket + driving
- * between the stores. Driving from home and the ferry are shown, not priced.
+ * between the stores + the ferry estimate. Driving from home is shown, not priced.
  */
 export function ShoppingOptions({ results, loading }: { results: ShopResult[]; loading: boolean }) {
   const [postcode, setPostcode] = useSetting("graense-pris-postnr", "");
@@ -118,8 +118,9 @@ export function ShoppingOptions({ results, loading }: { results: ShopResult[]; l
       )}
       <p className="mt-2 text-xs text-zinc-500">
         Prisen er varerne plus kørsel mellem butikkerne (ca. {kr(CAR_TYPES[carType].krPerKm)} kr./km for en gennemsnitlig{" "}
-        {CAR_TYPES[carType].label.toLowerCase()}). Turen hjemmefra og færgen er ikke med, da de koster det samme, uanset
-        hvilke butikker du vælger på turen – afstand og tid er skøn. Vi foreslår kun flere butikker, når det sparer mindst{" "}
+        {CAR_TYPES[carType].label.toLowerCase()}) og færgen, hvis turen kræver en – færgeprisen er Scandlines&apos; laveste
+        pris for en dagsbillet, og den rigtige pris afhænger af afgangen. Turen hjemmefra er ikke med, da den afhænger af,
+        hvor du bor – afstand og tid er skøn. Vi foreslår kun flere butikker, når det sparer mindst{" "}
         {MIN_SAVING_PER_EXTRA_STORE} kr. pr. ekstra butik. Postnumre:{" "}
         <a href="https://www.geonames.org" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
           GeoNames
@@ -167,13 +168,14 @@ function OptionCard({
           </p>
         </div>
         <p className="shrink-0 whitespace-nowrap text-right text-xl font-semibold tabular-nums">
-          {(estimated > 0 || split) && "ca. "}
+          {(estimated > 0 || split || o.ferryCost > 0) && "ca. "}
           {krRound(o.total)} kr.
         </p>
       </div>
       {o.area.ferry && (
         <p className="mt-1 text-xs text-zinc-500">
-          + færge {o.area.ferry.route} (ikke med i prisen,{" "}
+          Inkl. færge {o.area.ferry.route} tur/retur, ca. {krRound(o.ferryCost)} kr. (Scandlines dagsbillet fra{" "}
+          {o.area.ferry.returnEur} €,{" "}
           <a href={o.area.ferry.url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
             se pris
           </a>
