@@ -1,6 +1,8 @@
 /**
  * Trips: a shopper picks a crossing first, then shops. The Padborg shops lie within
  * ~10 km of each other, so they're one trip; the two BorderShops sit at ferry ports.
+ * A chain can be on several trips when its prices apply in every store: Calle's
+ * newsletter covers Kruså as well as Burg on Fehmarn, a few km from Puttgarden.
  *
  * Distances are rough on purpose: straight lines x ROAD_FACTOR, routed over the
  * Little Belt and Great Belt bridges so e.g. Odense -> Rødby doesn't cross water.
@@ -17,6 +19,8 @@ export interface Area {
   id: AreaId;
   name: string;
   shops: string[];
+  /** Store names on this trip where the shop's own name would be misleading. */
+  storeNames?: Record<string, string>;
   /** Where the drive in Denmark ends: the border, or the ferry port. */
   destination: { name: string; point: Point; region: Region };
   ferry: { route: string; minutes: number; url: string } | null;
@@ -33,7 +37,8 @@ export const AREAS: Area[] = [
   {
     id: "puttgarden",
     name: "Rødby–Puttgarden",
-    shops: ["bordershop"],
+    shops: ["bordershop", "calle"],
+    storeNames: { calle: "Calle Burg (Fehmarn)" },
     destination: { name: "Rødby Færgehavn", point: [54.655, 11.35], region: "zealand" },
     ferry: { route: "Rødby–Puttgarden", minutes: 45, url: "https://www.scandlines.dk" },
   },
@@ -111,4 +116,9 @@ export type CarType = keyof typeof CAR_TYPES;
 
 export function areaOfShop(shopId: string): Area | undefined {
   return AREAS.find((a) => a.shops.includes(shopId));
+}
+
+/** A shop's name as shown on a trip card ("Calle Burg (Fehmarn)" on the Puttgarden trip). */
+export function storeName(area: Area, shop: { id: string; name: string }): string {
+  return area.storeNames?.[shop.id] ?? shop.name;
 }

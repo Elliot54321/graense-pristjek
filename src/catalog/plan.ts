@@ -8,7 +8,7 @@
  * Items a trip lacks keep the estimate from compare.ts (the highest price in any
  * other shop), so trips stay comparable.
  */
-import { AREAS, type Area } from "./trips";
+import { AREAS, type Area, storeName } from "./trips";
 import type { ShopResult } from "./types";
 
 export const MIN_SPLIT_SAVING = 50;
@@ -56,7 +56,7 @@ export function planTrips(results: ShopResult[]): TripPlan[] {
       // No shop here has it, so the single shop lacks it too and carries its estimate.
       if (!offers.length) return missing.push({ label: line.label, estimate: line.estimate });
       const best = offers[0];
-      const stop = stops.get(best.shop.id) ?? { shopId: best.shop.id, shopName: best.shop.name, items: [], cost: 0 };
+      const stop = stops.get(best.shop.id) ?? { shopId: best.shop.id, shopName: storeName(area, best.shop), items: [], cost: 0 };
       // Coupon prices stay marked all the way to the trip card.
       const coupon = shops.find((s) => s.shop.id === best.shop.id)?.lines[i].buy?.coupon;
       stop.items.push(coupon ? `${line.label} (kuponpris)` : line.label);

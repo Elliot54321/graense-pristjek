@@ -87,7 +87,8 @@ export function BasketView() {
       <p className="mt-4 text-xs text-zinc-500">
         {state.results.some((r) => r.lines.some((l) => l.buy?.coupon)) && <>{COUPON_NOTE} </>}
         Butikkerne ligger forskellige steder: Fleggaard, Calle og Poetzsch ved Padborg/Kruså, Scandinavian Park ved motorvejen i
-        Handewitt, BorderShop ved færgerne i Puttgarden (Rødby–Puttgarden) og Rostock (Gedser–Rostock). Fleggaards og
+        Handewitt, BorderShop ved færgerne i Puttgarden (Rødby–Puttgarden) og Rostock (Gedser–Rostock). Calle har også
+        butik i Burg på Fehmarn, få km fra færgen i Puttgarden. Fleggaards og
         Calles priser kommer fra deres aviser og gælder til avisens slutdato. Har en butik ikke en vare, regner vi med
         den højeste pris i de andre butikker, så totalerne kan sammenlignes.
       </p>

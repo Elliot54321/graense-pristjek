@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { planTrips, type TripPlan } from "@/catalog/plan";
-import { CAR_TYPES, type CarType, oneWayKm, oneWayMinutes, regionOf } from "@/catalog/trips";
+import { CAR_TYPES, type CarType, oneWayKm, oneWayMinutes, regionOf, storeName } from "@/catalog/trips";
 import type { ShopResult } from "@/catalog/types";
 import { duration, kr, krRound } from "@/lib/format";
 
@@ -229,7 +229,7 @@ function TripCard({
           </>
         ) : (
           <>
-            <dt>Varer hos {plan.single.shop.name}</dt>
+            <dt>Varer hos {storeName(plan.area, plan.single.shop)}</dt>
             <dd className="tabular-nums">{kr(plan.single.total)}</dd>
           </>
         )}
