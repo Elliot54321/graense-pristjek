@@ -42,7 +42,11 @@ const Offer = z.object({
   unit_count: z.number().nullable().describe("Number of items in the pack (18 for 18 x 0,33 l.), null if not stated"),
   unit_size: z.number().nullable().describe("Size of one item in liters or kg (0.33), null if a range or unknown"),
   unit: z.enum(["l", "kg", "stk"]).nullable(),
-  price: z.number().describe('Price in DKK for one price unit; "5999" printed large = 59.99, "22,-" = 22'),
+  price: z
+    .number()
+    .describe(
+      'Price in DKK for ONE unit; "5999" printed large = 59.99, "22,-" = 22. If the big price is for several ("6 stk. 100,-"), use the single price from the small print ("Pr. stk. 22,22") and put the deal in multi_buy; if no single price is printed, use total / quantity',
+    ),
   price_unit: z.string().describe('As printed: "Pr. ks.", "Pr. fl.", "Pr. ps." ...'),
   price_per_liter_or_kg: z.number().nullable().describe('From "Pr. liter 10,10." / "Pr. kg 49,95."; null if absent'),
   price_per_is_max: z.boolean().describe('True if printed as "max", e.g. "Pr. liter max 13,47."'),

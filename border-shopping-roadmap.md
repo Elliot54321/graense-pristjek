@@ -605,3 +605,10 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
 - Wording (user): "skønnet" -> **"estimeret pris"** everywhere on the site ("Billigst – inkl. 2 estimerede priser", "afstand og tid er estimater").
 - Every estimated line now links to where it can be double-checked: one shop -> that shop's site (also the scraped shops, not just newsletter shops); a split option -> **every store in the option** ("ikke fundet i disse butikker – estimeret pris (tjek calle.dk, poetzsch-padborg.dk)").
 - ScandiPark's website in `shops` now points to its Danish click & collect shop (migration `20261106000000_scandipark_website.sql`, applied directly), so its links match where its prices come from.
+
+### Newsletter multi-buy totals stored as single prices - fixed (2026-11-06)
+
+- Found by the user: Fleggaard's Marabou showed 588 kr./kg. The newsletter's big price was "6 stk. 100,-" and the extraction stored **100 kr. as the price of one 170 g bar**; the single price is in the small print ("Pr. stk. 22,22" -> ~131 kr./kg). The multi-buy itself was stored correctly.
+- **28 offers were affected** (20 Fleggaard, 8 Calle; e.g. Marabou, Nutella, Finish, Barebells, Omo). It also inflated the "estimeret pris" for other shops, since those use the highest price found anywhere.
+- Fix: `singlePrice()` in `src/flyers/prices.ts` - when the price equals the multi-buy total, use the printed single price ("Pr. stk./ks./gl./pk./ds./rl. ...", not the "v/merkøb" per-kg one), else total / quantity (12 offers had no printed single price). The printed per-kg figure is then ignored, since it may be the multi-buy one. The extraction prompt now asks for the single price directly, for future issues. Both November issues re-imported from the existing extraction (no API cost): 64 + 16 price rows changed; Marabou now 22,22 kr. (130,71 kr./kg), 6 for 100 kept as the deal.
+- Note: "Billigst pr. kg" in search uses the single price; a multi-buy's per-kg price (Marabou 6 for 100 = 98 kr./kg) only counts in the basket when you buy enough.

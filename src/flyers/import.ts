@@ -14,6 +14,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { unitPrice } from "../scrapers/quantity";
+import { singlePrice } from "./prices";
 import { adminClient, finishRun, saveProducts, startRun, type RunSummary } from "../scrapers/save";
 import type { BaseUnit, ScrapedProduct } from "../scrapers/types";
 
@@ -33,6 +34,8 @@ interface Offer {
   multi_buy: { quantity: number; total_price: number } | null;
   always_low_price: boolean;
   saving_vs_dk_percent: number | null;
+  price_unit?: string;
+  limit_note?: string | null;
   /** Missing in extractions made before coupons were read (2026-11-05). */
   coupon?: boolean;
 }
@@ -69,6 +72,7 @@ export function offersToProducts(data: Extracted, shop: string, validTo: string,
     const until = sections.find((s) => page >= s.from && page <= s.to)?.validTo ?? validTo;
     for (const o of result.offers) {
       const total = content(o);
+      const price = singlePrice(o);
       const names = [...new Set([...o.products, ...o.visible_variants].map((n) => n.trim()).filter(Boolean))];
       for (const name of names) {
         const key = productKey(name, o.pack);
@@ -80,13 +84,14 @@ export function offersToProducts(data: Extracted, shop: string, validTo: string,
           brand: null,
           ean: null,
           categories: [o.category],
-          price: o.price,
+          price,
           currency: "DKK",
           packText: o.pack,
           packCount: o.unit_count,
           unitSize: o.unit_size && (o.unit === "l" || o.unit === "kg") ? { amount: o.unit_size, unit: o.unit } : null,
           totalContent: total,
-          pricePerUnit: unitPrice(o.price, total, o.price_per_is_max ? null : o.price_per_liter_or_kg),
+          // The printed per-kg price may be the multi-buy one ("v/merkøb"), so only trust our own.
+          pricePerUnit: unitPrice(price, total, o.price_per_is_max || price !== o.price ? null : o.price_per_liter_or_kg),
           onOffer: !o.always_low_price,
           regularPrice: null,
           offerEndsAt: o.always_low_price ? null : until,
