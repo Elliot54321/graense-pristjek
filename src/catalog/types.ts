@@ -36,6 +36,8 @@ export interface Pack {
   familyId: number | null;
   contentAmount: number | null;
   contentUnit: Unit | null;
+  /** "24 x 0,33 l" - how the shops sell it; contentAmount (7,92 l) is for comparing per liter. */
+  packLabel: string | null;
   offers: Offer[];
 }
 
@@ -51,7 +53,8 @@ export interface FamilyResult {
 /** What the browser keeps in its basket. */
 export type BasketItem =
   /** step = how much one "+" adds: the pack size the family was added with. */
-  | { key: string; kind: "family"; familyId: number; label: string; amount: number; step: number; unit: Unit }
+  /** packLabel: the pack one step is ("24 x 0,33 l"), shown instead of liters; missing in older baskets. */
+  | { key: string; kind: "family"; familyId: number; label: string; amount: number; step: number; unit: Unit; packLabel?: string }
   | { key: string; kind: "product"; productId: number; label: string; quantity: number };
 
 export interface LineResult {

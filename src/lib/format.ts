@@ -9,6 +9,22 @@ export const amount = (n: number) => n.toLocaleString("da-DK", { maximumFraction
 export const UNIT_LABEL: Record<Unit, string> = { l: "l", kg: "kg", piece: "stk." };
 export const PER_UNIT_LABEL: Record<Unit, string> = { l: "pr. liter", kg: "pr. kg", piece: "pr. stk." };
 
+/**
+ * A pack as shoppers know it: "24 x 0,33 l" for a case, "0,7 l" for one bottle.
+ * Falls back to the total content when the pack shape is unknown.
+ */
+export function packLabel(
+  count: number | null,
+  unitSize: number | null,
+  unit: Unit | null,
+  total: number | null,
+): string | null {
+  if (unit && unitSize && count && count > 1) return `${count} x ${amount(unitSize)} ${UNIT_LABEL[unit]}`;
+  if (unit && unitSize) return `${amount(unitSize)} ${UNIT_LABEL[unit]}`;
+  if (unit && total) return `${amount(total)} ${UNIT_LABEL[unit]}`;
+  return null;
+}
+
 /** 3. november */
 export const day = (iso: string) => new Date(iso).toLocaleDateString("da-DK", { day: "numeric", month: "long" });
 

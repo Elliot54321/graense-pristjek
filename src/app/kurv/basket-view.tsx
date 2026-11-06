@@ -111,14 +111,18 @@ function BasketRow({ item }: { item: BasketItem }) {
   }
   // Families are bought by amount; each step is the pack size the family was added with.
   const step = item.step;
+  // Shown as packs ("5 × 24 x 0,33 l") when the amount is whole packs of the added size.
+  const packs = item.packLabel && Math.abs(item.amount / step - Math.round(item.amount / step)) < 1e-6 ? Math.round(item.amount / step) : null;
   return (
     <li className="flex items-center justify-between gap-3 px-3 py-2.5">
       <div className="min-w-0 flex-1">
         <p className="text-sm">{item.label}</p>
-        <p className="text-xs text-zinc-500">Billigste pakning – vi vælger størrelsen</p>
+        <p className="text-xs text-zinc-500">
+          {packs !== null && `${amount(item.amount)} ${UNIT_LABEL[item.unit]} i alt · `}Billigste pakning – vi vælger størrelsen
+        </p>
       </div>
       <Stepper
-        value={`${amount(item.amount)} ${UNIT_LABEL[item.unit]}`}
+        value={packs !== null ? `${amount(packs)} × ${item.packLabel}` : `${amount(item.amount)} ${UNIT_LABEL[item.unit]}`}
         onMinus={() =>
           item.amount - step > 0.0001 ? updateBasketItem(item.key, { amount: round(item.amount - step) }) : removeFromBasket(item.key)
         }

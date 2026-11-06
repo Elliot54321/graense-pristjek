@@ -21,6 +21,7 @@ const Item = z.discriminatedUnion("kind", [
     amount: z.number().positive().max(10_000),
     step: z.number().positive().max(10_000),
     unit: z.enum(["l", "kg", "piece"]),
+    packLabel: z.string().max(40).optional(),
   }),
   z.object({
     key: z.string().max(100),

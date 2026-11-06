@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { getShops, searchFamilies } from "@/catalog/data";
 import type { FamilyResult, Pack, Shop } from "@/catalog/types";
 import { AddToBasket } from "@/components/add-to-basket";
-import { amount, day, kr, PER_UNIT_LABEL, UNIT_LABEL } from "@/lib/format";
+import { day, kr, PER_UNIT_LABEL } from "@/lib/format";
 import { CouponBadge, COUPON_NOTE } from "@/components/coupon-badge";
 
 const EXAMPLES = ["cola", "øl", "haribo", "gin", "chips"];
@@ -118,6 +118,7 @@ function FamilyCard({ family, shops }: { family: FamilyResult; shops: Map<string
               amount: bestPack.contentAmount,
               step: bestPack.contentAmount,
               unit: family.best.unit,
+              packLabel: bestPack.packLabel ?? undefined,
             }}
           />
         )}
@@ -137,9 +138,7 @@ function PackRow({ pack, shops }: { pack: Pack; shops: Map<string, Shop> }) {
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium">
           {pack.name}
-          {pack.contentAmount && pack.contentUnit && (
-            <span className="font-normal text-zinc-500"> · {amount(pack.contentAmount)} {UNIT_LABEL[pack.contentUnit]}</span>
-          )}
+          {pack.packLabel && <span className="font-normal text-zinc-500"> · {pack.packLabel}</span>}
         </p>
         <ul className="mt-0.5 text-sm text-zinc-700 dark:text-zinc-300">
           {pack.offers.map((o) => (

@@ -9,6 +9,7 @@ import { cacheLife } from "next/cache";
 import { publicClient } from "@/db/public";
 import type { FamilyInfo } from "./import-limits";
 import { finalScore, preScore } from "./ranking";
+import { packLabel } from "@/lib/format";
 import type { FamilyResult, Offer, Pack, Shop, Unit } from "./types";
 
 const MAX_FAMILIES = 30;
@@ -21,6 +22,14 @@ interface ProductRow {
   family_id: number | null;
   content_amount: number | null;
   content_unit: Unit | null;
+}
+
+interface ListingRow {
+  product_id: number;
+  shop_products:
+    | { pack_count: number | null; unit_size_amount: number | null; unit_size_unit: Unit | null }
+    | { pack_count: number | null; unit_size_amount: number | null; unit_size_unit: Unit | null }[]
+    | null;
 }
 
 interface PriceRow {
@@ -75,6 +84,27 @@ async function loadPacks(productIds: number[], familyIds: number[]): Promise<Pac
     .in("product_id", products.map((p) => p.id));
   if (priceError) throw priceError;
 
+  // Pack shape ("24 x 0,33 l") from the shops' listings; the most common one wins.
+  const { data: listings, error: listingError } = await db
+    .from("product_matches")
+    .select("product_id, shop_products(pack_count, unit_size_amount, unit_size_unit)")
+    .in("product_id", products.map((p) => p.id));
+  if (listingError) throw listingError;
+  const shapes = new Map<number, Map<string, number>>();
+  for (const l of listings as unknown as ListingRow[]) {
+    const sp = Array.isArray(l.shop_products) ? l.shop_products[0] : l.shop_products;
+    if (!sp?.unit_size_amount || !sp.unit_size_unit) continue;
+    const key = `${sp.pack_count ?? 1}|${Number(sp.unit_size_amount)}|${sp.unit_size_unit}`;
+    const counts = shapes.get(l.product_id) ?? new Map<string, number>();
+    shapes.set(l.product_id, counts.set(key, (counts.get(key) ?? 0) + 1));
+  }
+  const shapeOf = (id: number) => {
+    const best = [...(shapes.get(id) ?? [])].sort((a, b) => b[1] - a[1])[0]?.[0];
+    if (!best) return null;
+    const [count, size, unit] = best.split("|");
+    return { count: Number(count), size: Number(size), unit: unit as Unit };
+  };
+
   const offersByProduct = new Map<number, Offer[]>();
   for (const r of prices as PriceRow[]) {
     const offer: Offer = {
@@ -105,6 +135,13 @@ async function loadPacks(productIds: number[], familyIds: number[]): Promise<Pac
       familyId: p.family_id,
       contentAmount: p.content_amount === null ? null : Number(p.content_amount),
       contentUnit: p.content_unit,
+      packLabel: (() => {
+        const shape = shapeOf(p.id);
+        const content = p.content_amount === null ? null : Number(p.content_amount);
+        // Only trust the shape if it adds up to the product's content (7,92 = 24 x 0,33).
+        const fits = shape && content && shape.unit === p.content_unit && Math.abs(shape.count * shape.size - content) / content < 0.02;
+        return fits ? packLabel(shape.count, shape.size, shape.unit, content) : packLabel(null, null, p.content_unit, content);
+      })(),
       offers: (offersByProduct.get(p.id) ?? []).sort((a, b) => a.price - b.price),
     }))
     .filter((p) => p.offers.length > 0); // products no shop currently sells are left out
