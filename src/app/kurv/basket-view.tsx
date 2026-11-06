@@ -3,13 +3,12 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { AlcoholType } from "@/catalog/import-limits";
-import { NEWSLETTER_SHOPS } from "@/catalog/compare";
 import type { BasketItem, ShopResult } from "@/catalog/types";
 import { clearBasket, removeFromBasket, updateBasketItem, useBasket } from "@/components/basket";
-import { amount, day, kr, UNIT_LABEL } from "@/lib/format";
-import { CouponBadge, COUPON_NOTE } from "@/components/coupon-badge";
+import { amount, UNIT_LABEL } from "@/lib/format";
+import { COUPON_NOTE } from "@/components/coupon-badge";
 import { ImportLimits } from "./import-limits";
-import { TripPlanner } from "./trip-planner";
+import { ShoppingOptions } from "./shopping-options";
 
 type Alcohol = Partial<Record<AlcoholType, number>>;
 type State = { status: "idle" | "loading" | "error"; results: ShopResult[]; alcohol: Alcohol };
@@ -73,16 +72,9 @@ export function BasketView() {
         </button>
       </div>
 
-      {state.results.length > 0 && <TripPlanner results={state.results} />}
-
-      <h2 className="mt-8 text-xl font-semibold tracking-tight">Pris pr. butik</h2>
-      {state.status === "error" && <p className="mt-2 text-red-700">Kunne ikke hente priser. Prøv igen om lidt.</p>}
-      {state.status === "loading" && !state.results.length && <p className="mt-2 text-zinc-500">Regner priser ud…</p>}
-      <ol className={`mt-3 flex flex-col gap-4 ${state.status === "loading" ? "opacity-60" : ""}`}>
-        {state.results.map((r, i) => (
-          <ShopCard key={r.shop.id} result={r} cheapest={i === 0 && state.results.length > 1} />
-        ))}
-      </ol>
+      {state.status === "error" && <p className="mt-8 text-red-700">Kunne ikke hente priser. Prøv igen om lidt.</p>}
+      {state.status === "loading" && !state.results.length && <p className="mt-8 text-zinc-500">Regner priser ud…</p>}
+      {state.results.length > 0 && <ShoppingOptions results={state.results} loading={state.status === "loading"} />}
       <ImportLimits liters={state.alcohol} />
       <p className="mt-4 text-xs text-zinc-500">
         {state.results.some((r) => r.lines.some((l) => l.buy?.coupon)) && <>{COUPON_NOTE} </>}
@@ -146,83 +138,5 @@ function Stepper({ value, onMinus, onPlus }: { value: string; onMinus: () => voi
         +
       </button>
     </div>
-  );
-}
-
-function ShopCard({ result, cheapest }: { result: ShopResult; cheapest: boolean }) {
-  const { shop } = result;
-  // Newsletter shops only show part of their range, so the item is probably there.
-  const newsletter = NEWSLETTER_SHOPS.has(shop.id);
-  return (
-    <li className={`rounded-lg border p-4 ${cheapest ? "border-emerald-500 ring-1 ring-emerald-500" : "border-zinc-200 dark:border-zinc-800"}`}>
-      <div className="flex items-baseline justify-between gap-3">
-        <div>
-          <h3 className="font-semibold">
-            {shop.name}
-            {cheapest && (
-              <span className="ml-2 inline-block whitespace-nowrap rounded bg-emerald-600 px-1.5 py-0.5 text-xs font-medium text-white">
-                Billigst{result.estimates > 0 && ` – inkl. ${result.estimates} skønnet`}
-              </span>
-            )}
-          </h3>
-          {shop.location && <p className="text-xs text-zinc-500">{shop.location}</p>}
-        </div>
-        <p className="shrink-0 whitespace-nowrap text-right text-xl font-semibold tabular-nums">
-          {result.estimates > 0 && "ca. "}
-          {kr(result.totalWithEstimates)} kr.
-        </p>
-      </div>
-      {result.estimates > 0 && (
-        <p className="mt-1 text-sm text-amber-700 dark:text-amber-400">
-          {result.estimates} {result.estimates === 1 ? "vare" : "varer"}{" "}
-          {newsletter ? "er ikke i butikkens avis" : "findes ikke i webshoppen"} – regnet med den højeste pris i de andre
-          butikker
-        </p>
-      )}
-      <ul className="mt-2 text-sm">
-        {result.lines.map((l) => (
-          <li key={l.key} className="flex justify-between gap-3 py-0.5">
-            {l.buy ? (
-              <>
-                <a href={l.buy.url} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 hover:underline">
-                  {l.buy.quantity} × {l.buy.productName}
-                  {l.buy.multiBuy && (
-                    <span className="ml-1 text-xs text-sky-700 dark:text-sky-400">
-                      ({l.buy.multiBuy.quantity} for {kr(l.buy.multiBuy.price)})
-                    </span>
-                  )}
-                  {l.buy.coupon && <CouponBadge />}
-                  {l.buy.onOffer && (
-                    <span className="ml-1 text-xs text-amber-700 dark:text-amber-400">
-                      tilbud{l.buy.offerEndsAt ? ` til ${day(l.buy.offerEndsAt)}` : ""}
-                    </span>
-                  )}
-                </a>
-                <span className="tabular-nums">{kr(l.cost!)}</span>
-              </>
-            ) : l.estimate !== null ? (
-              <>
-                <span className="min-w-0 flex-1 text-zinc-500">
-                  {l.label}: {newsletter ? "ikke i avisen" : "ikke i webshoppen"} – skønnet
-                  {newsletter && (
-                    <>
-                      {" "}
-                      (
-                      <a href={shop.website} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
-                        tjek {shop.website.replace(/^https?:\/\/(www\.)?/, "")}
-                      </a>
-                      )
-                    </>
-                  )}
-                </span>
-                <span className="tabular-nums text-zinc-500">~{kr(l.estimate)}</span>
-              </>
-            ) : (
-              <span className="text-zinc-500">{l.label}: findes ingen steder</span>
-            )}
-          </li>
-        ))}
-      </ul>
-    </li>
   );
 }

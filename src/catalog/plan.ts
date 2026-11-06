@@ -1,86 +1,102 @@
 /**
- * Shopping plans per trip, from the per-shop basket prices: the best single shop
- * in the area, and - when the area has several shops - the cheapest split, buying
- * each item where it's cheapest. A split is used when it covers items the single
- * shop lacks, or else when it saves at least MIN_SPLIT_SAVING, since every extra
- * stop takes time.
+ * Shopping options for a basket: every shop on its own, plus - per trip - the best
+ * way to split the basket over several stores. One list, ranked by price.
  *
- * Items a trip lacks keep the estimate from compare.ts (the highest price in any
- * other shop), so trips stay comparable.
+ * Price = basket + the extra driving between stores. Getting to the border (and the
+ * ferry) is left out: it's the same whichever stores you pick on a trip, and it's
+ * shown separately as information (user decision, 2026-11-06).
+ *
+ * Items a store lacks keep the estimate from compare.ts (the highest price in any
+ * other shop), so options stay comparable.
  */
-import { AREAS, type Area, storeName } from "./trips";
-import type { ShopResult } from "./types";
+import { AREAS, type Area, betweenStoresKm, storeName } from "./trips";
+import type { LineResult, ShopResult } from "./types";
 
-export const MIN_SPLIT_SAVING = 50;
+/** A split is only suggested when it saves at least this per extra store, after driving. */
+export const MIN_SAVING_PER_EXTRA_STORE = 25;
 
-export interface SplitStop {
+export interface Stop {
   shopId: string;
-  shopName: string;
-  /** Basket item labels bought here. */
-  items: string[];
+  name: string;
+  /** What to buy here (the shop's own lines; for a single shop also its estimated lines). */
+  lines: LineResult[];
   cost: number;
 }
 
-export interface TripPlan {
+export interface ShoppingOption {
+  key: string;
   area: Area;
-  /** The best single shop: lowest total with missing items at their estimate. */
-  single: ShopResult;
-  /** Cheapest split across the area's shops, when it beats the single shop by MIN_SPLIT_SAVING. */
-  split: { total: number; saving: number; stops: SplitStop[] } | null;
-  /** Total for the plan we recommend (split if suggested, else the single shop). */
-  total: number;
-  /** Basket items no shop in the area has, with the estimate used (null if no shop anywhere has it). */
+  stops: Stop[];
+  /** Items no store in this option has, counted at their estimate (null: no shop has it). */
   missing: { label: string; estimate: number | null }[];
-  /** Plan total plus the estimates for missing items - what trips are ranked by. */
-  totalWithEstimates: number;
+  /** Basket price, missing items at their estimate. */
+  basket: number;
+  betweenKm: number;
+  betweenCost: number;
+  total: number;
 }
 
 const round = (n: number) => Math.round(n * 100) / 100;
 
-export function planTrips(results: ShopResult[]): TripPlan[] {
-  const plans: TripPlan[] = [];
+/** All subsets of at least two shops (a trip has at most four). */
+function combinations<T>(list: T[]): T[][] {
+  const out: T[][] = [];
+  for (let mask = 1; mask < 1 << list.length; mask++) {
+    const pick = list.filter((_, i) => mask & (1 << i));
+    if (pick.length >= 2) out.push(pick);
+  }
+  return out;
+}
+
+/** Buy each item at the cheapest of these shops. */
+function split(area: Area, shops: ShopResult[], krPerKm: number): Omit<ShoppingOption, "key"> {
+  const stops = new Map<string, Stop>();
+  const missing: ShoppingOption["missing"] = [];
+  shops[0].lines.forEach((line, i) => {
+    const best = shops
+      .map((s) => ({ shop: s.shop, line: s.lines[i] }))
+      .filter((o) => o.line.cost !== null)
+      .sort((a, b) => a.line.cost! - b.line.cost!)[0];
+    // No store here has it: every line carries the same estimate.
+    if (!best) return missing.push({ label: line.label, estimate: line.estimate });
+    const stop = stops.get(best.shop.id) ?? { shopId: best.shop.id, name: storeName(area, best.shop), lines: [], cost: 0 };
+    stop.lines.push(best.line);
+    stop.cost = round(stop.cost + best.line.cost!);
+    stops.set(best.shop.id, stop);
+  });
+  const used = [...stops.values()].sort((a, b) => b.cost - a.cost);
+  const betweenKm = betweenStoresKm(area, used.map((s) => s.shopId));
+  const betweenCost = round(betweenKm * krPerKm);
+  const basket = round(used.reduce((sum, s) => sum + s.cost, 0) + missing.reduce((sum, m) => sum + (m.estimate ?? 0), 0));
+  return { area, stops: used, missing, basket, betweenKm, betweenCost, total: round(basket + betweenCost) };
+}
+
+export function shoppingOptions(results: ShopResult[], krPerKm: number): ShoppingOption[] {
+  const options: ShoppingOption[] = [];
   for (const area of AREAS) {
     const shops = results.filter((r) => area.shops.includes(r.shop.id));
     if (!shops.length) continue;
-    // Best single shop: lowest total once its missing items are counted at the estimate.
-    const single = [...shops].sort((a, b) => a.totalWithEstimates - b.totalWithEstimates)[0];
 
-    // Each item from the shop where it's cheapest (lines are in basket order in every shop).
-    const stops = new Map<string, SplitStop>();
-    const missing: TripPlan["missing"] = [];
-    single.lines.forEach((line, i) => {
-      const offers = shops
-        .map((s) => ({ shop: s.shop, cost: s.lines[i].cost }))
-        .filter((o): o is { shop: ShopResult["shop"]; cost: number } => o.cost !== null)
-        .sort((a, b) => a.cost - b.cost);
-      // No shop here has it, so the single shop lacks it too and carries its estimate.
-      if (!offers.length) return missing.push({ label: line.label, estimate: line.estimate });
-      const best = offers[0];
-      const stop = stops.get(best.shop.id) ?? { shopId: best.shop.id, shopName: storeName(area, best.shop), items: [], cost: 0 };
-      // Coupon prices stay marked all the way to the trip card.
-      const coupon = shops.find((s) => s.shop.id === best.shop.id)?.lines[i].buy?.coupon;
-      stop.items.push(coupon ? `${line.label} (kuponpris)` : line.label);
-      stop.cost = round(stop.cost + best.cost);
-      stops.set(best.shop.id, stop);
-    });
-    const splitTotal = round([...stops.values()].reduce((sum, s) => sum + s.cost, 0));
+    // Every shop on its own.
+    const singles: ShoppingOption[] = shops.map((r) => ({
+      key: `${area.id}-${r.shop.id}`,
+      area,
+      stops: [{ shopId: r.shop.id, name: storeName(area, r.shop), lines: r.lines, cost: r.totalWithEstimates }],
+      missing: [],
+      basket: r.totalWithEstimates,
+      betweenKm: 0,
+      betweenCost: 0,
+      total: r.totalWithEstimates,
+    }));
+    options.push(...singles);
 
-    // Compare like with like: both sides count their missing items at the estimate.
-    const singleMissing = single.lines.flatMap((l) => (l.cost === null ? [{ label: l.label, estimate: l.estimate }] : []));
-    const singleFull = single.totalWithEstimates;
-    const splitFull = round(splitTotal + missing.reduce((sum, x) => sum + (x.estimate ?? 0), 0));
-    const saving = round(singleFull - splitFull);
-    // An item another shop here sells is bought there, not estimated - so a split
-    // that covers more items is always used; otherwise only when it saves enough.
-    const coversMore = missing.length < singleMissing.length;
-    const split =
-      stops.size > 1 && (coversMore || saving >= MIN_SPLIT_SAVING)
-        ? { total: splitTotal, saving: coversMore ? 0 : saving, stops: [...stops.values()].sort((a, b) => b.cost - a.cost) }
-        : null;
-
-    const total = split ? split.total : single.total;
-    const planMissing = split ? missing : singleMissing;
-    plans.push({ area, single, split, total, missing: planMissing, totalWithEstimates: split ? splitFull : singleFull });
+    // The best split on this trip, if it beats the best single store by enough per extra store.
+    const bestSingle = Math.min(...singles.map((o) => o.total));
+    const splits = combinations(shops)
+      .map((combo) => split(area, combo, krPerKm))
+      .filter((o) => o.stops.length >= 2 && bestSingle - o.total >= MIN_SAVING_PER_EXTRA_STORE * (o.stops.length - 1))
+      .sort((a, b) => a.total - b.total);
+    if (splits[0]) options.push({ ...splits[0], key: `${area.id}-split` });
   }
-  return plans;
+  return options.sort((a, b) => a.total - b.total);
 }

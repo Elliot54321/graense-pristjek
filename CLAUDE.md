@@ -99,10 +99,11 @@ after 8 unattended nightly runs; Phase 2 (matching) is largely done.
 - `src/catalog/` – website data: `data.ts` (cached reads with the publishable key: search,
   packs for a basket, shops), `ranking.ts` (search scoring; bestsellers in `common-items.ts`),
   `compare.ts` (basket price per shop), `import-limits.ts` (Danish guide amounts for alcohol,
-  source and date in the file – recheck yearly), `trips.ts` (shops grouped by crossing, rough
-  distance from a postcode, car-type costs), `plan.ts` (best shop / split per trip, missing items at
-  the highest price elsewhere), `postcodes.json` (GeoNames, CC BY 4.0), `types.ts`
-- `src/app/page.tsx` – search; `src/app/kurv/` – basket (client) + `src/app/api/compare/`
+  source and date in the file – recheck yearly), `trips.ts` (shops grouped by crossing, store locations, rough
+  distance from a postcode, car-type costs), `plan.ts` (shopping options: every shop plus the best
+  split per trip, priced as basket + driving between stores; home driving and ferry are info only), `postcodes.json` (GeoNames, CC BY 4.0), `types.ts`
+- `src/app/page.tsx` – search; `src/app/kurv/` – basket (client; `shopping-options.tsx` is the ranked
+  list) + `src/app/api/compare/`
 - `src/components/basket.ts` – basket in localStorage (`useBasket`, `addToBasket`, ...)
 - `src/db/public.ts` – read-only Supabase client (publishable key) for website code
 - `src/catalog/interpret.ts` – free-text list interpretation; **shelved, not used** (roadmap 2026-10-25)

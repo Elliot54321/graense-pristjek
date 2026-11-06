@@ -21,6 +21,8 @@ export interface Area {
   shops: string[];
   /** Store names on this trip where the shop's own name would be misleading. */
   storeNames?: Record<string, string>;
+  /** Rough store locations (from the addresses, ~1 km), for the driving between stores. */
+  storePoints: Record<string, Point>;
   /** Where the drive in Denmark ends: the border, or the ferry port. */
   destination: { name: string; point: Point; region: Region };
   ferry: { route: string; minutes: number; url: string } | null;
@@ -31,6 +33,12 @@ export const AREAS: Area[] = [
     id: "padborg",
     name: "Padborg / Kruså",
     shops: ["poetzsch", "fleggaard", "scandipark", "calle"],
+    storePoints: {
+      poetzsch: [54.817, 9.376], // Industrieweg 40, Harrislee (by the Padborg crossing)
+      fleggaard: [54.816, 9.379], // Industrieweg 27, Harrislee
+      calle: [54.842, 9.408], // Lykberg 1, by the Kruså crossing
+      scandipark: [54.769, 9.338], // Handewitt, at the A7/E45 exit
+    },
     destination: { name: "grænsen ved Padborg", point: [54.83, 9.36], region: "jutland" },
     ferry: null,
   },
@@ -39,6 +47,10 @@ export const AREAS: Area[] = [
     name: "Rødby–Puttgarden",
     shops: ["bordershop", "calle"],
     storeNames: { calle: "Calle Burg (Fehmarn)" },
+    storePoints: {
+      bordershop: [54.501, 11.226], // at the Puttgarden ferry terminal
+      calle: [54.44, 11.19], // Burg auf Fehmarn
+    },
     destination: { name: "Rødby Færgehavn", point: [54.655, 11.35], region: "zealand" },
     ferry: { route: "Rødby–Puttgarden", minutes: 45, url: "https://www.scandlines.dk" },
   },
@@ -46,6 +58,7 @@ export const AREAS: Area[] = [
     id: "rostock",
     name: "Gedser–Rostock",
     shops: ["bordershop-rostock"],
+    storePoints: { "bordershop-rostock": [54.153, 12.097] }, // at the Rostock ferry terminal
     destination: { name: "Gedser Færgehavn", point: [54.575, 11.928], region: "zealand" },
     ferry: { route: "Gedser–Rostock", minutes: 120, url: "https://www.scandlines.dk" },
   },
@@ -95,6 +108,24 @@ export function oneWayKm(home: Point, homeRegion: Region, area: Area): number {
     km += isGreatBelt(a, b) ? GREAT_BELT_KM : haversineKm(a, b) * ROAD_FACTOR;
   }
   return Math.round(km);
+}
+
+/**
+ * Extra driving for visiting several stores on one trip: the shortest order through
+ * them, one way (getting there and home is the same whichever stores you pick).
+ */
+export function betweenStoresKm(area: Area, shopIds: string[]): number {
+  const points = shopIds.map((id) => area.storePoints[id]).filter(Boolean);
+  if (points.length < 2) return 0;
+  const orders = (list: Point[]): Point[][] =>
+    list.length <= 1 ? [list] : list.flatMap((p, i) => orders([...list.slice(0, i), ...list.slice(i + 1)]).map((rest) => [p, ...rest]));
+  let best = Infinity;
+  for (const order of orders(points)) {
+    let km = 0;
+    for (let i = 1; i < order.length; i++) km += haversineKm(order[i - 1], order[i]) * ROAD_FACTOR;
+    best = Math.min(best, km);
+  }
+  return Math.round(best * 10) / 10;
 }
 
 /** Driving plus ferry crossing, one way, in minutes. */
