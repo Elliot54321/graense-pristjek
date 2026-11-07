@@ -12,8 +12,10 @@
  * The same safety rules as the full run apply (src/matching/safety.ts): a link to
  * an existing product is only saved when it's safe; otherwise the new product gets
  * its own product (in the family, if the model is sure) and a suggestion note for
- * the review page. Answers are cached in data/llm-batches/cache, so re-runs and
- * dry runs of the same input cost nothing.
+ * the review page. Answers are cached in data/llm-batches/cache - per product, so a
+ * re-run after a failed save (or after a dry run) never pays for the same product
+ * twice, however the remaining products are grouped. Database writes are retried
+ * on temporary network errors (a Supabase timeout once doubled a run's cost).
  *
  * Some shop products have no category on the shop's own site (713 at Poetzsch in
  * Nov 2026), so no comparison group either. Haiku sorts those into a group by name
@@ -154,6 +156,27 @@ function tokens(text: string): string[] {
     .filter((t) => t.length >= 3 && !/^\d+$/.test(t));
 }
 
+/** A Supabase call, retried on temporary network errors ("fetch failed", timeouts). */
+async function withRetry<T extends { error: unknown }>(op: () => PromiseLike<T>): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    const result = await Promise.resolve(op()).then(
+      (r) => r,
+      (e: unknown) => ({ error: e }) as T,
+    );
+    const message = String((result.error as { message?: string } | null)?.message ?? result.error ?? "");
+    if (!result.error || attempt === 4 || !/fetch failed|timeout|ECONNRESET|socket/i.test(message)) return result;
+    console.warn(`  database call failed (${message.slice(0, 80)}), retrying in ${attempt * 5} s`);
+    await new Promise((r) => setTimeout(r, attempt * 5000));
+  }
+}
+
+/** One product's answer, remembered so a re-run doesn't pay for it again. */
+interface Remembered {
+  decision: Decision;
+  candidateIds: number[];
+}
+const INSTRUCTIONS_HASH = createHash("sha1").update(INSTRUCTIONS).digest("hex").slice(0, 8);
+
 const fmtContent = (a: number | null, u: string | null) => (a !== null ? `${Number(a)} ${u}` : "?");
 
 async function main() {
@@ -218,10 +241,21 @@ async function main() {
   console.log(`${newItems.length} new shop products to match against ${candidates.length} existing products.`);
   if (!newItems.length) return console.log("Nothing to match - no API calls made.");
 
+  // Products answered before (e.g. in a run whose save failed) are not asked again.
+  const itemCacheFile = (r: ShopRow) =>
+    `${CACHE_DIR}/item-${MODEL}-${createHash("sha1").update(`${INSTRUCTIONS_HASH}|${r.id}|${r.name}|${groupOf(r)}`).digest("hex")}.json`;
+  const remembered = new Map<number, Remembered>();
+  for (const r of newItems) {
+    const file = itemCacheFile(r);
+    if (existsSync(file)) remembered.set(r.id, JSON.parse(readFileSync(file, "utf8")));
+  }
+  if (remembered.size) console.log(`${remembered.size} of them were answered before - no API cost for those.`);
+  const toAsk = newItems.filter((r) => !remembered.has(r.id));
+
   // Chunks per category, alphabetical so the same brand lands together.
   const chunks: { group: string; items: ShopRow[]; candidateIds: number[] }[] = [];
   for (const group of GROUP_IDS) {
-    const items = newItems.filter((r) => groupOf(r) === group).sort((a, b) => a.name.localeCompare(b.name));
+    const items = toAsk.filter((r) => groupOf(r) === group).sort((a, b) => a.name.localeCompare(b.name));
     const pool = candidates.filter((c) => c.group === group);
     for (let i = 0; i < items.length; i += CHUNK_SIZE) {
       const part = items.slice(i, i + CHUNK_SIZE);
@@ -255,7 +289,14 @@ async function main() {
     const fresh = chunk.items.map((r) => `${r.id} | ${r.shop_id} | ${r.name} | ${fmtContent(r.content_amount, r.content_unit)} | ${priceOf.get(r.id) ?? "?"} kr`);
     const prompt = `Category: ${chunk.group}\n\nNEW products (id | shop | name | content | price):\n${fresh.join("\n")}\n\nEXISTING products (id | name | content | family | shop listings):\n${existing.join("\n") || "(none)"}`;
     const cacheFile = `${CACHE_DIR}/new-${MODEL}-${createHash("sha1").update(prompt).digest("hex")}.json`;
-    if (existsSync(cacheFile)) return { chunk, decisions: JSON.parse(readFileSync(cacheFile, "utf8")) as Decision[] };
+    const remember = (decisions: Decision[]) => {
+      for (const d of decisions) {
+        const item = chunk.items.find((r) => r.id === d.new_id);
+        if (item) writeFileSync(itemCacheFile(item), JSON.stringify({ decision: d, candidateIds: chunk.candidateIds } satisfies Remembered));
+      }
+      return { chunk, decisions };
+    };
+    if (existsSync(cacheFile)) return remember(JSON.parse(readFileSync(cacheFile, "utf8")) as Decision[]);
     const response = await client.messages.parse({
       model: MODEL,
       max_tokens: 16000,
@@ -269,8 +310,13 @@ async function main() {
     }
     cost += costUsd(MODEL, response.usage.input_tokens, response.usage.output_tokens);
     writeFileSync(cacheFile, JSON.stringify(response.parsed_output.decisions));
-    return { chunk, decisions: response.parsed_output.decisions };
+    return remember(response.parsed_output.decisions);
   };
+  // Remembered answers, each as a one-product "chunk" with the candidates it was asked with.
+  for (const r of newItems.filter((r) => remembered.has(r.id))) {
+    const m = remembered.get(r.id)!;
+    answers.push({ chunk: { group: groupOf(r)!, items: [r], candidateIds: m.candidateIds }, decisions: [m.decision] });
+  }
   for (let i = 0; i < todo.length; i += CONCURRENCY) {
     answers.push(...(await Promise.all(todo.slice(i, i + CONCURRENCY).map(ask))));
     process.stderr.write(`  asked ${Math.min(i + CONCURRENCY, todo.length)}/${todo.length} chunks\n`);
@@ -310,7 +356,7 @@ async function main() {
         report.newFamily++;
       }
       // Exact product link, only when safe.
-      if (d.same_product_id !== null && chunk.candidateIds.includes(d.same_product_id)) {
+      if (d.same_product_id !== null && chunk.candidateIds.includes(d.same_product_id) && productById.has(d.same_product_id)) {
         const target = productById.get(d.same_product_id)!;
         const others = listings.get(target.id) ?? [];
         const describe = [item, ...others].map((r) => `${r.shop_id} "${r.name}" ${priceOf.get(r.id) ?? "?"}`).join("  <->  ");
@@ -353,9 +399,11 @@ async function main() {
   const familyIds = new Map<string, number>();
   const famRows = [...newFamilies.values()].map((f) => ({ category: f.category, name: f.name, search_words: [...f.search_words] }));
   for (let i = 0; i < famRows.length; i += 500) {
-    const { data, error } = await db.from("product_families").upsert(famRows.slice(i, i + 500), { onConflict: "category,name" }).select("id, category, name");
+    const { data, error } = await withRetry(() =>
+      db.from("product_families").upsert(famRows.slice(i, i + 500), { onConflict: "category,name" }).select("id, category, name"),
+    );
     if (error) throw error;
-    for (const f of data) familyIds.set(`${f.category}|${f.name.toLowerCase()}`, f.id);
+    for (const f of data!) familyIds.set(`${f.category}|${f.name.toLowerCase()}`, f.id);
   }
   const resolveFamily = (v: number | string | undefined) => (typeof v === "string" ? familyIds.get(v) ?? null : v ?? null);
 
@@ -373,16 +421,18 @@ async function main() {
     }
     let productId = current?.product_id;
     if (productId === undefined) {
-      const { data, error } = await db
-        .from("products")
-        .insert({ name: item.name, content_amount: item.content_amount, content_unit: item.content_unit, family_id: familyId })
-        .select("id")
-        .single();
+      const { data, error } = await withRetry(() =>
+        db
+          .from("products")
+          .insert({ name: item.name, content_amount: item.content_amount, content_unit: item.content_unit, family_id: familyId })
+          .select("id")
+          .single(),
+      );
       if (error) throw error;
-      productId = data.id as number;
+      productId = data!.id as number;
       created++;
     } else if (familyId !== null) {
-      const { error } = await db.from("products").update({ family_id: familyId }).eq("id", productId);
+      const { error } = await withRetry(() => db.from("products").update({ family_id: familyId }).eq("id", productId));
       if (error) throw error;
     }
     if (!current || notes.has(item.id)) {
@@ -397,7 +447,7 @@ async function main() {
     }
   }
   for (let i = 0; i < matchRows.length; i += 500) {
-    const { error } = await db.from("product_matches").upsert(matchRows.slice(i, i + 500), { onConflict: "shop_product_id" });
+    const { error } = await withRetry(() => db.from("product_matches").upsert(matchRows.slice(i, i + 500), { onConflict: "shop_product_id" }));
     if (error) throw error;
   }
   console.log(`Saved: ${famRows.length} new families, ${created} new products, ${matchRows.length} matches.`);
