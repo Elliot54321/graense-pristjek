@@ -652,3 +652,8 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
 - **`/robots.txt`** (allows all but `/admin`, `/api/`, `/fejl`, `/kurv`) and **`/sitemap.xml`** (front page, `/om`).
 - **Rate limits** (`src/lib/rate-limit.ts`, in-memory, per IP, nothing stored): 60 price comparisons per minute (the basket re-prices on every change, so real use is ~10-20), 5 error reports per 10 minutes. Over the limit: a friendly Danish message; the basket keeps its last prices. Not exact across Vercel's server instances - enough to stop obvious abuse. Tested on a production build: 60 x 200, then 429. "Om siden" mentions the short-lived IP counting.
 - Later (Phase 6): product pages that can rank in Google ("Coca-Cola billigst ved grænsen").
+
+### `/admin` review queue sorted by importance (2026-11-10)
+
+- The queue held 143 suggestions and 824 unreviewed AI links - too many to go through. `src/app/admin/priority.ts` ranks each item: common items first (bestsellers above the rest), then category (soda/beer > spirits/candy > wine > groceries/household), searches on the site that match the product (from `search_log`), and how many shops the match spans; items not on sale sink to the bottom. Each card shows why ("Bestseller: Coca-Cola", "Søgt 3×").
+- The page shows the **50 most important of each list** ("de 50 vigtigste af 824"); as items are confirmed or rejected, the next ones move up. Top of the list today: Coca-Cola, Carlsberg, Faxe Kondi, Baileys, Harboe, Monster, Tuborg.

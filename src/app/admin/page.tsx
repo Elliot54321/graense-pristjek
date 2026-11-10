@@ -48,7 +48,7 @@ async function Review() {
     );
   }
 
-  const [{ suggestions, llmLinks }, insights] = await Promise.all([loadReview(), loadInsights()]);
+  const [{ suggestions, llmLinks, totals }, insights] = await Promise.all([loadReview(), loadInsights()]);
   return (
     <>
       <form action={logout} className="mt-2">
@@ -94,7 +94,9 @@ async function Review() {
       </section>
 
       <section className="mt-8">
-        <h2 className="text-xl font-semibold">Forslag ({suggestions.length})</h2>
+        <h2 className="text-xl font-semibold">
+          Forslag ({suggestions.length < totals.suggestions ? `de ${suggestions.length} vigtigste af ${totals.suggestions}` : totals.suggestions})
+        </h2>
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
           AI&apos;en mener, varerne er de samme, men noget var tvivlsomt, så de er ikke linket endnu.
         </p>
@@ -107,7 +109,9 @@ async function Review() {
       </section>
 
       <section className="mt-10">
-        <h2 className="text-xl font-semibold">AI-links ({llmLinks.length})</h2>
+        <h2 className="text-xl font-semibold">
+          AI-links ({llmLinks.length < totals.llmLinks ? `de ${llmLinks.length} vigtigste af ${totals.llmLinks}` : totals.llmLinks})
+        </h2>
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
           Linket af AI&apos;en uden EAN. Bekræft, eller fjern linket hvis varerne ikke er de samme.
         </p>
@@ -125,8 +129,9 @@ async function Review() {
 function SuggestionCard({ s }: { s: Suggestion }) {
   return (
     <li className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
-      <p className="text-sm">
+      <p className="flex flex-wrap gap-2 text-sm">
         <span className="rounded bg-amber-100 px-2 py-0.5 text-amber-900">{s.reason || "tvivl"}</span>
+        <PriorityTags tags={s.priority.tags} />
       </p>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <Side title="Denne vare" product={s.currentProduct} listings={[s.self]} />
@@ -151,7 +156,10 @@ function SuggestionCard({ s }: { s: Suggestion }) {
 function LinkCard({ l }: { l: LlmLink }) {
   return (
     <li className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">Sikkerhed {Math.round(l.confidence * 100)} %</p>
+      <p className="flex flex-wrap gap-2 text-sm text-zinc-600 dark:text-zinc-400">
+        <span>Sikkerhed {Math.round(l.confidence * 100)} %</span>
+        <PriorityTags tags={l.priority.tags} />
+      </p>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <Side title="Denne vare" product={null} listings={[l.self]} />
         <Side title="Linket til" product={l.product} listings={l.others} empty="Ingen andre varer på produktet." />
@@ -227,6 +235,19 @@ function SearchList({ title, note, rows }: { title: string; note: string; rows: 
       </ol>
       {!rows.length && <p className="mt-2 text-sm text-zinc-500">Ingen endnu.</p>}
     </div>
+  );
+}
+
+/** Why an item is near the top: common item, searched for, or not on sale. */
+function PriorityTags({ tags }: { tags: string[] }) {
+  return (
+    <>
+      {tags.map((t) => (
+        <span key={t} className="rounded bg-sky-100 px-2 py-0.5 text-sky-900 dark:bg-sky-900 dark:text-sky-100">
+          {t}
+        </span>
+      ))}
+    </>
   );
 }
 

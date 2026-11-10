@@ -3,8 +3,14 @@
  *  - suggestions: matches the LLM run flagged with a "LLM suggests same product
  *    as #<id>" note instead of linking (price outlier, bottle vs can, ...)
  *  - LLM links: unreviewed matches the LLM run did save
+ * Both are sorted by priority.ts (popular, searched, on sale first) and cut to
+ * the most important REVIEW_PAGE_SIZE, so the page stays workable.
  */
 import { adminClient, fetchAll } from "@/db/admin";
+import { isListed } from "@/matching/groups";
+import { priority, type Priority } from "./priority";
+
+export const REVIEW_PAGE_SIZE = 50;
 
 export const SUGGESTION_PREFIX = "LLM suggests same product as #";
 
@@ -18,12 +24,15 @@ export interface Listing {
   onOffer: boolean;
   contentAmount: number | null;
   contentUnit: string | null;
+  /** On sale now (seen in the last 3 days, or in a current newsletter). */
+  listed: boolean;
 }
 
 export interface ProductInfo {
   id: number;
   name: string;
   family: string | null;
+  category: string | null;
 }
 
 export interface Suggestion {
@@ -32,6 +41,7 @@ export interface Suggestion {
   target: ProductInfo | null; // null if the suggested product no longer exists
   targetListings: Listing[];
   reason: string;
+  priority: Priority;
 }
 
 export interface LlmLink {
@@ -39,6 +49,7 @@ export interface LlmLink {
   product: ProductInfo;
   confidence: number;
   others: Listing[]; // other shop products linked to the same product
+  priority: Priority;
 }
 
 interface MatchRow {
@@ -51,7 +62,15 @@ interface MatchRow {
 interface LinkedRow {
   product_id: number;
   shop_product_id: number;
-  shop_products: { shop_id: string; name: string; url: string; content_amount: number | null; content_unit: string | null };
+  shop_products: {
+    shop_id: string;
+    name: string;
+    url: string;
+    content_amount: number | null;
+    content_unit: string | null;
+    last_seen_at: string | null;
+    listed_until: string | null;
+  };
 }
 
 interface PriceRow {
@@ -82,11 +101,23 @@ function toListing(r: LinkedRow, price: PriceRow | undefined): Listing {
     onOffer: price?.on_offer ?? false,
     contentAmount: sp.content_amount === null ? null : Number(sp.content_amount),
     contentUnit: sp.content_unit,
+    listed: isListed(sp),
   };
 }
 
-export async function loadReview(): Promise<{ suggestions: Suggestion[]; llmLinks: LlmLink[] }> {
+export async function loadReview(): Promise<{
+  suggestions: Suggestion[];
+  llmLinks: LlmLink[];
+  totals: { suggestions: number; llmLinks: number };
+}> {
   const db = adminClient();
+  // What people searched for in the last 30 days, to rank by.
+  const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
+  const searchRows = await fetchAll<{ id: number; query: string }>((f, t) =>
+    db.from("search_log").select("id, query").gte("created_at", since).order("id").range(f, t),
+  );
+  const searches = new Map<string, number>();
+  for (const r of searchRows) searches.set(r.query, (searches.get(r.query) ?? 0) + 1);
 
   const [suggestionRows, llmRows] = await Promise.all([
     fetchAll<MatchRow>((from, to) =>
@@ -127,19 +158,19 @@ export async function loadReview(): Promise<{ suggestions: Suggestion[]; llmLink
     const ids = productIds.slice(i, i + 200);
     const { data: prodData, error: prodError } = await db
       .from("products")
-      .select("id, name, product_families(name)")
+      .select("id, name, product_families(name, category)")
       .in("id", ids);
     if (prodError) throw prodError;
     for (const p of prodData ?? []) {
-      const fam = p.product_families as unknown as { name: string } | null;
-      products.set(p.id, { id: p.id, name: p.name, family: fam?.name ?? null });
+      const fam = p.product_families as unknown as { name: string; category: string } | null;
+      products.set(p.id, { id: p.id, name: p.name, family: fam?.name ?? null, category: fam?.category ?? null });
     }
     // Every shop product linked to these products. (Not via the matched_prices
     // view: the secret-key role has no grant on it.)
     const linked = await fetchAll<LinkedRow>((from, to) =>
       db
         .from("product_matches")
-        .select("product_id, shop_product_id, shop_products(shop_id, name, url, content_amount, content_unit)")
+        .select("product_id, shop_product_id, shop_products(shop_id, name, url, content_amount, content_unit, last_seen_at, listed_until)")
         .in("product_id", ids)
         .order("shop_product_id")
         .range(from, to)
@@ -162,19 +193,31 @@ export async function loadReview(): Promise<{ suggestions: Suggestion[]; llmLink
     }
   }
 
-  const unknownProduct = (id: number): ProductInfo => ({ id, name: "(ukendt produkt)", family: null });
+  const unknownProduct = (id: number): ProductInfo => ({ id, name: "(ukendt produkt)", family: null, category: null });
+  const rank = (self: Listing, products: ProductInfo[], listings: Listing[]) =>
+    priority(
+      [self.name, ...products.flatMap((p) => [p.name, p.family ?? ""]), ...listings.map((l) => l.name)].filter(Boolean),
+      products.find((p) => p.category)?.category ?? null,
+      new Set([self, ...listings].map((l) => l.shopId)).size,
+      self.listed,
+      searches,
+    );
 
   const suggestions = suggestionRows.flatMap((r): Suggestion[] => {
     const p = parsed.get(r.shop_product_id);
     const self = byShopProduct.get(r.shop_product_id);
     if (!p || !self) return [];
+    const currentProduct = products.get(r.product_id) ?? unknownProduct(r.product_id);
+    const target = products.get(p.targetId) ?? null;
+    const targetListings = byProduct.get(p.targetId) ?? [];
     return [
       {
         self,
-        currentProduct: products.get(r.product_id) ?? unknownProduct(r.product_id),
-        target: products.get(p.targetId) ?? null,
-        targetListings: byProduct.get(p.targetId) ?? [],
+        currentProduct,
+        target,
+        targetListings,
         reason: p.reason,
+        priority: rank(self, [currentProduct, ...(target ? [target] : [])], targetListings),
       },
     ];
   });
@@ -182,15 +225,15 @@ export async function loadReview(): Promise<{ suggestions: Suggestion[]; llmLink
   const llmLinks = llmRows.flatMap((r): LlmLink[] => {
     const self = byShopProduct.get(r.shop_product_id);
     if (!self) return [];
-    return [
-      {
-        self,
-        product: products.get(r.product_id) ?? unknownProduct(r.product_id),
-        confidence: Number(r.confidence),
-        others: (byProduct.get(r.product_id) ?? []).filter((l) => l.shopProductId !== r.shop_product_id),
-      },
-    ];
+    const product = products.get(r.product_id) ?? unknownProduct(r.product_id);
+    const others = (byProduct.get(r.product_id) ?? []).filter((l) => l.shopProductId !== r.shop_product_id);
+    return [{ self, product, confidence: Number(r.confidence), others, priority: rank(self, [product], others) }];
   });
 
-  return { suggestions, llmLinks };
+  const byPriority = (a: { priority: Priority }, b: { priority: Priority }) => b.priority.score - a.priority.score;
+  return {
+    suggestions: suggestions.sort(byPriority).slice(0, REVIEW_PAGE_SIZE),
+    llmLinks: llmLinks.sort(byPriority).slice(0, REVIEW_PAGE_SIZE),
+    totals: { suggestions: suggestions.length, llmLinks: llmLinks.length },
+  };
 }
