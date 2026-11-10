@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { BasketLink } from "@/components/basket-link";
@@ -43,9 +44,14 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <Link href="/om" className="underline underline-offset-2">
               Om siden
             </Link>{" "}
-            – hvor priserne kommer fra, og hvordan vi håndterer dine data.
+            – hvor priserne kommer fra, og hvordan vi håndterer dine data.{" "}
+            <Link href="/fejl" className="underline underline-offset-2">
+              Fundet en fejl?
+            </Link>
           </p>
         </footer>
+        {/* Cookie-free page-view counts (Vercel Web Analytics); no consent banner needed. */}
+        <Analytics />
       </body>
     </html>
   );

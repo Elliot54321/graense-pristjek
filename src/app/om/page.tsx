@@ -73,8 +73,14 @@ export default function AboutPage() {
       <p className={p}>
         Der er intet login og ingen cookies til sporing eller reklame. Din kurv, dit postnummer og dine indstillinger
         gemmes kun i din egen browser og sendes ikke til os – postnummeret bruges kun i browseren til at regne afstanden ud.
-        Når du sammenligner priser, sendes kurvens varer til siden for at finde priserne, men de gemmes ikke. Siden ligger
-        hos Vercel, som – som de fleste hostingfirmaer – kan registrere tekniske oplysninger som IP-adresse i deres logs.
+        Når du sammenligner priser, sendes kurvens varer til siden for at finde priserne, men de gemmes ikke.
+      </p>
+      <p className={p}>
+        Vi gemmer, hvad der søges på, og hvor mange varer søgningen fandt – uden IP-adresse eller andet, der kan pege på
+        dig – så vi kan se, hvilke varer folk mangler. Fejlrapporter gemmes med den tekst, du skriver, og den pris, de
+        handler om. Vi tæller sidevisninger med Vercel Web Analytics, som ikke bruger cookies og ikke kan genkende dig fra
+        dag til dag. Siden ligger hos Vercel, som – som de fleste hostingfirmaer – kan registrere tekniske oplysninger
+        som IP-adresse i deres logs.
       </p>
 
       <h2 className={h2}>Kontakt</h2>
@@ -88,7 +94,13 @@ export default function AboutPage() {
             .
           </>
         ) : (
-          <>Kontaktoplysninger følger snart.</>
+          <>
+            Kontaktoplysninger følger snart. Indtil da kan du{" "}
+            <a href="/fejl" className={a}>
+              rapportere en fejl her
+            </a>
+            .
+          </>
         )}
       </p>
 

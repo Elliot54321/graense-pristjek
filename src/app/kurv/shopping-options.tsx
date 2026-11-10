@@ -5,6 +5,7 @@ import { MIN_SAVING_PER_EXTRA_STORE, shoppingOptions, type ShoppingOption } from
 import { CAR_TYPES, type CarType, oneWayKm, oneWayMinutes, regionOf } from "@/catalog/trips";
 import type { LineResult, Shop, ShopResult } from "@/catalog/types";
 import { CouponBadge } from "@/components/coupon-badge";
+import { ReportLink } from "@/components/report-link";
 import { day, duration, kr, krRound } from "@/lib/format";
 
 type Home = { point: [number, number]; place: string; region: NonNullable<ReturnType<typeof regionOf>> };
@@ -268,7 +269,10 @@ function LineRow({ line: l, shop }: { line: LineResult; shop: Shop | undefined }
               </span>
             )}
           </a>
-          <span className="tabular-nums">{kr(l.cost!)}</span>
+          <span className="shrink-0 tabular-nums">
+            {kr(l.cost!)}
+            {shop && <ReportLink shop={shop.id} product={l.buy.productName} price={l.buy.price} page="/kurv" />}
+          </span>
         </>
       ) : l.estimate !== null ? (
         <>

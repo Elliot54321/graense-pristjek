@@ -137,3 +137,12 @@ export async function unlink(formData: FormData) {
   }
   refresh();
 }
+
+/** Error report -> "Klaret": hide it from the list. */
+export async function markReportHandled(formData: FormData) {
+  await requireAdmin();
+  const id = idFrom(formData, "reportId");
+  const { error } = await adminClient().from("feedback").update({ handled: true }).eq("id", id);
+  if (error) throw error;
+  refresh();
+}

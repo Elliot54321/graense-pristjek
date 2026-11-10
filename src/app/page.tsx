@@ -1,9 +1,12 @@
+import { after, connection } from "next/server";
 import { Suspense } from "react";
 import { getShops, searchFamilies } from "@/catalog/data";
 import type { FamilyResult, Pack, Shop } from "@/catalog/types";
 import { AddToBasket } from "@/components/add-to-basket";
 import { day, kr, PER_UNIT_LABEL } from "@/lib/format";
 import { CouponBadge, COUPON_NOTE } from "@/components/coupon-badge";
+import { logSearch } from "@/db/log";
+import { ReportLink } from "@/components/report-link";
 
 const EXAMPLES = ["cola", "øl", "haribo", "gin", "chips"];
 
@@ -70,6 +73,10 @@ async function Search({ searchParams }: { searchParams: PageProps<"/">["searchPa
 
 async function Results({ query }: { query: string }) {
   const [families, shops] = await Promise.all([searchFamilies(query), getShops()]);
+  // Logged after the page is sent, so it never slows the search down - and only for
+  // real requests, never while Next.js prerenders the page.
+  await connection();
+  after(() => logSearch(query, families.length));
   if (!families.length) {
     return <p className="mt-6 text-zinc-600 dark:text-zinc-400">Ingen varer fundet for “{query}”. Prøv et andet ord.</p>;
   }
@@ -79,7 +86,7 @@ async function Results({ query }: { query: string }) {
     <>
       <ul className="mt-6 flex flex-col gap-4">
         {families.map((f) => (
-          <FamilyCard key={f.id} family={f} shops={shopById} />
+          <FamilyCard key={f.id} family={f} shops={shopById} page={`/?q=${encodeURIComponent(query)}`} />
         ))}
       </ul>
       {hasCoupon && <p className="mt-4 text-xs text-zinc-500">{COUPON_NOTE}</p>}
@@ -92,7 +99,7 @@ const shopLabel = (shops: Map<string, Shop>, id: string) => {
   return s ? `${s.name}${s.location && !s.name.includes(s.location) ? ` (${s.location})` : ""}` : id;
 };
 
-function FamilyCard({ family, shops }: { family: FamilyResult; shops: Map<string, Shop> }) {
+function FamilyCard({ family, shops, page }: { family: FamilyResult; shops: Map<string, Shop>; page: string }) {
   const bestPack = family.best ? family.packs.find((p) => p.name === family.best!.productName) : undefined;
   return (
     <li className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
@@ -125,14 +132,15 @@ function FamilyCard({ family, shops }: { family: FamilyResult; shops: Map<string
       </div>
       <ul className="mt-3 divide-y divide-zinc-100 dark:divide-zinc-800">
         {family.packs.map((p) => (
-          <PackRow key={p.productId} pack={p} shops={shops} />
+          <PackRow key={p.productId} pack={p} shops={shops} page={page} />
         ))}
       </ul>
     </li>
   );
 }
 
-function PackRow({ pack, shops }: { pack: Pack; shops: Map<string, Shop> }) {
+/** page: the search to return to after reporting a price. */
+function PackRow({ pack, shops, page }: { pack: Pack; shops: Map<string, Shop>; page: string }) {
   return (
     <li className="flex flex-wrap items-center justify-between gap-2 py-2">
       <div className="min-w-0 flex-1">
@@ -164,6 +172,7 @@ function PackRow({ pack, shops }: { pack: Pack; shops: Map<string, Shop> }) {
               {o.savingVsDkPercent !== null && (
                 <span className="ml-1 text-xs text-zinc-500">(butikken: spar {o.savingVsDkPercent}% ift. DK)</span>
               )}
+              <ReportLink shop={o.shopId} product={pack.name} price={o.price} page={page} />
             </li>
           ))}
         </ul>

@@ -116,7 +116,7 @@ created: 2026-10-16
 **Goal:** Learn what people actually want before building more.
 
 - [ ] Share in Facebook groups for people near the border, plus friends and family
-- [ ] Add basic analytics and a feedback button
+- [x] Add basic analytics and a feedback button (2026-11-10: search log, "Fejl?" reports and Vercel Web Analytics - the last must be switched on in the Vercel dashboard)
 - [ ] Review what people search for, where matching fails, and which items are missing
 - [ ] Fix the top 10 problems before adding new features
 
@@ -634,3 +634,13 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
 - Now each product's answer is also remembered on its own (`data/llm-batches/cache/item-*`, keyed by product, name, group and the prompt's version), so a re-run - after a failed save or a dry run - never pays for an answered product again ("N of them were answered before - no API cost for those"). A product whose remembered link target was deleted is just not linked.
 - Database writes are retried up to 3 times on temporary network errors ("fetch failed", timeouts) with a short wait; real errors (e.g. a duplicate key) still stop the run. Tested with a fake failing call.
 - Limit: the cache lives on the machine that ran it. GitHub's nightly runner starts empty each night, but nightly runs are small (a few cents) and now have the retries; big runs (new shop, new category, newsletters) are done locally anyway.
+
+### Feedback, search log and analytics (2026-11-10)
+
+- **Search log:** every search is saved with the number of families found (`search_log`; no IP or other personal data), written after the page is sent (`after()` + `connection()` in `page.tsx`, `src/db/log.ts`). Logging can never break a search.
+- **"Fejl?" reports:** a small link next to every price (search and basket) opens `/fejl`, pre-filled with shop, product and price; a general link sits in the footer. Saved to `feedback` via a server action (`src/app/fejl/actions.ts`): validated, max lengths, and a hidden bot-trap field. Until there's a contact email this is the only way users can reach us.
+- **`/admin`** now shows open error reports (with "Klaret") and the last 30 days' searches: most searched, and **searches that found nothing** - the list to use for deciding what coverage to add.
+- **Vercel Web Analytics** (`@vercel/analytics`, `<Analytics />` in the layout): cookie-free page-view counts, so no consent banner. **Must be enabled in the Vercel dashboard** (project -> Analytics); the free plan has a monthly event limit.
+- Both tables are private (migration `20261110000000_search_log_feedback.sql`): checked that the publishable key can neither read nor write them. "Om siden" describes what is logged.
+- Gotchas found while testing: (1) Next.js aborts a render when a `"use cache"` function awaits another cached call the page is making at the same moment - `getFreshness()` now reads `shops` itself. (2) The dev server renders pages twice, so it logs each search twice; a production build logs once. (3) In a hidden browser pane React doesn't reveal streamed content (no animation frames) - a test artifact only.
+

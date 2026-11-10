@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { confirmLink, linkSuggestion, logout, rejectSuggestion, unlink } from "./actions";
+import { confirmLink, linkSuggestion, logout, markReportHandled, rejectSuggestion, unlink } from "./actions";
 import { adminConfigured, isAdmin } from "./auth";
 import { loadReview, type Listing, type LlmLink, type ProductInfo, type Suggestion } from "./data";
 import { ActionButton, LoginForm } from "./forms";
+import { loadInsights, type SearchCount } from "./insights";
 
 export const metadata: Metadata = {
   title: "Gennemgå matches – Grænse Pris",
@@ -47,12 +48,50 @@ async function Review() {
     );
   }
 
-  const { suggestions, llmLinks } = await loadReview();
+  const [{ suggestions, llmLinks }, insights] = await Promise.all([loadReview(), loadInsights()]);
   return (
     <>
       <form action={logout} className="mt-2">
         <button className="text-sm text-zinc-500 underline">Log ud</button>
       </form>
+
+      <section className="mt-8">
+        <h2 className="text-xl font-semibold">Fejlrapporter ({insights.reports.length})</h2>
+        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Fra &quot;Fejl i prisen?&quot; på siden. Nyeste først.</p>
+        <ul className="mt-4 flex flex-col gap-3">
+          {insights.reports.map((r) => (
+            <li key={r.id} className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+              <p className="text-xs text-zinc-500">
+                {new Date(r.createdAt).toLocaleString("da-DK", { timeZone: "Europe/Copenhagen" })}
+                {r.page && ` · fra ${r.page}`}
+              </p>
+              {(r.product || r.shopId) && (
+                <p className="mt-1 text-sm font-medium">
+                  {r.product ?? "?"}
+                  {r.shopId && ` – ${SHOP_NAMES[r.shopId] ?? r.shopId}`}
+                  {r.price !== null && ` – ${kr(r.price)} kr.`}
+                </p>
+              )}
+              <p className="mt-1 whitespace-pre-wrap text-sm">{r.message}</p>
+              <form className="mt-3 flex">
+                <input type="hidden" name="reportId" value={r.id} />
+                <ActionButton action={markReportHandled} variant="no">
+                  Klaret
+                </ActionButton>
+              </form>
+            </li>
+          ))}
+        </ul>
+        {!insights.reports.length && <p className="mt-4 text-zinc-500">Ingen åbne fejlrapporter.</p>}
+      </section>
+
+      <section className="mt-10">
+        <h2 className="text-xl font-semibold">Søgninger, sidste {insights.days} dage ({insights.totalSearches})</h2>
+        <div className="mt-4 grid gap-6 sm:grid-cols-2">
+          <SearchList title="Uden resultat" note="Varer folk leder efter, som siden ikke kender." rows={insights.emptySearches} />
+          <SearchList title="Mest søgt" note="Alle søgninger." rows={insights.topSearches} />
+        </div>
+      </section>
 
       <section className="mt-8">
         <h2 className="text-xl font-semibold">Forslag ({suggestions.length})</h2>
@@ -170,3 +209,24 @@ function ListingRow({ x }: { x: Listing }) {
     </div>
   );
 }
+
+function SearchList({ title, note, rows }: { title: string; note: string; rows: SearchCount[] }) {
+  return (
+    <div>
+      <h3 className="font-semibold">{title}</h3>
+      <p className="text-xs text-zinc-500">{note}</p>
+      <ol className="mt-2 text-sm">
+        {rows.map((r) => (
+          <li key={r.query} className="flex justify-between gap-3 border-b border-zinc-100 py-1 dark:border-zinc-800">
+            <a href={`/?q=${encodeURIComponent(r.query)}`} className="underline-offset-2 hover:underline">
+              {r.query}
+            </a>
+            <span className="tabular-nums text-zinc-500">{r.count}</span>
+          </li>
+        ))}
+      </ol>
+      {!rows.length && <p className="mt-2 text-sm text-zinc-500">Ingen endnu.</p>}
+    </div>
+  );
+}
+

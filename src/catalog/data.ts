@@ -76,7 +76,10 @@ export async function getFreshness(): Promise<Freshness[]> {
   cacheLife("hours");
   const db = publicClient();
   const today = new Date().toISOString().slice(0, 10);
-  const shops = await getShops();
+  // Read here rather than via getShops(): a cached function waiting on another cached
+  // call that a page is also making at the same moment makes Next.js abort the render.
+  const { data: shops, error: shopError } = await db.from("shops").select("id, name, location, website").order("id");
+  if (shopError) throw shopError;
   return Promise.all(
     shops.map(async (shop): Promise<Freshness> => {
       if (NEWSLETTER_SHOPS.has(shop.id)) {
