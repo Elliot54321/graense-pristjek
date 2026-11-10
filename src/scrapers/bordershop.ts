@@ -1,5 +1,5 @@
 import * as cheerio from "cheerio";
-import { fetchSitemap, fetchText, sitemapLocs } from "./http";
+import { fetchSitemap, fetchText, ogImage, sitemapLocs } from "./http";
 import { PRICE_NUMBER, parseDecimal, parseQuantity, quantityFromName, unitPrice } from "./quantity";
 import type { ScrapedProduct, Scraper } from "./types";
 
@@ -121,6 +121,7 @@ export function parseProductPage(html: string, url: string, shop: ShopId = "bord
     offerEndsAt: onOffer ? (offer?.priceValidUntil ?? null) : null,
     // BorderShop shows no can deposit; export cans are deposit-free (see roadmap).
     pfand: null,
+    imageUrl: ogImage($, url),
     scrapedAt: new Date().toISOString(),
   };
 }

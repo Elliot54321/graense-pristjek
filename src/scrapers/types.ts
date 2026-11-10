@@ -40,6 +40,8 @@ export interface ScrapedProduct {
   pfand: number | null;
   /** Newsletter prices only: on sale until this date (YYYY-MM-DD), even if not seen again. */
   listedUntil?: string | null;
+  /** Address of the product photo on the shop's site (og:image), for /admin. */
+  imageUrl?: string | null;
   /** Newsletter products: the issue and page they were read from, and what was printed. */
   source?: { issue: string; page: number; text: string } | null;
   /** Multi-buy deal, e.g. 3 for 155 kr. */

@@ -204,6 +204,18 @@ function Side({
 function ListingRow({ x }: { x: Listing }) {
   return (
     <div className="mt-2">
+      {x.imageUrl && (
+        <a href={x.url} target="_blank" rel="noopener noreferrer" className="float-right ml-3">
+          {/* eslint-disable-next-line @next/next/no-img-element -- the shop's own photo, shown as-is */}
+          <img
+            src={x.imageUrl}
+            alt=""
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            className="h-20 w-20 rounded border border-zinc-200 bg-white object-contain dark:border-zinc-700"
+          />
+        </a>
+      )}
       <a href={x.url} target="_blank" rel="noopener noreferrer" className="font-medium underline-offset-2 hover:underline">
         {x.name}
       </a>
@@ -234,6 +246,7 @@ function ListingRow({ x }: { x: Listing }) {
           )}
         </div>
       )}
+      <div className="clear-both" />
     </div>
   );
 }

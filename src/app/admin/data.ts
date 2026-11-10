@@ -27,6 +27,8 @@ export interface Listing {
   contentUnit: string | null;
   /** On sale now (seen in the last 3 days, or in a current newsletter). */
   listed: boolean;
+  /** The shop's product photo (scraped shops), shown next to the listing. */
+  imageUrl: string | null;
   /** Newsletter products: issue, page, printed text, and a short-lived link to the page image. */
   source: { issue: string; page: number; text: string; image: string | null } | null;
 }
@@ -76,6 +78,7 @@ interface LinkedRow {
     source_issue: string | null;
     source_page: number | null;
     source_text: string | null;
+    image_url: string | null;
   };
 }
 
@@ -108,6 +111,7 @@ function toListing(r: LinkedRow, price: PriceRow | undefined): Listing {
     contentAmount: sp.content_amount === null ? null : Number(sp.content_amount),
     contentUnit: sp.content_unit,
     listed: isListed(sp),
+    imageUrl: sp.image_url,
     source:
       sp.source_issue && sp.source_page
         ? { issue: sp.source_issue, page: sp.source_page, text: sp.source_text ?? "", image: null }
@@ -180,7 +184,7 @@ export async function loadReview(): Promise<{
     const linked = await fetchAll<LinkedRow>((from, to) =>
       db
         .from("product_matches")
-        .select("product_id, shop_product_id, shop_products(shop_id, name, url, content_amount, content_unit, last_seen_at, listed_until, source_issue, source_page, source_text)")
+        .select("product_id, shop_product_id, shop_products(shop_id, name, url, content_amount, content_unit, last_seen_at, listed_until, source_issue, source_page, source_text, image_url)")
         .in("product_id", ids)
         .order("shop_product_id")
         .range(from, to)

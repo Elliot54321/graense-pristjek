@@ -52,3 +52,14 @@ export function sitemapLocs(xml: string): string[] {
     m[1].replace(/&amp;/g, "&"),
   );
 }
+
+/** The product photo a page advertises (og:image), as an absolute address. */
+export function ogImage($: { (selector: string): { attr(name: string): string | undefined } }, pageUrl: string): string | null {
+  const src = $('meta[property="og:image"]').attr("content")?.trim();
+  if (!src) return null;
+  try {
+    return new URL(src, pageUrl).toString();
+  } catch {
+    return null;
+  }
+}

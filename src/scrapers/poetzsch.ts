@@ -1,5 +1,5 @@
 import * as cheerio from "cheerio";
-import { fetchSitemap, fetchText, sitemapLocs } from "./http";
+import { fetchSitemap, fetchText, ogImage, sitemapLocs } from "./http";
 import { PRICE_NUMBER, parseDecimal, parseQuantity, unitPrice } from "./quantity";
 import type { ScrapedProduct, Scraper } from "./types";
 
@@ -72,6 +72,7 @@ export function parseProductPage(html: string, url: string): ScrapedProduct | nu
     offerEndsAt: null,
     // Poetzsch charges no can deposit with an export declaration (see roadmap).
     pfand: null,
+    imageUrl: ogImage($, url),
     scrapedAt: new Date().toISOString(),
   };
 }

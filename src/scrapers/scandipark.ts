@@ -1,5 +1,5 @@
 import * as cheerio from "cheerio";
-import { fetchText } from "./http";
+import { fetchText, ogImage } from "./http";
 import { parseDecimal, quantityFromName, unitPrice } from "./quantity";
 import type { Quantity, ScrapedProduct, Scraper } from "./types";
 
@@ -141,6 +141,7 @@ export function parseProductPage(html: string, url: string): ScrapedProduct | nu
     // Sold deposit-free with an export declaration ("Export" cans); no deposit is shown.
     pfand: null,
     multiBuy,
+    imageUrl: ogImage($, url),
     scrapedAt: new Date().toISOString(),
   };
 }
