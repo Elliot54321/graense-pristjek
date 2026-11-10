@@ -4,7 +4,7 @@ import { getShops } from "@/catalog/data";
 import { FeedbackForm } from "./form";
 
 export const metadata: Metadata = {
-  title: "Rapportér en fejl – Grænse Pris",
+  title: "Rapportér en fejl",
   robots: { index: false, follow: false },
 };
 

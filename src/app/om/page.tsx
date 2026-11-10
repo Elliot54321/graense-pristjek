@@ -3,7 +3,7 @@ import { SOURCE_URL as TOLD_URL } from "@/catalog/import-limits";
 import { CONTACT_EMAIL } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: "Om siden – Grænse Pris",
+  title: "Om siden",
   description: "Hvor priserne kommer fra, hvor præcise de er, og hvordan Grænse Pris håndterer dine data.",
 };
 
@@ -79,8 +79,9 @@ export default function AboutPage() {
         Vi gemmer, hvad der søges på, og hvor mange varer søgningen fandt – uden IP-adresse eller andet, der kan pege på
         dig – så vi kan se, hvilke varer folk mangler. Fejlrapporter gemmes med den tekst, du skriver, og den pris, de
         handler om. Vi tæller sidevisninger med Vercel Web Analytics, som ikke bruger cookies og ikke kan genkende dig fra
-        dag til dag. Siden ligger hos Vercel, som – som de fleste hostingfirmaer – kan registrere tekniske oplysninger
-        som IP-adresse i deres logs.
+        dag til dag. For at stoppe misbrug husker serveren i op til
+        ti minutter, hvor mange forespørgsler der kommer fra den samme IP-adresse – det gemmes ikke. Siden ligger hos
+        Vercel, som – som de fleste hostingfirmaer – kan registrere tekniske oplysninger som IP-adresse i deres logs.
       </p>
 
       <h2 className={h2}>Kontakt</h2>

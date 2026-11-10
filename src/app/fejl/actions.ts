@@ -4,8 +4,13 @@
  * everything is validated here; a hidden "website" field catches simple spam bots
  * (people never see or fill it).
  */
+import { headers } from "next/headers";
 import { z } from "zod";
 import { adminClient } from "@/db/admin";
+import { allow, clientIp } from "@/lib/rate-limit";
+
+/** Plenty for a person reporting a few prices; stops a script flooding the table. */
+const REPORTS_PER_TEN_MINUTES = 5;
 
 const Report = z.object({
   message: z.string().trim().min(3).max(2000),
@@ -35,6 +40,9 @@ export async function sendFeedback(_prev: FeedbackState, formData: FormData): Pr
     // A filled bot trap looks like success, so bots don't learn anything.
     if (value("website")) return { status: "sent" };
     return { status: "error", message: "Skriv gerne lidt mere om fejlen (mindst 3 tegn)." };
+  }
+  if (!allow("feedback", clientIp(await headers()), REPORTS_PER_TEN_MINUTES, 10 * 60_000)) {
+    return { status: "error", message: "Du har sendt mange beskeder lige nu - prøv igen om lidt." };
   }
   const r = parsed.data;
   const { error } = await adminClient()

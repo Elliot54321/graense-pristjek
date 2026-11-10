@@ -11,7 +11,7 @@ import { ImportLimits } from "./import-limits";
 import { ShoppingOptions } from "./shopping-options";
 
 type Alcohol = Partial<Record<AlcoholType, number>>;
-type State = { status: "idle" | "loading" | "error"; results: ShopResult[]; alcohol: Alcohol };
+type State = { status: "idle" | "loading" | "error" | "busy"; results: ShopResult[]; alcohol: Alcohol };
 
 export function BasketView() {
   const items = useBasket();
@@ -30,6 +30,8 @@ export function BasketView() {
           body: JSON.stringify({ items }),
           signal: controller.signal,
         });
+        // Too many re-pricings in a minute (rate limit): keep the last prices and say so.
+        if (res.status === 429) return setState((s) => ({ ...s, status: "busy" }));
         if (!res.ok) throw new Error(String(res.status));
         const { results, alcohol } = (await res.json()) as { results: ShopResult[]; alcohol: Alcohol };
         setState({ status: "idle", results, alcohol });
@@ -73,6 +75,9 @@ export function BasketView() {
       </div>
 
       {state.status === "error" && <p className="mt-8 text-red-700">Kunne ikke hente priser. Prøv igen om lidt.</p>}
+      {state.status === "busy" && (
+        <p className="mt-8 text-amber-700 dark:text-amber-400">Du har ændret kurven mange gange på kort tid – vent et øjeblik.</p>
+      )}
       {state.status === "loading" && !state.results.length && <p className="mt-8 text-zinc-500">Regner priser ud…</p>}
       {state.results.length > 0 && <ShoppingOptions results={state.results} loading={state.status === "loading"} />}
       <ImportLimits liters={state.alcohol} />

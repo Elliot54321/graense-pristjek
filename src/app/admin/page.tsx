@@ -7,7 +7,7 @@ import { ActionButton, LoginForm } from "./forms";
 import { loadInsights, type SearchCount } from "./insights";
 
 export const metadata: Metadata = {
-  title: "Gennemgå matches – Grænse Pris",
+  title: "Gennemgå matches",
   robots: { index: false, follow: false },
 };
 

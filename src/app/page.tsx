@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { after, connection } from "next/server";
 import { Suspense } from "react";
 import { getShops, searchFamilies } from "@/catalog/data";
@@ -9,6 +10,21 @@ import { logSearch } from "@/db/log";
 import { ReportLink } from "@/components/report-link";
 
 const EXAMPLES = ["cola", "øl", "haribo", "gin", "chips"];
+
+/**
+ * "cola – priser ved grænsen" for a search, so a shared link says what it shows.
+ * Search result pages are kept out of search engines (endless near-duplicates).
+ */
+export async function generateMetadata(props: PageProps<"/">): Promise<Metadata> {
+  const raw = (await props.searchParams).q;
+  const query = (Array.isArray(raw) ? raw[0] : raw)?.trim().slice(0, 60);
+  if (!query) return {};
+  return {
+    title: `${query} – priser ved grænsen`,
+    description: `Sammenlign priser på ${query} i grænsebutikkerne og find den billigste.`,
+    robots: { index: false, follow: true },
+  };
+}
 
 export default function Home(props: PageProps<"/">) {
   return (

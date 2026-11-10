@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { BasketLink } from "@/components/basket-link";
 import { Freshness } from "@/components/freshness";
+import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -18,8 +19,14 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Grænse Pris – find den billigste grænsebutik",
-  description: "Sammenlign priser på sodavand, øl, slik og spiritus i grænsebutikkerne.",
+  metadataBase: new URL(SITE_URL),
+  // Pages set their own title ("Din kurv"); the template adds the site name.
+  title: { default: `${SITE_NAME} – find den billigste grænsebutik`, template: `%s – ${SITE_NAME}` },
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  // The share card (app/opengraph-image.tsx) is added automatically.
+  openGraph: { siteName: SITE_NAME, locale: "da_DK", type: "website", url: "/", description: SITE_DESCRIPTION },
+  twitter: { card: "summary_large_image" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

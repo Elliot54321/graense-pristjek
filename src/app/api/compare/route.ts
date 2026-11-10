@@ -9,8 +9,11 @@ import { z } from "zod";
 import { compareBasket } from "@/catalog/compare";
 import { familiesById, getShops, packsForBasket } from "@/catalog/data";
 import { alcoholLiters } from "@/catalog/import-limits";
+import { allow, clientIp } from "@/lib/rate-limit";
 
 const MAX_ITEMS = 100;
+/** The basket re-prices on every change, so a busy shopper sends ~10-20 a minute. */
+const PER_MINUTE = 60;
 
 const Item = z.discriminatedUnion("kind", [
   z.object({
@@ -34,6 +37,9 @@ const Item = z.discriminatedUnion("kind", [
 const Body = z.object({ items: z.array(Item).max(MAX_ITEMS) });
 
 export async function POST(request: Request) {
+  if (!allow("compare", clientIp(request.headers), PER_MINUTE, 60_000)) {
+    return Response.json({ error: "For mange forespørgsler - prøv igen om lidt." }, { status: 429 });
+  }
   const parsed = Body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "Ugyldig kurv" }, { status: 400 });
 
