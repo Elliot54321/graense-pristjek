@@ -40,6 +40,8 @@ export interface ScrapedProduct {
   pfand: number | null;
   /** Newsletter prices only: on sale until this date (YYYY-MM-DD), even if not seen again. */
   listedUntil?: string | null;
+  /** Newsletter products: the issue and page they were read from, and what was printed. */
+  source?: { issue: string; page: number; text: string } | null;
   /** Multi-buy deal, e.g. 3 for 155 kr. */
   multiBuy?: { quantity: number; price: number } | null;
   /** The shop's own "SPAR x% ift. DK" claim. */

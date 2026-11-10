@@ -2,7 +2,7 @@
  * Import newsletter offers (from `flyer:extract`) as a shop's prices.
  *
  *   npm run flyer:import -- <offers.json> --shop fleggaard --valid-to 2026-11-03 \
- *     [--section 26-38:2026-12-31] [--dry-run]
+ *     [--section 26-38:2026-12-31] [--dry-run] [--no-pages]
  *
  * Every product an offer names (and every variety readable on the picture) becomes
  * a shop product with the offer's price. Products count as on sale until the
@@ -10,10 +10,16 @@
  * with their own period (e.g. a premium wine section). Prices are only stored when
  * they change, like the scrapers. Products still need matching afterwards
  * (`npm run match:new`) before the website shows them.
+ *
+ * Each product remembers its issue (the offers file's name), page and the text printed
+ * with the offer, and the pages are uploaded as images to a private bucket - so
+ * /admin can show where a match came from (see pages.ts). --no-pages skips the upload.
  */
 import { createHash } from "node:crypto";
+import path from "node:path";
 import { readFileSync } from "node:fs";
 import { unitPrice } from "../scrapers/quantity";
+import { uploadPages } from "./pages";
 import { packPrice, singlePrice } from "./prices";
 import { adminClient, finishRun, saveProducts, startRun, type RunSummary } from "../scrapers/save";
 import type { BaseUnit, ScrapedProduct } from "../scrapers/types";
@@ -65,7 +71,28 @@ function content(o: Offer): { amount: number; unit: BaseUnit } | null {
 const productKey = (name: string, pack: string) =>
   "nl-" + createHash("sha1").update(`${name}|${pack}`.toLowerCase().replace(/\s+/g, " ").trim()).digest("hex").slice(0, 16);
 
-export function offersToProducts(data: Extracted, shop: string, validTo: string, sections: ReturnType<typeof parseSections>) {
+/** What the newsletter printed with an offer, for checking a match: "Coca Cola / Coca Cola Zero · 6 x 1,25 l. · 6,66 Pr. fl. · ..." */
+function printedText(o: Offer): string {
+  return [
+    [...o.products, ...o.visible_variants].join(" / "),
+    o.pack,
+    `${o.price} ${o.price_unit ?? ""}`.trim(),
+    o.multi_buy && `${o.multi_buy.quantity} for ${o.multi_buy.total_price}`,
+    o.limit_note,
+    o.coupon && "KUPONTILBUD",
+    o.always_low_price && "ALTID LAV PRIS",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+export function offersToProducts(
+  data: Extracted,
+  shop: string,
+  validTo: string,
+  sections: ReturnType<typeof parseSections>,
+  issue: string,
+) {
   const now = new Date().toISOString();
   const byKey = new Map<string, ScrapedProduct>();
   for (const { page, result } of data.pages) {
@@ -98,6 +125,7 @@ export function offersToProducts(data: Extracted, shop: string, validTo: string,
           offerEndsAt: o.always_low_price ? null : until,
           pfand: null,
           listedUntil: until,
+          source: { issue, page, text: printedText(o) },
           multiBuy: o.multi_buy ? { quantity: o.multi_buy.quantity, price: o.multi_buy.total_price } : null,
           savingVsDkPercent: o.saving_vs_dk_percent,
           coupon: o.coupon ?? false,
@@ -123,7 +151,9 @@ async function main() {
     process.exit(1);
   }
   const data: Extracted = JSON.parse(readFileSync(file, "utf8"));
-  const products = offersToProducts(data, shop, validTo, parseSections(args));
+  // The issue is the offers file's name: "fleggaard-2026-november-1".
+  const issue = path.basename(file).replace(/\.offers\.json$/, "");
+  const products = offersToProducts(data, shop, validTo, parseSections(args), issue);
 
   const cats: Record<string, number> = {};
   for (const p of products) cats[p.categories[0]] = (cats[p.categories[0]] ?? 0) + 1;
@@ -145,6 +175,12 @@ async function main() {
     summary.warnings.push(...result.warnings);
     await finishRun(db, runId, summary);
     console.log(`Saved: ${result.priceChanges} new price rows (run #${runId}). Next: npm run match:new`);
+    if (!args.includes("--no-pages")) {
+      const pdf = file.replace(/\.offers\.json$/, ".pdf");
+      const pages = [...new Set(products.map((p) => p.source!.page))].sort((a, b) => a - b);
+      await uploadPages(db, pdf, issue, pages);
+      console.log(`Uploaded ${pages.length} page images for /admin (private bucket).`);
+    }
   } catch (e) {
     await finishRun(db, runId, summary, String(e));
     throw e;

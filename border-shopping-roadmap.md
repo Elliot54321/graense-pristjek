@@ -657,3 +657,10 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
 
 - The queue held 143 suggestions and 824 unreviewed AI links - too many to go through. `src/app/admin/priority.ts` ranks each item: common items first (bestsellers above the rest), then category (soda/beer > spirits/candy > wine > groceries/household), searches on the site that match the product (from `search_log`), and how many shops the match spans; items not on sale sink to the bottom. Each card shows why ("Bestseller: Coca-Cola", "Søgt 3×").
 - The page shows the **50 most important of each list** ("de 50 vigtigste af 824"); as items are confirmed or rejected, the next ones move up. Top of the list today: Coca-Cola, Carlsberg, Faxe Kondi, Baileys, Harboe, Monster, Tuborg.
+
+### Newsletter source in `/admin` (2026-11-10)
+
+- Problem (user): newsletter matches in `/admin` only linked to the shop's front page, so there was nothing to check against.
+- `shop_products` got `source_issue`, `source_page`, `source_text` (migration `20261110000001_newsletter_source.sql`). `flyer:import` fills them (issue = the offers file's name; text = names, pack, printed price and label, multi-buy, small print, coupon / ALTID LAV PRIS) and **uploads the pages as images to the private Supabase bucket `newsletters`** (`src/flyers/pages.ts`, rendered locally with pdftoppm; `--no-pages` skips it). Public links to the bucket are refused; `/admin` shows each newsletter listing's issue, page and printed text plus the page image through signed links valid for an hour.
+- Both November issues re-imported from the saved readings: **no API cost**, no price changes, 84 page images (~15-25 MB).
+- Future issues get this automatically when imported.

@@ -214,6 +214,26 @@ function ListingRow({ x }: { x: Listing }) {
         {x.pricePerUnit !== null && x.contentUnit && <> ({kr(x.pricePerUnit)} kr./{UNIT[x.contentUnit] ?? x.contentUnit})</>}
         {x.onOffer && <> · tilbud</>}
       </p>
+      {/* Newsletter products have no product page: show what was printed and the page itself. */}
+      {x.source && (
+        <div className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
+          <p>
+            Avis {x.source.issue}, side {x.source.page}: <span className="italic">{x.source.text}</span>
+          </p>
+          {x.source.image && (
+            <a href={x.source.image} target="_blank" rel="noopener noreferrer" className="mt-1 block">
+              {/* eslint-disable-next-line @next/next/no-img-element -- a signed, short-lived link, not a static asset */}
+              <img
+                src={x.source.image}
+                alt={`Avisside ${x.source.page}`}
+                loading="lazy"
+                className="max-h-56 rounded border border-zinc-200 dark:border-zinc-700"
+              />
+              <span className="underline underline-offset-2">Åbn siden i fuld størrelse</span>
+            </a>
+          )}
+        </div>
+      )}
     </div>
   );
 }

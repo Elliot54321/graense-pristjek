@@ -7,6 +7,7 @@
  * the most important REVIEW_PAGE_SIZE, so the page stays workable.
  */
 import { adminClient, fetchAll } from "@/db/admin";
+import { PAGES_BUCKET, pagePath } from "@/flyers/page-paths";
 import { isListed } from "@/matching/groups";
 import { priority, type Priority } from "./priority";
 
@@ -26,6 +27,8 @@ export interface Listing {
   contentUnit: string | null;
   /** On sale now (seen in the last 3 days, or in a current newsletter). */
   listed: boolean;
+  /** Newsletter products: issue, page, printed text, and a short-lived link to the page image. */
+  source: { issue: string; page: number; text: string; image: string | null } | null;
 }
 
 export interface ProductInfo {
@@ -70,6 +73,9 @@ interface LinkedRow {
     content_unit: string | null;
     last_seen_at: string | null;
     listed_until: string | null;
+    source_issue: string | null;
+    source_page: number | null;
+    source_text: string | null;
   };
 }
 
@@ -102,6 +108,10 @@ function toListing(r: LinkedRow, price: PriceRow | undefined): Listing {
     contentAmount: sp.content_amount === null ? null : Number(sp.content_amount),
     contentUnit: sp.content_unit,
     listed: isListed(sp),
+    source:
+      sp.source_issue && sp.source_page
+        ? { issue: sp.source_issue, page: sp.source_page, text: sp.source_text ?? "", image: null }
+        : null,
   };
 }
 
@@ -170,7 +180,7 @@ export async function loadReview(): Promise<{
     const linked = await fetchAll<LinkedRow>((from, to) =>
       db
         .from("product_matches")
-        .select("product_id, shop_product_id, shop_products(shop_id, name, url, content_amount, content_unit, last_seen_at, listed_until)")
+        .select("product_id, shop_product_id, shop_products(shop_id, name, url, content_amount, content_unit, last_seen_at, listed_until, source_issue, source_page, source_text)")
         .in("product_id", ids)
         .order("shop_product_id")
         .range(from, to)
@@ -231,9 +241,25 @@ export async function loadReview(): Promise<{
   });
 
   const byPriority = (a: { priority: Priority }, b: { priority: Priority }) => b.priority.score - a.priority.score;
+  const shownSuggestions = suggestions.sort(byPriority).slice(0, REVIEW_PAGE_SIZE);
+  const shownLinks = llmLinks.sort(byPriority).slice(0, REVIEW_PAGE_SIZE);
+
+  // Newsletter page images for the shown items: signed links to the private bucket, valid an hour.
+  const shownListings = [
+    ...shownSuggestions.flatMap((s) => [s.self, ...s.targetListings]),
+    ...shownLinks.flatMap((l) => [l.self, ...l.others]),
+  ].filter((l) => l.source);
+  const paths = [...new Set(shownListings.map((l) => pagePath(l.source!.issue, l.source!.page)))];
+  if (paths.length) {
+    const { data, error } = await db.storage.from(PAGES_BUCKET).createSignedUrls(paths, 3600);
+    if (error) console.error("signed page links failed:", error.message);
+    const url = new Map((data ?? []).filter((d) => d.signedUrl).map((d) => [d.path, d.signedUrl]));
+    for (const l of shownListings) l.source!.image = url.get(pagePath(l.source!.issue, l.source!.page)) ?? null;
+  }
+
   return {
-    suggestions: suggestions.sort(byPriority).slice(0, REVIEW_PAGE_SIZE),
-    llmLinks: llmLinks.sort(byPriority).slice(0, REVIEW_PAGE_SIZE),
+    suggestions: shownSuggestions,
+    llmLinks: shownLinks,
     totals: { suggestions: suggestions.length, llmLinks: llmLinks.length },
   };
 }

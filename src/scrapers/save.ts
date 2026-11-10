@@ -146,6 +146,8 @@ export async function saveProducts(
           content_unit: p.totalContent?.unit ?? null,
           last_seen_at: now,
           listed_until: p.listedUntil ?? null,
+          // Only newsletter products carry a source; scraped rows leave the columns alone.
+          ...(p.source ? { source_issue: p.source.issue, source_page: p.source.page, source_text: p.source.text } : {}),
         })),
         { onConflict: "shop_id,shop_product_id" },
       )
