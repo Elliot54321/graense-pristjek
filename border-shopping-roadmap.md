@@ -714,3 +714,15 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   put flavours in whole-series families. First run moved 128 shop products and re-familied 17 products;
   0 split barcodes left. First draft would have moved 569 (it also undid deliberate multi-barcode
   products) and then hidden 52 visible products behind weak links - both caught in dry runs.
+
+### Fleggaard/Calle twin offers (2026-11-11)
+- The user saw Thisted Julekalender only offered as "same family": Fleggaard's and Calle's identical
+  offers each had their own product. Both issues are imported the same day, and `match:new` only offers
+  existing products as candidates, so it can't link one new product to another. 60 pairs with identical
+  wording + content were on different products (Carlsberg, Royal, Milka, Nutella, ...).
+- `match:new` now first joins them (`linkNewsletterTwins` in `src/matching/carry-over.ts`, no API cost):
+  human decision > link shown on the site (0.8+) > own product > weak link; tie Fleggaard. The moved twin
+  takes over method, confidence and review, so one review covers both shops. Price within 1.4x.
+  First run joined 58.
+- Faxe Kondi was decided two ways: Calle reviewed as "not the bottles" (cans), Fleggaard relinked to the
+  bottles in the 2026-11-05 bulk fix. Same offer, so Fleggaard now follows Calle to the cans.

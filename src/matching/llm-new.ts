@@ -27,7 +27,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import { adminClient, fetchAll } from "../db/admin";
-import { carryOverReviewed } from "./carry-over";
+import { carryOverReviewed, linkNewsletterTwins } from "./carry-over";
 import { GROUP_IDS, GROUPS, isListed } from "./groups";
 import { costUsd } from "./llm";
 import { isCatchAllFamilyName, linkDoubts } from "./safety";
@@ -190,6 +190,8 @@ async function main() {
   // Reviewed newsletter decisions first: a reworded offer needs no API call (carry-over.ts).
   const carried = await carryOverReviewed(db, dryRun);
   console.log(`Carried over reviewed newsletter decisions: ${carried}${dryRun ? " (dry run, not saved)" : ""}`);
+  const twins = await linkNewsletterTwins(db, dryRun);
+  console.log(`Fleggaard/Calle twin offers joined: ${twins}${dryRun ? " (dry run, not saved)" : ""}`);
 
   const [shopRows, products, families, prices] = await Promise.all([
     fetchAll<ShopRow>((f, t) =>
