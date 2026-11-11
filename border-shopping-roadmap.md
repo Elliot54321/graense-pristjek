@@ -732,6 +732,10 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   149,99 - the basket uses the deal for every full 12). Fleggaard's extraction read the same offer as pack
   "12 x 55 g." with price 149,99 and multi-buy 12 for 149,99; `singlePrice` then took "Pr. stk. 16,99" and
   kept the 12-bar content: 16,99 kr. for 0,66 kg = 25,74 kr./kg, a false "cheapest".
-- `import.ts`: when the pack count equals the multi-buy count and the price is the multi-buy total, the
-  offer is one pack at the total (149,99 for 12 x 55 g = 227 kr./kg, like ScandiPark's 12-pack). Only
-  offer with this pattern in the three issues; re-import changed exactly those 4 prices.
+- `import.ts` (`singlesWithDeal`): when the pack count equals the multi-buy count and the price is the
+  multi-buy total, the offer is single items with a deal - stored like Calle's (55 g at 16,99, 12 for
+  149,99), so the same offer gets the same product at both shops and the basket uses the deal for every
+  full 12. (A first fix stored it as a 12-pack at 149,99: correct, but inconsistent with Calle - the user
+  noticed.) Fleggaard's bars rejoined their October products, which Calle's are linked to; the four
+  "12 x 55 g." rows were retired (listed_until/last_seen_at backdated). Only offer with this pattern in the
+  three issues. "Salted Peanut Caramel 55 g." is new and gets matched in the nightly run.

@@ -86,6 +86,19 @@ function printedText(o: Offer): string {
     .join(" · ");
 }
 
+/**
+ * "12 x 55 g." priced "12 stk. 149,99" with multi-buy 12 for 149,99 is not a 12-pack: the
+ * shop sells single bars ("Pr. stk. 16,99"), 12 for 149,99. The same offer was read that way
+ * at Calle, and as a 12-pack at Fleggaard (then priced 16,99 for all 12 bars). Store it as
+ * the single item with the deal, so both shops get the same product and the basket uses
+ * the deal for every full 12.
+ */
+function singlesWithDeal(o: Offer): Offer {
+  const deal = o.multi_buy;
+  if (!deal || (o.unit_count ?? 0) < 2 || o.unit_count !== deal.quantity || Math.abs(o.price - deal.total_price) >= 0.005) return o;
+  return { ...o, pack: o.pack.replace(/^\s*\d+\s*[x×]\s*/i, ""), unit_count: 1 };
+}
+
 export function offersToProducts(
   data: Extracted,
   shop: string,
@@ -97,14 +110,11 @@ export function offersToProducts(
   const byKey = new Map<string, ScrapedProduct>();
   for (const { page, result } of data.pages) {
     const until = sections.find((s) => page >= s.from && page <= s.to)?.validTo ?? validTo;
-    for (const o of result.offers) {
+    for (const read of result.offers) {
+      const o = singlesWithDeal(read);
       const total = content(o);
       // One unit's price, for the whole pack (see prices.ts).
-      // "12 x 55 g." with "12 stk. 149,99" and multi-buy 12 for 149,99 is one 12-pack at the
-      // total. Taking the single price ("Pr. stk. 16,99") would price all 12 bars at 16,99.
-      const wholePack =
-        !!o.multi_buy && (o.unit_count ?? 0) >= 2 && o.unit_count === o.multi_buy.quantity && Math.abs(o.price - o.multi_buy.total_price) < 0.005;
-      const price = wholePack ? o.price : packPrice(o, singlePrice(o));
+      const price = packPrice(o, singlePrice(o));
       const names = [...new Set([...o.products, ...o.visible_variants].map((n) => n.trim()).filter(Boolean))];
       for (const name of names) {
         const key = productKey(name, o.pack);
@@ -129,8 +139,8 @@ export function offersToProducts(
           offerEndsAt: o.always_low_price ? null : until,
           pfand: null,
           listedUntil: until,
-          source: { issue, page, text: printedText(o) },
-          multiBuy: o.multi_buy && !wholePack ? { quantity: o.multi_buy.quantity, price: o.multi_buy.total_price } : null,
+          source: { issue, page, text: printedText(read) },
+          multiBuy: o.multi_buy ? { quantity: o.multi_buy.quantity, price: o.multi_buy.total_price } : null,
           savingVsDkPercent: o.saving_vs_dk_percent,
           coupon: o.coupon ?? false,
           scrapedAt: now,
