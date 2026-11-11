@@ -18,8 +18,13 @@ export interface Winner {
   shopProductId: number;
   productId: number;
   confidence: number;
-  /** Cheapest listing per other shop in the family, cheapest first. */
+  /**
+   * Other shops' listings to compare with, cheapest first: for an exact link the same
+   * product (so a can isn't shown next to the family's bottles), else the family's
+   * cheapest per shop.
+   */
   rivalIds: number[];
+  sameProduct: boolean;
   /** How much cheaper per liter/kg than the next shop, 0.25 = 25 %. */
   saving: number;
 }
@@ -67,20 +72,27 @@ export async function findWinners(db: SupabaseClient): Promise<Winner[]> {
       if (confidence === undefined || !NEWSLETTER_SHOPS.has(r.shop_id)) continue;
       const others = group.filter((o) => o.shop_id !== r.shop_id);
       if (!others.length) continue;
+      // Exact link: show the linked product in the other shops (falls back to the family).
+      const linked = confidence < 1 ? others.filter((o) => o.product_id === r.product_id) : [];
+      const sameProduct = linked.length > 0;
+      const shown = sameProduct ? linked : others;
       const cheapestPerShop = new Map<string, PriceRow>();
-      for (const o of others) {
+      for (const o of shown) {
         const best = cheapestPerShop.get(o.shop_id);
         if (!best || Number(o.price_per_unit) < Number(best.price_per_unit)) cheapestPerShop.set(o.shop_id, o);
       }
       const rivals = [...cheapestPerShop.values()].sort((a, b) => Number(a.price_per_unit) - Number(b.price_per_unit));
-      if (Number(r.price_per_unit) > Number(rivals[0].price_per_unit)) continue;
+      // Winning is judged on the whole family, like the site's answer.
+      const byPrice = [...others].sort((a, b) => Number(a.price_per_unit) - Number(b.price_per_unit));
+      if (Number(r.price_per_unit) > Number(byPrice[0].price_per_unit)) continue;
       // Fleggaard and Calle print the same prices, so measure the lead against the other shops.
-      const next = Number((rivals.find((o) => !NEWSLETTER_SHOPS.has(o.shop_id)) ?? rivals[0]).price_per_unit);
+      const next = Number((byPrice.find((o) => !NEWSLETTER_SHOPS.has(o.shop_id)) ?? byPrice[0]).price_per_unit);
       winners.push({
         shopProductId: r.shop_product_id,
         productId: r.product_id,
         confidence,
         rivalIds: rivals.slice(0, RIVALS_SHOWN).map((o) => o.shop_product_id),
+        sameProduct,
         saving: next > 0 ? 1 - Number(r.price_per_unit) / next : 0,
       });
     }

@@ -157,7 +157,7 @@ function WinnerItem({ w }: { w: WinnerCard }) {
       </p>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <Side title="Avistilbud" product={w.product} listings={[w.self]} />
-        <Side title="Billigst i andre butikker" product={null} listings={w.rivals} />
+        <Side title={w.sameProduct ? "Samme vare i andre butikker" : "Billigst i familien i andre butikker"} product={null} listings={w.rivals} />
       </div>
       <form className="mt-4 flex gap-3">
         <input type="hidden" name="shopProductId" value={w.self.shopProductId} />

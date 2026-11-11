@@ -71,7 +71,8 @@ export interface WinnerCard {
   self: Listing;
   product: ProductInfo;
   confidence: number;
-  rivals: Listing[]; // cheapest listing per other shop in the family
+  rivals: Listing[]; // the linked product in other shops, or the family's cheapest per shop
+  sameProduct: boolean;
   saving: number; // 0.25 = 25 % cheaper per liter/kg than the next shop
   priority: Priority;
 }
@@ -310,6 +311,7 @@ export async function loadReview(): Promise<{
     product,
     confidence: w.confidence,
     rivals: w.rivalIds.flatMap((id) => rivalListings.get(id) ?? []),
+    sameProduct: w.sameProduct,
     saving: w.saving,
     priority,
   }));
