@@ -166,7 +166,15 @@ function WinnerItem({ w }: { w: WinnerCard }) {
         <span className={pct > 40 ? "rounded bg-red-100 px-2 py-0.5 text-red-900" : "rounded bg-emerald-100 px-2 py-0.5 text-emerald-900"}>
           {pct > 0 ? `${pct} % billigere pr. ${UNIT[w.self.contentUnit ?? ""] ?? "enhed"} end næste butik` : "Samme pris som næste butik"}
         </span>
-        <span>{exactLink ? `Linket som samme vare · sikkerhed ${Math.round(w.confidence * 100)} %` : "Kun samme familie"}</span>
+        <span>
+          {!exactLink
+            ? "Kun samme familie"
+            : w.sameProduct
+              ? `Linket som samme vare · sikkerhed ${Math.round(w.confidence * 100)} %`
+              : // Linked to a product no other shop sells right now (e.g. an expired newsletter offer):
+                // the right side shows the family, so say so instead of "same product".
+                "Linket til en vare, ingen anden butik har lige nu – vurdér familien"}
+        </span>
         {w.sameProduct && <SameBarcode listings={w.rivals} />}
         <PriorityTags tags={w.priority.tags} />
       </p>
