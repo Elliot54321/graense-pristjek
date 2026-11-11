@@ -143,6 +143,20 @@ async function Review() {
   );
 }
 
+/**
+ * "Samme stregkode" when two or more listings carry the same barcode: then they're the
+ * same product even if the shops' photos show different can designs.
+ */
+function SameBarcode({ listings }: { listings: Listing[] }) {
+  const eans = listings.map((x) => x.ean).filter((e): e is string => !!e);
+  if (eans.length < 2 || new Set(eans).size !== 1) return null;
+  return (
+    <span className="rounded bg-emerald-100 px-2 py-0.5 text-emerald-900" title={eans[0]}>
+      Samme stregkode ({eans.length} butikker)
+    </span>
+  );
+}
+
 function WinnerItem({ w }: { w: WinnerCard }) {
   const pct = Math.round(w.saving * 100);
   const exactLink = w.confidence < 1;
@@ -153,6 +167,7 @@ function WinnerItem({ w }: { w: WinnerCard }) {
           {pct > 0 ? `${pct} % billigere pr. ${UNIT[w.self.contentUnit ?? ""] ?? "enhed"} end næste butik` : "Samme pris som næste butik"}
         </span>
         <span>{exactLink ? `Linket som samme vare · sikkerhed ${Math.round(w.confidence * 100)} %` : "Kun samme familie"}</span>
+        {w.sameProduct && <SameBarcode listings={w.rivals} />}
         <PriorityTags tags={w.priority.tags} />
       </p>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -174,6 +189,7 @@ function SuggestionCard({ s }: { s: Suggestion }) {
     <li className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
       <p className="flex flex-wrap gap-2 text-sm">
         <span className="rounded bg-amber-100 px-2 py-0.5 text-amber-900">{s.reason || "tvivl"}</span>
+        <SameBarcode listings={s.targetListings} />
         <PriorityTags tags={s.priority.tags} />
       </p>
       <PriceRange listings={[s.self, ...s.targetListings]} />
@@ -205,6 +221,7 @@ function LinkCard({ l }: { l: LlmLink }) {
         {l.confidence < SHOWN_CONFIDENCE && (
           <span className="rounded bg-amber-100 px-2 py-0.5 text-amber-900">Vises ikke på siden før bekræftet</span>
         )}
+        <SameBarcode listings={l.others} />
         <PriorityTags tags={l.priority.tags} />
       </p>
       <PriceRange listings={[l.self, ...l.others]} />
@@ -273,6 +290,7 @@ function ListingRow({ x }: { x: Listing }) {
         {x.price !== null && <> · {kr(x.price)} kr.</>}
         {x.pricePerUnit !== null && x.contentUnit && <> ({kr(x.pricePerUnit)} kr./{UNIT[x.contentUnit] ?? x.contentUnit})</>}
         {x.onOffer && <> · tilbud</>}
+        {x.ean && <> · stregkode {x.ean}</>}
       </p>
       {/* Newsletter products have no product page: show what was printed and the page itself. */}
       {x.source && (
