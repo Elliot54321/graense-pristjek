@@ -133,6 +133,7 @@ function SuggestionCard({ s }: { s: Suggestion }) {
         <span className="rounded bg-amber-100 px-2 py-0.5 text-amber-900">{s.reason || "tvivl"}</span>
         <PriorityTags tags={s.priority.tags} />
       </p>
+      <PriceRange listings={[s.self, ...s.targetListings]} />
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <Side title="Denne vare" product={s.currentProduct} listings={[s.self]} />
         <Side
@@ -160,6 +161,7 @@ function LinkCard({ l }: { l: LlmLink }) {
         <span>Sikkerhed {Math.round(l.confidence * 100)} %</span>
         <PriorityTags tags={l.priority.tags} />
       </p>
+      <PriceRange listings={[l.self, ...l.others]} />
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <Side title="Denne vare" product={null} listings={[l.self]} />
         <Side title="Linket til" product={l.product} listings={l.others} empty="Ingen andre varer på produktet." />
@@ -281,6 +283,25 @@ function PriorityTags({ tags }: { tags: string[] }) {
         </span>
       ))}
     </>
+  );
+}
+
+/**
+ * Cheapest and dearest shop among the listings on sale, so a "price differs" note can be
+ * read at a glance: a real price gap (one shop is just dearer) or a sign of a wrong match.
+ */
+function PriceRange({ listings }: { listings: Listing[] }) {
+  const priced = listings.filter((x) => x.listed && x.price !== null);
+  if (new Set(priced.map((x) => x.shopId)).size < 2) return null;
+  const sorted = [...priced].sort((a, b) => a.price! - b.price!);
+  const [low, high] = [sorted[0], sorted[sorted.length - 1]];
+  const diff = Math.round((high.price! / low.price! - 1) * 100);
+  return (
+    <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+      Pris: {kr(low.price!)} ({SHOP_NAMES[low.shopId] ?? low.shopId}) – {kr(high.price!)} (
+      {SHOP_NAMES[high.shopId] ?? high.shopId})
+      <span className={diff > 40 ? "font-semibold text-red-700 dark:text-red-400" : ""}> · {diff} % forskel</span>
+    </p>
   );
 }
 
