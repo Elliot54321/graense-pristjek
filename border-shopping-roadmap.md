@@ -77,6 +77,7 @@ created: 2026-10-16
 - [x] Compute price per liter or kg for everything (done in the scrapers: price ÷ content)
 - [x] Build a small admin view to review uncertain matches (`/admin`, password in `ADMIN_PASSWORD`; LLM suggestions and LLM links - EAN matches with confidence 0.6 not shown yet)
 - [ ] Go through the open suggestions and LLM links in `/admin` - **deferred to the final stages** (decided 2026-10-22; a few were reviewed already). Fine-tune pairings once the comparison works end to end.
+- [x] Keep the monthly newsletter review small (2026-11-11): `/admin` "Avistilbud der vinder" lists only unreviewed newsletter offers that are cheapest in their family; reviewed decisions carry over to reworded offers; weak (0.75) unreviewed links are held back from the site
 
 **Done when:** The common items (`src/matching/common-items.ts`, 120+ and growing) match correctly across both shops, and most of each category's shared range (soda, beer, candy/chocolate, spirits) is linked. Comparing prices is the whole point of the site, so broad coverage matters more than a short list.
 
@@ -675,3 +676,22 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
 - Name brainstorm (all free 2026-11-10): Sydpå (sydpaa.dk), Grænseturen (graenseturen.dk), Prisgrænsen (prisgraensen.dk + prisgrænsen.dk), Kurvtjek (kurvtjek.dk), Grænselisten (graenselisten.dk + grænselisten.dk), Kroneklip (kroneklip.dk), Spar ved grænsen (sparvedgraensen.dk), Grænsesmart (graensesmart.dk), Tur sydpå (tursydpaa.dk), Handelsturen, Kassetjek, Pantfrit, Grenzen. Top three suggested: Sydpå, Grænseturen, Prisgrænsen.
 - **Price range on review cards (2026-11-11, user request):** the user linked Haribo Matador Mix 2 kg although its note said "price differs 50%" - correctly: BorderShop Puttgarden charges 149,95 for the same bag vs 99,99 at Calle/Fleggaard (Rostock 99,95). The note didn't say which price caused it, so each card now shows "Pris: 99,99 (Calle) – 149,95 (BorderShop Puttgarden) · 50 % forskel" (listings on sale only; red above 40 %). A big gap alone is not a reason to reject - one shop can simply be dearer.
 - **Fixed (2026-11-11): "alcohol % differs" on newsletter ranges.** Newsletters print one price for several drinks with a strength range ("Baileys 1 l. 17-37,5%"). `linkDoubts()` now reads strengths as ranges and only doubts when they can't overlap (37,5 % vs 40 % is still flagged). New doubt **"size range in offer"** for offers covering several bottle sizes ("Kahlua 0,7-1 l."), where it's unclear which size the price is for. All 14 suggestions flagged only for alcohol % were rechecked against current data: 12 now pass every rule and became unreviewed AI links (still in the review list), 2 (Kahlua) stay suggestions with the new reason.
+
+### Newsletter review that stays small (2026-11-11)
+- The user can't review ~700 newsletter products a month, but a wrong match is worse than a missing one.
+  A wrong link only changes the answer when the offer wins (cheapest per l/kg in its family): 226 of 814
+  unreviewed newsletter products on the site did. `/admin` now starts with "Avistilbud der vinder" -
+  only those, ranked by priority, with the cheapest listing from up to 3 other shops (`src/app/admin/winners.ts`).
+  Fleggaard and Calle print the same prices, so the lead is measured against the other shops.
+  Newsletter links with high confidence that don't win are left out of the "AI-links" list.
+  New action "Ikke sammenlignelig": the product gets its own product with no family, so it's never compared.
+- **Carry-over:** an identical name + pack already keeps its shop product and match (220 of 734 Fleggaard
+  products in November). `match:new` now first copies reviewed decisions onto new unmatched newsletter
+  products with the same words in any order/punctuation and the same content, same shop, price within 1.4x
+  (`src/matching/carry-over.ts`, no API cost). Measured Oct -> Nov it catches only ~9 more (e.g. "Heineken
+  0.0" -> "0,0", "18-24" -> "18 - 24"): most new products are genuinely new offers, not rewordings.
+  Looser fuzzy matching was rejected: one word ("Zero") can be a different product.
+- **Hold back weak links:** migration `20261111000000_hold_back_weak_links.sql` keeps unreviewed LLM links
+  with confidence < 0.8 (the "medium" ones) out of `matched_prices` until confirmed in `/admin`
+  (188 listed products on 2026-11-11 across all shops: Fleggaard 50, Poetzsch 48, Calle 38, ScandiPark 32,
+  BorderShop 20). Those still show in the "AI-links" list, tagged "Vises ikke på siden før bekræftet".

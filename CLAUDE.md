@@ -92,7 +92,8 @@ after 8 unattended nightly runs; Phase 2 (matching) is largely done.
   multi-buy, "spar %"). Then run `npm run match:new`.
 - `src/matching/llm-new.ts` – `npm run match:new [-- --dry-run]`: matches unmatched shop products
   (and products without family) against existing products with Sonnet 5.5; shared safety
-  rules in `src/matching/safety.ts`.
+  rules in `src/matching/safety.ts`. First copies reviewed newsletter decisions onto reworded offers
+  (`carry-over.ts`). Unreviewed LLM links below 0.8 confidence are held back from the site (`matched_prices`).
 - `src/flyers/extract.ts` – reads a PDF newsletter page by page with Claude vision
   (`npm run flyer:extract -- <pdf> [--pages ...] [--direct]`), writes `<pdf>.offers.json` for review.
   Uses the Batch API by default (half price; waits for the result, rerun the same command to resume);
@@ -113,7 +114,8 @@ after 8 unattended nightly runs; Phase 2 (matching) is largely done.
   `src/app/opengraph-image.tsx`, `robots.ts`, `sitemap.ts`; `src/lib/rate-limit.ts` (in-memory, per IP)
 - `src/app/fejl/` – error-report form (`feedback` table); `src/app/om/` – about page; `src/db/log.ts` –
   search log (`search_log`). Both tables are private (secret key only).
-- `src/app/admin/` – review page `/admin` (password `ADMIN_PASSWORD`): error reports, search stats, LLM suggestions
+- `src/app/admin/` – review page `/admin` (password `ADMIN_PASSWORD`): error reports, search stats, winning newsletter
+  offers (`winners.ts`: unreviewed and cheapest in their family - the ones worth checking), LLM suggestions
   (Link / Ikke den samme) and unreviewed LLM links (Bekræft / Fjern link). Server actions
   in `actions.ts` write with the secret key and must each call `requireAdmin()` first.
 

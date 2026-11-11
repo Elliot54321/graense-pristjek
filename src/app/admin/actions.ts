@@ -138,6 +138,38 @@ export async function unlink(formData: FormData) {
   refresh();
 }
 
+/**
+ * Winning newsletter offer -> "Ikke sammenlignelig": wrong family or wrong link. The
+ * shop product gets its own product with no family, so it is never compared with
+ * other shops' products (it can still be found on its own).
+ */
+export async function separate(formData: FormData) {
+  await requireAdmin();
+  const shopProductId = idFrom(formData, "shopProductId");
+  const match = await loadMatch(shopProductId);
+  if (match.method !== "llm") throw new Error("Ikke et LLM-match.");
+  const db = adminClient();
+  const { data: sp, error: spError } = await db
+    .from("shop_products")
+    .select("name, content_amount, content_unit")
+    .eq("id", shopProductId)
+    .single();
+  if (spError) throw spError;
+  const { data: created, error: createError } = await db
+    .from("products")
+    .insert({ name: sp.name, content_amount: sp.content_amount, content_unit: sp.content_unit, family_id: null })
+    .select("id")
+    .single();
+  if (createError) throw createError;
+  await saveMatch(shopProductId, {
+    product_id: created.id,
+    method: "manual",
+    confidence: 1,
+    note: `Separated in review from product #${match.product_id}`,
+  });
+  refresh();
+}
+
 /** Error report -> "Klaret": hide it from the list. */
 export async function markReportHandled(formData: FormData) {
   await requireAdmin();

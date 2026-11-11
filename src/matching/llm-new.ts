@@ -27,6 +27,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import { adminClient, fetchAll } from "../db/admin";
+import { carryOverReviewed } from "./carry-over";
 import { GROUP_IDS, GROUPS, isListed } from "./groups";
 import { costUsd } from "./llm";
 import { isCatchAllFamilyName, linkDoubts } from "./safety";
@@ -185,6 +186,10 @@ async function main() {
   const limitArg = args.indexOf("--limit-chunks");
   const limitChunks = limitArg >= 0 ? Number(args[limitArg + 1]) : null;
   const db = adminClient();
+
+  // Reviewed newsletter decisions first: a reworded offer needs no API call (carry-over.ts).
+  const carried = await carryOverReviewed(db, dryRun);
+  console.log(`Carried over reviewed newsletter decisions: ${carried}${dryRun ? " (dry run, not saved)" : ""}`);
 
   const [shopRows, products, families, prices] = await Promise.all([
     fetchAll<ShopRow>((f, t) =>

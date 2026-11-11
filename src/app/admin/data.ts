@@ -3,13 +3,23 @@
  *  - suggestions: matches the LLM run flagged with a "LLM suggests same product
  *    as #<id>" note instead of linking (price outlier, bottle vs can, ...)
  *  - LLM links: unreviewed matches the LLM run did save
- * Both are sorted by priority.ts (popular, searched, on sale first) and cut to
+ *  - winners: newsletter offers that are currently the cheapest in their family
+ *    (winners.ts) - the newsletter matches worth checking; other unreviewed
+ *    high-confidence newsletter links are left out of the LLM list
+ * All are sorted by priority.ts (popular, searched, on sale first) and cut to
  * the most important REVIEW_PAGE_SIZE, so the page stays workable.
  */
+import { connection } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { NEWSLETTER_SHOPS } from "@/catalog/compare";
 import { adminClient, fetchAll } from "@/db/admin";
 import { PAGES_BUCKET, pagePath } from "@/flyers/page-paths";
 import { isListed } from "@/matching/groups";
 import { priority, type Priority } from "./priority";
+import { findWinners } from "./winners";
+
+/** Below this, an unreviewed LLM link is held back from the site (see the 2026-11-11 migration). */
+export const SHOWN_CONFIDENCE = 0.8;
 
 export const REVIEW_PAGE_SIZE = 50;
 
@@ -54,6 +64,15 @@ export interface LlmLink {
   product: ProductInfo;
   confidence: number;
   others: Listing[]; // other shop products linked to the same product
+  priority: Priority;
+}
+
+export interface WinnerCard {
+  self: Listing;
+  product: ProductInfo;
+  confidence: number;
+  rivals: Listing[]; // cheapest listing per other shop in the family
+  saving: number; // 0.25 = 25 % cheaper per liter/kg than the next shop
   priority: Priority;
 }
 
@@ -119,11 +138,36 @@ function toListing(r: LinkedRow, price: PriceRow | undefined): Listing {
   };
 }
 
+const LISTING_FIELDS =
+  "shop_id, name, url, content_amount, content_unit, last_seen_at, listed_until, source_issue, source_page, source_text, image_url";
+
+/** Listings by shop product id (for shop products not reached through a product). */
+async function listingsById(db: SupabaseClient, ids: number[]): Promise<Map<number, Listing>> {
+  const out = new Map<number, Listing>();
+  for (let i = 0; i < ids.length; i += 200) {
+    const chunk = ids.slice(i, i + 200);
+    const [{ data: sps, error }, { data: prices, error: priceError }] = await Promise.all([
+      db.from("shop_products").select(`id, ${LISTING_FIELDS}`).in("id", chunk),
+      db.from("current_prices").select("shop_product_id, price, price_per_unit, on_offer").in("shop_product_id", chunk),
+    ]);
+    if (error) throw error;
+    if (priceError) throw priceError;
+    const priceOf = new Map((prices ?? []).map((p) => [p.shop_product_id, p as PriceRow]));
+    for (const sp of sps ?? []) {
+      const row = { product_id: 0, shop_product_id: sp.id, shop_products: sp } as unknown as LinkedRow;
+      out.set(sp.id, toListing(row, priceOf.get(sp.id)));
+    }
+  }
+  return out;
+}
+
 export async function loadReview(): Promise<{
   suggestions: Suggestion[];
   llmLinks: LlmLink[];
-  totals: { suggestions: number; llmLinks: number };
+  winners: WinnerCard[];
+  totals: { suggestions: number; llmLinks: number; winners: number };
 }> {
+  await connection(); // per request: the 30-day window below reads the clock
   const db = adminClient();
   // What people searched for in the last 30 days, to rank by.
   const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
@@ -133,7 +177,7 @@ export async function loadReview(): Promise<{
   const searches = new Map<string, number>();
   for (const r of searchRows) searches.set(r.query, (searches.get(r.query) ?? 0) + 1);
 
-  const [suggestionRows, llmRows] = await Promise.all([
+  const [suggestionRows, llmRows, winnerRows] = await Promise.all([
     fetchAll<MatchRow>((from, to) =>
       db
         .from("product_matches")
@@ -153,6 +197,7 @@ export async function loadReview(): Promise<{
         .order("shop_product_id")
         .range(from, to),
     ),
+    findWinners(db),
   ]);
 
   const parsed = new Map(suggestionRows.map((r) => [r.shop_product_id, parseSuggestion(r.note ?? "")]));
@@ -161,6 +206,7 @@ export async function loadReview(): Promise<{
       ...suggestionRows.map((r) => r.product_id),
       ...[...parsed.values()].flatMap((p) => (p ? [p.targetId] : [])),
       ...llmRows.map((r) => r.product_id),
+      ...winnerRows.map((w) => w.productId),
     ]),
   ];
 
@@ -184,7 +230,7 @@ export async function loadReview(): Promise<{
     const linked = await fetchAll<LinkedRow>((from, to) =>
       db
         .from("product_matches")
-        .select("product_id, shop_product_id, shop_products(shop_id, name, url, content_amount, content_unit, last_seen_at, listed_until, source_issue, source_page, source_text, image_url)")
+        .select(`product_id, shop_product_id, shop_products(${LISTING_FIELDS})`)
         .in("product_id", ids)
         .order("shop_product_id")
         .range(from, to)
@@ -239,6 +285,8 @@ export async function loadReview(): Promise<{
   const llmLinks = llmRows.flatMap((r): LlmLink[] => {
     const self = byShopProduct.get(r.shop_product_id);
     if (!self) return [];
+    // Newsletter links shown on the site are checked through "winners" instead: only those decide answers.
+    if (NEWSLETTER_SHOPS.has(self.shopId) && Number(r.confidence) >= SHOWN_CONFIDENCE) return [];
     const product = products.get(r.product_id) ?? unknownProduct(r.product_id);
     const others = (byProduct.get(r.product_id) ?? []).filter((l) => l.shopProductId !== r.shop_product_id);
     return [{ self, product, confidence: Number(r.confidence), others, priority: rank(self, [product], others) }];
@@ -248,10 +296,29 @@ export async function loadReview(): Promise<{
   const shownSuggestions = suggestions.sort(byPriority).slice(0, REVIEW_PAGE_SIZE);
   const shownLinks = llmLinks.sort(byPriority).slice(0, REVIEW_PAGE_SIZE);
 
+  // Winners: rank with their own listing, then load the rival shops' listings for the shown ones.
+  const ranked = winnerRows.flatMap((w) => {
+    const self = byShopProduct.get(w.shopProductId);
+    if (!self) return [];
+    const product = products.get(w.productId) ?? unknownProduct(w.productId);
+    return [{ w, self, product, priority: rank(self, [product], []) }];
+  });
+  const topWinners = ranked.sort(byPriority).slice(0, REVIEW_PAGE_SIZE);
+  const rivalListings = await listingsById(db, [...new Set(topWinners.flatMap((x) => x.w.rivalIds))]);
+  const shownWinners: WinnerCard[] = topWinners.map(({ w, self, product, priority }) => ({
+    self,
+    product,
+    confidence: w.confidence,
+    rivals: w.rivalIds.flatMap((id) => rivalListings.get(id) ?? []),
+    saving: w.saving,
+    priority,
+  }));
+
   // Newsletter page images for the shown items: signed links to the private bucket, valid an hour.
   const shownListings = [
     ...shownSuggestions.flatMap((s) => [s.self, ...s.targetListings]),
     ...shownLinks.flatMap((l) => [l.self, ...l.others]),
+    ...shownWinners.flatMap((w) => [w.self, ...w.rivals]),
   ].filter((l) => l.source);
   const paths = [...new Set(shownListings.map((l) => pagePath(l.source!.issue, l.source!.page)))];
   if (paths.length) {
@@ -264,6 +331,7 @@ export async function loadReview(): Promise<{
   return {
     suggestions: shownSuggestions,
     llmLinks: shownLinks,
-    totals: { suggestions: suggestions.length, llmLinks: llmLinks.length },
+    winners: shownWinners,
+    totals: { suggestions: suggestions.length, llmLinks: llmLinks.length, winners: ranked.length },
   };
 }

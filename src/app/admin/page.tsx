@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { confirmLink, linkSuggestion, logout, markReportHandled, rejectSuggestion, unlink } from "./actions";
+import { confirmLink, linkSuggestion, logout, markReportHandled, rejectSuggestion, separate, unlink } from "./actions";
 import { adminConfigured, isAdmin } from "./auth";
-import { loadReview, type Listing, type LlmLink, type ProductInfo, type Suggestion } from "./data";
+import { loadReview, SHOWN_CONFIDENCE, type Listing, type LlmLink, type ProductInfo, type Suggestion, type WinnerCard } from "./data";
 import { ActionButton, LoginForm } from "./forms";
 import { loadInsights, type SearchCount } from "./insights";
 
@@ -48,7 +48,7 @@ async function Review() {
     );
   }
 
-  const [{ suggestions, llmLinks, totals }, insights] = await Promise.all([loadReview(), loadInsights()]);
+  const [{ suggestions, llmLinks, winners, totals }, insights] = await Promise.all([loadReview(), loadInsights()]);
   return (
     <>
       <form action={logout} className="mt-2">
@@ -95,6 +95,23 @@ async function Review() {
 
       <section className="mt-8">
         <h2 className="text-xl font-semibold">
+          Avistilbud der vinder (
+          {winners.length < totals.winners ? `de ${winners.length} vigtigste af ${totals.winners}` : totals.winners})
+        </h2>
+        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+          Fleggaard- og Calle-tilbud, som AI&apos;en har matchet, og som lige nu er billigst pr. liter/kg i deres familie. Det er
+          dem, der afgør sidens svar – de øvrige avistilbud ændrer sjældent noget. Din beslutning følger med til næste avis.
+        </p>
+        <ul className="mt-4 flex flex-col gap-4">
+          {winners.map((w) => (
+            <WinnerItem key={w.self.shopProductId} w={w} />
+          ))}
+        </ul>
+        {!winners.length && <p className="mt-4 text-zinc-500">Ingen avistilbud at gennemgå.</p>}
+      </section>
+
+      <section className="mt-10">
+        <h2 className="text-xl font-semibold">
           Forslag ({suggestions.length < totals.suggestions ? `de ${suggestions.length} vigtigste af ${totals.suggestions}` : totals.suggestions})
         </h2>
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
@@ -123,6 +140,32 @@ async function Review() {
         {!llmLinks.length && <p className="mt-4 text-zinc-500">Ingen AI-links at gennemgå.</p>}
       </section>
     </>
+  );
+}
+
+function WinnerItem({ w }: { w: WinnerCard }) {
+  const pct = Math.round(w.saving * 100);
+  const exactLink = w.confidence < 1;
+  return (
+    <li className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
+      <p className="flex flex-wrap gap-2 text-sm text-zinc-600 dark:text-zinc-400">
+        <span className={pct > 40 ? "rounded bg-red-100 px-2 py-0.5 text-red-900" : "rounded bg-emerald-100 px-2 py-0.5 text-emerald-900"}>
+          {pct > 0 ? `${pct} % billigere pr. ${UNIT[w.self.contentUnit ?? ""] ?? "enhed"} end næste butik` : "Samme pris som næste butik"}
+        </span>
+        <span>{exactLink ? `Linket som samme vare · sikkerhed ${Math.round(w.confidence * 100)} %` : "Kun samme familie"}</span>
+        <PriorityTags tags={w.priority.tags} />
+      </p>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <Side title="Avistilbud" product={w.product} listings={[w.self]} />
+        <Side title="Billigst i andre butikker" product={null} listings={w.rivals} />
+      </div>
+      <form className="mt-4 flex gap-3">
+        <input type="hidden" name="shopProductId" value={w.self.shopProductId} />
+        <ActionButton action={confirmLink} variant="yes">Bekræft</ActionButton>
+        {exactLink && <ActionButton action={unlink} variant="no">Fjern link</ActionButton>}
+        <ActionButton action={separate} variant="no">Ikke sammenlignelig</ActionButton>
+      </form>
+    </li>
   );
 }
 
@@ -159,6 +202,9 @@ function LinkCard({ l }: { l: LlmLink }) {
     <li className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
       <p className="flex flex-wrap gap-2 text-sm text-zinc-600 dark:text-zinc-400">
         <span>Sikkerhed {Math.round(l.confidence * 100)} %</span>
+        {l.confidence < SHOWN_CONFIDENCE && (
+          <span className="rounded bg-amber-100 px-2 py-0.5 text-amber-900">Vises ikke på siden før bekræftet</span>
+        )}
         <PriorityTags tags={l.priority.tags} />
       </p>
       <PriceRange listings={[l.self, ...l.others]} />
