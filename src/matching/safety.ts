@@ -10,7 +10,23 @@ export const PRICE_OUTLIER = 1.4;
 export const SIZE_TOLERANCE = 0.05;
 const BOTTLE = /flask|flaske|\bfl\b|\bpet\b|bottle/i;
 const GIFT_BOX = /gaveæske|gave-?pakning|gift ?box|geschenk/i;
-const PERCENT = /(\d+(?:[.,]\d+)?)\s*%/;
+const PERCENT = /(\d+(?:[.,]\d+)?)\s*(?:-\s*(\d+(?:[.,]\d+)?)\s*)?%/;
+const num = (s: string) => Number(s.replace(",", "."));
+/** "0,7-1 l." - a newsletter price for several bottle sizes; unclear which one the price is for. */
+const SIZE_RANGE = /\d+(?:[.,]\d+)?\s*-\s*\d+(?:[.,]\d+)?\s*(?:l|cl|ml|kg|g)\b/i;
+
+/**
+ * Alcohol strength printed in a name, as a range: "40%" -> 40-40. Newsletters print
+ * one price for several drinks with a range ("Baileys 1 l. 17-37,5%"), which fits any
+ * strength inside it.
+ */
+function strength(name: string): { lo: number; hi: number } | null {
+  const m = name.match(PERCENT);
+  if (!m) return null;
+  const a = num(m[1]);
+  const b = m[2] ? num(m[2]) : a;
+  return { lo: Math.min(a, b), hi: Math.max(a, b) };
+}
 
 /**
  * Family names that group unrelated products ("Andre spiritus A-F" once lumped
@@ -45,10 +61,13 @@ export function linkDoubts(items: LinkCandidate[], confidence: "high" | "medium"
   const gifts = items.filter((i) => GIFT_BOX.test(i.name)).length;
   if (gifts && gifts < items.length) doubts.push("gift box vs plain");
 
-  const percents = new Set(
-    items.map((i) => i.name.match(PERCENT)?.[1]).filter(Boolean).map((p) => Number(p!.replace(",", "."))),
-  );
-  if (percents.size > 1 && Math.max(...percents) - Math.min(...percents) > 0.5) doubts.push("alcohol % differs");
+  // Strengths that can't all be the same drink: the highest lower bound is above the lowest upper bound.
+  const strengths = items.map((i) => strength(i.name)).filter((s): s is { lo: number; hi: number } => s !== null);
+  if (strengths.length > 1 && Math.max(...strengths.map((s) => s.lo)) - Math.min(...strengths.map((s) => s.hi)) > 0.5) {
+    doubts.push("alcohol % differs");
+  }
+
+  if (items.some((i) => SIZE_RANGE.test(i.name))) doubts.push("size range in offer");
 
   const sized = items.filter((i) => i.contentAmount !== null && Number(i.contentAmount) > 0);
   const units = new Set(sized.map((i) => i.contentUnit));
