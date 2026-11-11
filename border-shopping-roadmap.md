@@ -695,3 +695,22 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   with confidence < 0.8 (the "medium" ones) out of `matched_prices` until confirmed in `/admin`
   (188 listed products on 2026-11-11 across all shops: Fleggaard 50, Poetzsch 48, Calle 38, ScandiPark 32,
   BorderShop 20). Those still show in the "AI-links" list, tagged "Vises ikke på siden før bekræftet".
+
+### One barcode, one product (2026-11-11)
+- The user asked whether any of their rejections had split products with identical barcodes (a can's
+  artwork can differ between shops' photos - Carlsberg Brewmasters IPA - while the barcode is the same).
+  One had: Kronenbourg 1664 Blanc 0,0 % at Poetzsch, rejected on a wrong "bottle vs can" warning (same
+  barcode 3080216060514, same 24 x 0,33 l bottles). Relinked to the barcode product and marked reviewed.
+  `/admin` cards now show each listing's barcode and a "Samme stregkode" tag.
+- Rule for reviewing: "identical" means the same product, size, count and container - not the artwork.
+- 122 barcodes were split over several products: the early LLM run had moved one copy (sometimes wrongly:
+  Don Papa Rum -> Don Papa Baroko, O.P. Anderson organic -> the regular one), shops had changed a barcode
+  after it was matched, and hand-made links didn't pull in other shops' copies added later (Rostock,
+  ScandiPark). `match:ean` now keeps every barcode on one product (`src/matching/ean.ts`, `--dry-run`):
+  a human decision wins; new copies join where their twins are; split copies follow an LLM link only if
+  it's shown on the site (0.8+, inheriting its method and confidence, so one review settles all copies),
+  else go to the product with most copies (tie: the barcode's own product). When families differ, the more
+  specific one (fewer barcodes) wins - BorderShop's generic names ("SMÅ-serien, aromatiseret vodka") had
+  put flavours in whole-series families. First run moved 128 shop products and re-familied 17 products;
+  0 split barcodes left. First draft would have moved 569 (it also undid deliberate multi-barcode
+  products) and then hidden 52 visible products behind weak links - both caught in dry runs.
