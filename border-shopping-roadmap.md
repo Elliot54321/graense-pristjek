@@ -726,3 +726,12 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   First run joined 58.
 - Faxe Kondi was decided two ways: Calle reviewed as "not the bottles" (cans), Fleggaard relinked to the
   bottles in the 2026-11-05 bulk fix. Same offer, so Fleggaard now follows Calle to the cans.
+
+### Fleggaard Barebells priced as 12 bars for 16,99 (2026-11-11)
+- Reported by the user via Calle's Barebells (stored correctly: one 55 g bar at 16,99, multi-buy 12 for
+  149,99 - the basket uses the deal for every full 12). Fleggaard's extraction read the same offer as pack
+  "12 x 55 g." with price 149,99 and multi-buy 12 for 149,99; `singlePrice` then took "Pr. stk. 16,99" and
+  kept the 12-bar content: 16,99 kr. for 0,66 kg = 25,74 kr./kg, a false "cheapest".
+- `import.ts`: when the pack count equals the multi-buy count and the price is the multi-buy total, the
+  offer is one pack at the total (149,99 for 12 x 55 g = 227 kr./kg, like ScandiPark's 12-pack). Only
+  offer with this pattern in the three issues; re-import changed exactly those 4 prices.

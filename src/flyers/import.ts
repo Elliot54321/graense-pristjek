@@ -100,7 +100,11 @@ export function offersToProducts(
     for (const o of result.offers) {
       const total = content(o);
       // One unit's price, for the whole pack (see prices.ts).
-      const price = packPrice(o, singlePrice(o));
+      // "12 x 55 g." with "12 stk. 149,99" and multi-buy 12 for 149,99 is one 12-pack at the
+      // total. Taking the single price ("Pr. stk. 16,99") would price all 12 bars at 16,99.
+      const wholePack =
+        !!o.multi_buy && (o.unit_count ?? 0) >= 2 && o.unit_count === o.multi_buy.quantity && Math.abs(o.price - o.multi_buy.total_price) < 0.005;
+      const price = wholePack ? o.price : packPrice(o, singlePrice(o));
       const names = [...new Set([...o.products, ...o.visible_variants].map((n) => n.trim()).filter(Boolean))];
       for (const name of names) {
         const key = productKey(name, o.pack);
@@ -126,7 +130,7 @@ export function offersToProducts(
           pfand: null,
           listedUntil: until,
           source: { issue, page, text: printedText(o) },
-          multiBuy: o.multi_buy ? { quantity: o.multi_buy.quantity, price: o.multi_buy.total_price } : null,
+          multiBuy: o.multi_buy && !wholePack ? { quantity: o.multi_buy.quantity, price: o.multi_buy.total_price } : null,
           savingVsDkPercent: o.saving_vs_dk_percent,
           coupon: o.coupon ?? false,
           scrapedAt: now,
