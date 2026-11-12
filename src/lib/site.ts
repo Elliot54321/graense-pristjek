@@ -1,10 +1,11 @@
 /**
  * Site-wide settings.
  *
- * CONTACT_EMAIL: the public contact address. Left empty until there is a professional
- * address on the site's own domain (user decision, 2026-11-06) - never a personal one.
+ * CONTACT_EMAIL: the public contact address - the site's own mailbox (set up 2026-11-12),
+ * never a personal one. Shown on /om; the scrapers' User-Agent uses the same address
+ * (SCRAPER_CONTACT_EMAIL in .env.local and the GitHub secret).
  */
-export const CONTACT_EMAIL: string | null = null;
+export const CONTACT_EMAIL: string | null = "prisgraensen@gmail.com";
 
 /** The site's public address - change it here when the real domain is ready. */
 export const SITE_URL = "https://www.prisgraensen.dk";
