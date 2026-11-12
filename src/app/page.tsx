@@ -200,52 +200,53 @@ function PackRow({ pack, shops, page }: { pack: Pack; shops: Map<string, Shop>; 
   const [best, ...rest] = pack.offers;
   const ties = rest.filter((o) => o.price === best.price).length;
   return (
-    <li className="flex gap-3 py-3">
-      <ProductPhoto url={pack.imageUrl} />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-start justify-between gap-3">
-          <p className="min-w-0 text-sm font-medium">
+    <li className="py-3">
+      {/* Photo left, text and button right; the button sits under the price so the photo can be large. */}
+      <div className="flex gap-3">
+        <ProductPhoto url={pack.imageUrl} />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium">
             {pack.name}
             {pack.packLabel && <span className="font-normal text-zinc-500"> · {pack.packLabel}</span>}
           </p>
+          <p className="mt-1 text-sm">
+            <strong className="text-base tabular-nums">{kr(best.price)} kr.</strong> hos {shopName(shops, best.shopId)}
+            {ties > 0 && <span className="text-zinc-500"> (+{ties} til samme pris)</span>}
+          </p>
+          <OfferDetails offer={best} pack={pack} page={page} />
           <AddToBasket
             label="Sæt på listen"
             variant="secondary"
-            className="shrink-0"
+            className="mt-2"
             item={{ key: `p-${pack.productId}`, kind: "product", productId: pack.productId, label: pack.name, quantity: 1 }}
           />
         </div>
-        <p className="mt-1 text-sm">
-          <strong className="text-base tabular-nums">{kr(best.price)} kr.</strong> hos {shopName(shops, best.shopId)}
-          {ties > 0 && <span className="text-zinc-500"> (+{ties} til samme pris)</span>}
-        </p>
-        <OfferDetails offer={best} pack={pack} page={page} />
-        {rest.length > 0 && (
-          <details className="group mt-1">
-            <summary className="-mx-1 flex min-h-10 cursor-pointer list-none items-center gap-1.5 px-1 text-sm text-zinc-700 [&::-webkit-details-marker]:hidden dark:text-zinc-300">
-              <span aria-hidden className="inline-block text-xs transition-transform group-open:rotate-90">
-                ▶
-              </span>
-              Priser i alle {pack.offers.length} butikker
-            </summary>
-            <ul className="flex flex-col gap-1.5 pb-1">
-              {pack.offers.map((o) => (
-                <li key={`${o.shopId}-${o.url}`} className="text-sm">
-                  <div className="flex items-baseline justify-between gap-3">
-                    <a href={o.url} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate underline-offset-2 hover:underline">
-                      {shopName(shops, o.shopId)}
-                    </a>
-                    <strong className={`shrink-0 tabular-nums ${o.price === best.price ? "text-emerald-700 dark:text-emerald-400" : ""}`}>
-                      {kr(o.price)} kr.
-                    </strong>
-                  </div>
-                  <OfferDetails offer={o} pack={pack} page={page} />
-                </li>
-              ))}
-            </ul>
-          </details>
-        )}
       </div>
+      {rest.length > 0 && (
+        <details className="group mt-1">
+          <summary className="-mx-1 flex min-h-10 cursor-pointer list-none items-center gap-1.5 px-1 text-sm text-zinc-700 [&::-webkit-details-marker]:hidden dark:text-zinc-300">
+            <span aria-hidden className="inline-block text-xs transition-transform group-open:rotate-90">
+              ▶
+            </span>
+            Priser i alle {pack.offers.length} butikker
+          </summary>
+          <ul className="flex flex-col gap-1.5 pb-1">
+            {pack.offers.map((o) => (
+              <li key={`${o.shopId}-${o.url}`} className="text-sm">
+                <div className="flex items-baseline justify-between gap-3">
+                  <a href={o.url} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate underline-offset-2 hover:underline">
+                    {shopName(shops, o.shopId)}
+                  </a>
+                  <strong className={`shrink-0 tabular-nums ${o.price === best.price ? "text-emerald-700 dark:text-emerald-400" : ""}`}>
+                    {kr(o.price)} kr.
+                  </strong>
+                </div>
+                <OfferDetails offer={o} pack={pack} page={page} />
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
     </li>
   );
 }
@@ -276,13 +277,13 @@ function OfferDetails({ offer: o, pack, page }: { offer: Offer; pack: Pack; page
 function ProductPhoto({ url }: { url: string | null }) {
   return (
     <div
-      className={`flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-700 ${
+      className={`flex h-24 w-24 shrink-0 sm:h-28 sm:w-28 items-center justify-center overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-700 ${
         url ? "bg-white" : "bg-zinc-100 dark:bg-zinc-800"
       }`}
     >
       {url && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={url} alt="" width={56} height={56} loading="lazy" decoding="async" className="h-full w-full object-contain p-0.5" />
+        <img src={url} alt="" width={112} height={112} loading="lazy" decoding="async" className="h-full w-full object-contain p-1" />
       )}
     </div>
   );
