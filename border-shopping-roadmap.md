@@ -803,3 +803,9 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
 - **"Kurv" -> "Indkøbsliste" (2026-11-12):** "kurv" sounded like a webshop basket you check out from, but the site
   sells nothing. The page is now "Din indkøbsliste" at `/liste` (`/kurv` redirects permanently), the header button
   says "Indkøbsliste" and the add buttons "Sæt på listen" / "Billigste på listen". Code keeps the word "basket".
+- **Search: photos and folded shop prices (2026-11-12, user request):** each pack shows the shop's product photo
+  (`shop_products.image_url`, the og:image the scrapers already save; first listing with one wins) and only the
+  cheapest shop's price ("+1 til samme pris" for ties); "Priser i alle N butikker" opens the full list. Photos are
+  plain `<img>` links to the shops' own sites (lazy-loaded, not copied or proxied through Vercel). Coverage on
+  2026-11-12: Poetzsch 3,940/4,000, BorderShop ~3,700 per store, Scandinavian Park 5,005/7,212; Calle and
+  Fleggaard (newsletters) have none and show an empty tile.

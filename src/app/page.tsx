@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { after, connection } from "next/server";
 import { Suspense } from "react";
 import { getShops, searchFamilies } from "@/catalog/data";
-import type { FamilyResult, Pack, Shop } from "@/catalog/types";
+import type { FamilyResult, Offer, Pack, Shop } from "@/catalog/types";
 import { AddToBasket } from "@/components/add-to-basket";
 import { kr, PER_UNIT_LABEL } from "@/lib/format";
 import { CouponBadge, COUPON_NOTE, MultiBuyBadge, OfferBadge } from "@/components/badges";
@@ -190,55 +190,100 @@ function FamilyCard({ family, shops, page }: { family: FamilyResult; shops: Map<
   );
 }
 
-/** One pack with every shop's price, cheapest first. page: the search to return to after reporting a price. */
+/**
+ * One pack: photo, the cheapest shop's price, and every shop's price behind a tap,
+ * so a long list of shops doesn't bury the answer. page: the search to return to
+ * after reporting a price.
+ */
 function PackRow({ pack, shops, page }: { pack: Pack; shops: Map<string, Shop>; page: string }) {
+  // Offers are sorted by price, so the first is the cheapest (others may tie with it).
+  const [best, ...rest] = pack.offers;
+  const ties = rest.filter((o) => o.price === best.price).length;
   return (
-    <li className="py-3">
-      <div className="flex items-start justify-between gap-3">
-        <p className="min-w-0 pt-1.5 text-sm font-medium">
-          {pack.name}
-          {pack.packLabel && <span className="font-normal text-zinc-500"> · {pack.packLabel}</span>}
+    <li className="flex gap-3 py-3">
+      <ProductPhoto url={pack.imageUrl} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-3">
+          <p className="min-w-0 text-sm font-medium">
+            {pack.name}
+            {pack.packLabel && <span className="font-normal text-zinc-500"> · {pack.packLabel}</span>}
+          </p>
+          <AddToBasket
+            label="Sæt på listen"
+            variant="secondary"
+            className="shrink-0"
+            item={{ key: `p-${pack.productId}`, kind: "product", productId: pack.productId, label: pack.name, quantity: 1 }}
+          />
+        </div>
+        <p className="mt-1 text-sm">
+          <strong className="text-base tabular-nums">{kr(best.price)} kr.</strong> hos {shopName(shops, best.shopId)}
+          {ties > 0 && <span className="text-zinc-500"> (+{ties} til samme pris)</span>}
         </p>
-        <AddToBasket
-          variant="secondary"
-          className="shrink-0"
-          item={{ key: `p-${pack.productId}`, kind: "product", productId: pack.productId, label: pack.name, quantity: 1 }}
-        />
+        <OfferDetails offer={best} pack={pack} page={page} />
+        {rest.length > 0 && (
+          <details className="group mt-1">
+            <summary className="-mx-1 flex min-h-10 cursor-pointer list-none items-center gap-1.5 px-1 text-sm text-zinc-700 [&::-webkit-details-marker]:hidden dark:text-zinc-300">
+              <span aria-hidden className="inline-block text-xs transition-transform group-open:rotate-90">
+                ▶
+              </span>
+              Priser i alle {pack.offers.length} butikker
+            </summary>
+            <ul className="flex flex-col gap-1.5 pb-1">
+              {pack.offers.map((o) => (
+                <li key={`${o.shopId}-${o.url}`} className="text-sm">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <a href={o.url} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate underline-offset-2 hover:underline">
+                      {shopName(shops, o.shopId)}
+                    </a>
+                    <strong className={`shrink-0 tabular-nums ${o.price === best.price ? "text-emerald-700 dark:text-emerald-400" : ""}`}>
+                      {kr(o.price)} kr.
+                    </strong>
+                  </div>
+                  <OfferDetails offer={o} pack={pack} page={page} />
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
       </div>
-      <ul className="mt-1.5 flex flex-col gap-1.5">
-        {pack.offers.map((o) => {
-          // Offers are sorted by price; highlight the cheapest (ties too), unless all cost the same.
-          const low = pack.offers[0].price;
-          const cheapest = o.price === low && pack.offers.some((x) => x.price !== low);
-          return (
-            <li key={`${o.shopId}-${o.url}`} className="text-sm">
-              <div className="flex items-baseline justify-between gap-3">
-                <a
-                  href={o.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="min-w-0 truncate underline-offset-2 hover:underline"
-                >
-                  {shopName(shops, o.shopId)}
-                </a>
-                <strong className={`shrink-0 tabular-nums ${cheapest ? "text-emerald-700 dark:text-emerald-400" : ""}`}>{kr(o.price)} kr.</strong>
-              </div>
-              <div className="text-xs text-zinc-500">
-                {o.pricePerUnit !== null && pack.contentUnit && (
-                  <span>
-                    {kr(o.pricePerUnit)} kr. {PER_UNIT_LABEL[pack.contentUnit]}
-                  </span>
-                )}
-                {o.onOffer && <OfferBadge endsAt={o.offerEndsAt} />}
-                {o.multiBuy && <MultiBuyBadge quantity={o.multiBuy.quantity} price={o.multiBuy.price} />}
-                {o.coupon && <CouponBadge />}
-                {o.savingVsDkPercent !== null && <span className="ml-1">(butikken: spar {o.savingVsDkPercent}% ift. DK)</span>}
-                <ReportLink shop={o.shopId} product={pack.name} price={o.price} page={page} />
-              </div>
-            </li>
-          );
-        })}
-      </ul>
     </li>
+  );
+}
+
+/** Per-liter price, badges and the report link under a price. */
+function OfferDetails({ offer: o, pack, page }: { offer: Offer; pack: Pack; page: string }) {
+  return (
+    <div className="text-xs text-zinc-500">
+      {o.pricePerUnit !== null && pack.contentUnit && (
+        <span>
+          {kr(o.pricePerUnit)} kr. {PER_UNIT_LABEL[pack.contentUnit]}
+        </span>
+      )}
+      {o.onOffer && <OfferBadge endsAt={o.offerEndsAt} />}
+      {o.multiBuy && <MultiBuyBadge quantity={o.multiBuy.quantity} price={o.multiBuy.price} />}
+      {o.coupon && <CouponBadge />}
+      {o.savingVsDkPercent !== null && <span className="ml-1">(butikken: spar {o.savingVsDkPercent}% ift. DK)</span>}
+      <ReportLink shop={o.shopId} product={pack.name} price={o.price} page={page} />
+    </div>
+  );
+}
+
+/**
+ * The shop's own product photo, linked straight from its site (only the address is
+ * stored). A plain <img>: routing shop photos through Next's image optimizer would
+ * copy them onto our servers. Newsletter-only products get an empty tile.
+ */
+function ProductPhoto({ url }: { url: string | null }) {
+  return (
+    <div
+      className={`flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-700 ${
+        url ? "bg-white" : "bg-zinc-100 dark:bg-zinc-800"
+      }`}
+    >
+      {url && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={url} alt="" width={56} height={56} loading="lazy" decoding="async" className="h-full w-full object-contain p-0.5" />
+      )}
+    </div>
   );
 }

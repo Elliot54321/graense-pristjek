@@ -25,12 +25,16 @@ interface ProductRow {
   content_unit: Unit | null;
 }
 
+interface ListingShape {
+  pack_count: number | null;
+  unit_size_amount: number | null;
+  unit_size_unit: Unit | null;
+  image_url: string | null;
+}
+
 interface ListingRow {
   product_id: number;
-  shop_products:
-    | { pack_count: number | null; unit_size_amount: number | null; unit_size_unit: Unit | null }
-    | { pack_count: number | null; unit_size_amount: number | null; unit_size_unit: Unit | null }[]
-    | null;
+  shop_products: ListingShape | ListingShape[] | null;
 }
 
 interface PriceRow {
@@ -137,14 +141,17 @@ async function loadPacks(productIds: number[], familyIds: number[]): Promise<Pac
   if (priceError) throw priceError;
 
   // Pack shape ("24 x 0,33 l") from the shops' listings; the most common one wins.
+  // The photo is the first one a scraped shop has (newsletter listings have none).
   const { data: listings, error: listingError } = await db
     .from("product_matches")
-    .select("product_id, shop_products(pack_count, unit_size_amount, unit_size_unit)")
+    .select("product_id, shop_products(pack_count, unit_size_amount, unit_size_unit, image_url)")
     .in("product_id", products.map((p) => p.id));
   if (listingError) throw listingError;
   const shapes = new Map<number, Map<string, number>>();
+  const images = new Map<number, string>();
   for (const l of listings as unknown as ListingRow[]) {
     const sp = Array.isArray(l.shop_products) ? l.shop_products[0] : l.shop_products;
+    if (sp?.image_url && !images.has(l.product_id)) images.set(l.product_id, sp.image_url);
     if (!sp?.unit_size_amount || !sp.unit_size_unit) continue;
     const key = `${sp.pack_count ?? 1}|${Number(sp.unit_size_amount)}|${sp.unit_size_unit}`;
     const counts = shapes.get(l.product_id) ?? new Map<string, number>();
@@ -194,6 +201,7 @@ async function loadPacks(productIds: number[], familyIds: number[]): Promise<Pac
         const fits = shape && content && shape.unit === p.content_unit && Math.abs(shape.count * shape.size - content) / content < 0.02;
         return fits ? packLabel(shape.count, shape.size, shape.unit, content) : packLabel(null, null, p.content_unit, content);
       })(),
+      imageUrl: images.get(p.id) ?? null,
       offers: (offersByProduct.get(p.id) ?? []).sort((a, b) => a.price - b.price),
     }))
     .filter((p) => p.offers.length > 0); // products no shop currently sells are left out

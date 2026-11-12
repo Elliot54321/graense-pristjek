@@ -38,6 +38,8 @@ export interface Pack {
   contentUnit: Unit | null;
   /** "24 x 0,33 l" - how the shops sell it; contentAmount (7,92 l) is for comparing per liter. */
   packLabel: string | null;
+  /** Product photo on a shop's own site (og:image); null for newsletter-only products. */
+  imageUrl: string | null;
   offers: Offer[];
 }
 
