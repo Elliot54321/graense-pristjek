@@ -7,7 +7,7 @@
 export const CONTACT_EMAIL: string | null = null;
 
 /** The site's public address - change it here when the real domain is ready. */
-export const SITE_URL = "https://graense-pristjek.vercel.app";
+export const SITE_URL = "https://www.prisgraensen.dk";
 
 export const SITE_NAME = "Grænse Pris";
 

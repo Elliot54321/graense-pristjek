@@ -93,7 +93,7 @@ created: 2026-10-16
 - [ ] Show the interpretation and let the user correct it before calculating (shelved, see above)
 - [x] Basket comparison: total per shop, unmatched items flagged; compare **families by price per liter/kg** and show both "cheapest per liter" and "cheapest for the amount you want" (`/kurv`; whole packs only, mixing pack sizes not tried yet)
 - [x] Simple mobile-first UI
-- [ ] Deploy to a real domain (live on Vercel at https://graense-pristjek.vercel.app since 2026-10-24, auto-deploys on every push; own domain still to do)
+- [x] Deploy to a real domain (https://www.prisgraensen.dk since 2026-11-12; was https://graense-pristjek.vercel.app from 2026-10-24. prisgrænsen.dk - xn--prisgrnsen-i6a.dk - not active at the registry yet)
 
 **Done when:** You can use it on a real shopping trip and trust the answer.
 
@@ -781,3 +781,4 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   Checked against every name with "+" on the site (BorderShop's "+ 40 % + 0,7 liter", "Garlic+Herb",
   "Magnesium 500+B12", "25+ 62000 g" unchanged). The two rows were corrected directly (content and a new
   price row); the nightly scrape would have done the same, since a changed unit price writes a new row.
+- **Own domain (2026-11-12):** prisgraensen.dk registered at Simply.com ("Kun domæner": 64,95 kr. setup + 9 kr. first year, then 119 kr./year; no email included). DNS at Simply points to Vercel (A record for the bare domain, CNAME for www); Vercel serves www.prisgraensen.dk and redirects the bare domain there (308), so `SITE_URL` is the www address. The æ version prisgrænsen.dk (punycode xn--prisgrnsen-i6a.dk) is meant to redirect to it, but the .dk registry had no entry for it yet on 2026-11-12. The old graense-pristjek.vercel.app address keeps working.
