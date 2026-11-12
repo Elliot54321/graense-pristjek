@@ -14,9 +14,19 @@ export interface PricedOffer {
  */
 export function singlePrice(o: PricedOffer): number {
   if (!o.multi_buy || Math.abs(o.price - o.multi_buy.total_price) > 0.005) return o.price;
+  return printedSingle(o) ?? Math.round((o.multi_buy.total_price / o.multi_buy.quantity) * 100) / 100;
+}
+
+/**
+ * The small-print single price of a multi-buy offer ("Pr. fl. 59,99"), or null. When it's
+ * missing, singlePrice falls back to the deal price per item - too cheap if the shop does
+ * print a higher single price that the extraction missed (Fleggaard's Omo, Nov 2026), so
+ * the import warns about those offers.
+ */
+export function printedSingle(o: PricedOffer): number | null {
   const printed = (o.limit_note ?? "").match(/Pr\.\s*(?:stk|ks|fl|ps|pk|ds|gl|rl|bk|bakke|pose)\.?\s*(\d+(?:[.,]\d+)?)\s*(?:,-)?(?![^.]*merkøb)/i);
   const single = printed ? Number(printed[1].replace(".", "").replace(",", ".")) : NaN;
-  return single > 0 && single < o.price ? single : Math.round((o.multi_buy.total_price / o.multi_buy.quantity) * 100) / 100;
+  return single > 0 && single < o.price ? single : null;
 }
 
 export interface PackOffer extends PricedOffer {

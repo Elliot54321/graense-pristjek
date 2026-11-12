@@ -90,7 +90,8 @@ after 8 unattended nightly runs; Phase 2 (matching) is largely done.
   Always `--dry-run` first and read `data/llm-batches/last-links.txt` before saving.
 - `src/flyers/import.ts` – `npm run flyer:import -- <offers.json> --shop fleggaard --valid-to <date>
   [--section 26-38:<date>]`: newsletter offers -> shop products/prices (with `listed_until`,
-  multi-buy, "spar %"). Then run `npm run match:new`.
+  multi-buy, "spar %"). Then run `npm run match:new`. Check its "! p.." warnings: a deal without a printed
+  single price is stored at the deal price per item - add the printed "Pr. stk. X" to `limit_note` if missed.
 - `src/matching/llm-new.ts` – `npm run match:new [-- --dry-run]`: matches unmatched shop products
   (and products without family) against existing products with Sonnet 5.5; shared safety
   rules in `src/matching/safety.ts`. First copies reviewed newsletter decisions onto reworded offers

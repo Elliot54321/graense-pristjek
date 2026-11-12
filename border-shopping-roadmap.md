@@ -739,3 +739,13 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   noticed.) Fleggaard's bars rejoined their October products, which Calle's are linked to; the four
   "12 x 55 g." rows were retired (listed_until/last_seen_at backdated). Only offer with this pattern in the
   three issues. "Salted Peanut Caramel 55 g." is new and gets matched in the nightly run.
+
+### Missed single prices on multi-buy offers (2026-11-12)
+- The user saw Omo Vaskemiddel at different prices at Fleggaard (50) and Calle (59,99), same offer. Both
+  print "4 fl. 200,-" and "Pr. fl. 59,99."; Fleggaard's extraction missed the small print, so
+  `singlePrice` fell back to 200 / 4 = 50 (the deal price per bottle, not the single price).
+- 10 Fleggaard offers had this (pages 21, 55, 56: Omo, Vanish, Neutral, A+ Pure, Bamseline, Palmolive,
+  Libresse, Zendium, Glucosamin, Fazermint); Calle none. The printed single prices were read from the PDF
+  text and added to `limit_note` in the offers file (the reviewed input), then re-imported: 34 price rows.
+- `flyer:import` now warns about every multi-buy offer without a printed single price ("! p56 ..."), so the
+  next issue's gaps get checked before they reach the site (`printedSingle` in `src/flyers/prices.ts`).

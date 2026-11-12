@@ -20,7 +20,7 @@ import path from "node:path";
 import { readFileSync } from "node:fs";
 import { unitPrice } from "../scrapers/quantity";
 import { uploadPages } from "./pages";
-import { packPrice, singlePrice } from "./prices";
+import { packPrice, printedSingle, singlePrice } from "./prices";
 import { adminClient, finishRun, saveProducts, startRun, type RunSummary } from "../scrapers/save";
 import type { BaseUnit, ScrapedProduct } from "../scrapers/types";
 
@@ -112,6 +112,12 @@ export function offersToProducts(
     const until = sections.find((s) => page >= s.from && page <= s.to)?.validTo ?? validTo;
     for (const read of result.offers) {
       const o = singlesWithDeal(read);
+      if (o.multi_buy && Math.abs(o.price - o.multi_buy.total_price) < 0.005 && printedSingle(o) === null) {
+        console.warn(
+          `  ! p${page} "${o.products[0]}": deal ${o.multi_buy.quantity} for ${o.multi_buy.total_price} without a printed single price - ` +
+            `stored ${(o.multi_buy.total_price / o.multi_buy.quantity).toFixed(2)} per item. Check the page; add "Pr. stk. X" to limit_note if it's printed.`,
+        );
+      }
       const total = content(o);
       // One unit's price, for the whole pack (see prices.ts).
       const price = packPrice(o, singlePrice(o));
