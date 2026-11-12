@@ -108,7 +108,9 @@ after 8 unattended nightly runs; Phase 2 (matching) is largely done.
   source and date in the file – recheck yearly), `trips.ts` (shops grouped by crossing, store locations, rough
   distance from a postcode, car-type costs), `plan.ts` (shopping options: every shop plus the best
   split per trip, priced as basket + driving between stores; home driving and ferry are info only), `postcodes.json` (GeoNames, CC BY 4.0), `types.ts`
-- `src/app/page.tsx` – search; `src/app/liste/` – shopping list ("indkøbsliste"; "basket" in code) (client; `shopping-options.tsx` is the ranked
+- `src/app/page.tsx` – front page (hero with search, category row) and search; `src/app/kategori/[slug]/` – category
+  pages (`src/catalog/categories.ts` maps Danish slugs to `product_families.category`; result cards in
+  `src/components/family-list.tsx`); `src/app/liste/` – shopping list ("indkøbsliste"; "basket" in code) (client; `shopping-options.tsx` is the ranked
   list) + `src/app/api/compare/`
 - `src/components/basket.ts` – basket in localStorage (`useBasket`, `addToBasket`, ...)
 - `src/db/public.ts` – read-only Supabase client (publishable key) for website code

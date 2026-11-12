@@ -5,7 +5,7 @@ export const metadata: Metadata = { title: "Din indkøbsliste", robots: { index:
 
 export default function ShoppingListPage() {
   return (
-    <main>
+    <main className="mx-auto w-full max-w-3xl">
       <h1 className="text-2xl font-semibold tracking-tight">Din indkøbsliste</h1>
       <BasketView />
     </main>

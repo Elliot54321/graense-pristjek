@@ -9,13 +9,15 @@ import { cacheLife } from "next/cache";
 import { publicClient } from "@/db/public";
 import { dealPerPiece, effectivePrice, NEWSLETTER_SHOPS } from "./compare";
 import type { FamilyInfo } from "./import-limits";
-import { finalScore, preScore } from "./ranking";
+import { commonTier, finalScore, preScore } from "./ranking";
 import { packLabel } from "@/lib/format";
 import type { FamilyResult, Offer, Pack, Shop, Unit } from "./types";
 
 const MAX_FAMILIES = 30;
 /** Families fetched for a query before ranking (broad words like "øl" match hundreds). */
 const MAX_CANDIDATES = 400;
+/** Families whose prices are loaded for a category page before ranking. */
+const CATEGORY_SHORTLIST = 90;
 
 interface ProductRow {
   id: number;
@@ -233,7 +235,75 @@ export async function searchFamilies(rawQuery: string): Promise<FamilyResult[]> 
   if (!families.length) return [];
 
   const pre = new Map(families.map((f) => [f.id, preScore(f.name, f.search_words ?? [], q)]));
-  const shortlist = [...families].sort((a, b) => pre.get(b.id)! - pre.get(a.id)!).slice(0, MAX_FAMILIES * 2);
+  return rankFamilies(families, pre, MAX_FAMILIES * 2);
+}
+
+/**
+ * The best families in a category (the category pages): with no query, the
+ * hand-made list of common border items decides first, then shorter (more
+ * generic) names; prices are loaded for the shortlist and availability ranks it.
+ */
+export async function categoryFamilies(category: string): Promise<FamilyResult[]> {
+  "use cache";
+  cacheLife("hours");
+  const families: { id: number; name: string; category: string }[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await publicClient()
+      .from("product_families")
+      .select("id, name, category")
+      .eq("category", category)
+      .order("id")
+      .range(from, from + 999);
+    if (error) throw error;
+    families.push(...data);
+    if (data.length < 1000) break;
+  }
+  // Without a query, "what people buy" is guessed from the common-items list and
+  // from how many shops sell the family (widely sold = mainstream).
+  const shops = await familyShopCounts();
+  const pre = new Map(
+    families.map((f) => [f.id, 40 * commonTier(f.name) + 12 * (shops.get(f.id) ?? 0) - 2 * Math.min(f.name.split(" ").length, 8)]),
+  );
+  return rankFamilies(families, pre, CATEGORY_SHORTLIST);
+}
+
+/** Paged read of a whole table or view (PostgREST returns at most 1000 rows at a time). */
+async function readAll<T>(table: string, columns: string, orderBy: string): Promise<T[]> {
+  const rows: T[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await publicClient().from(table).select(columns).order(orderBy).range(from, from + 999);
+    if (error) throw error;
+    rows.push(...(data as T[]));
+    if (data.length < 1000) break;
+  }
+  return rows;
+}
+
+/** Number of shops currently selling each family (any pack). */
+async function familyShopCounts(): Promise<Map<number, number>> {
+  "use cache";
+  cacheLife("hours");
+  const [prices, products] = await Promise.all([
+    readAll<{ product_id: number; shop_id: string }>("matched_prices", "product_id, shop_id", "product_id"),
+    readAll<{ id: number; family_id: number | null }>("products", "id, family_id", "id"),
+  ]);
+  const familyOf = new Map(products.map((p) => [p.id, p.family_id]));
+  const shops = new Map<number, Set<string>>();
+  for (const p of prices) {
+    const family = familyOf.get(p.product_id);
+    if (family) shops.set(family, (shops.get(family) ?? new Set()).add(p.shop_id));
+  }
+  return new Map([...shops].map(([id, set]) => [id, set.size]));
+}
+
+/** Loads prices for the best `shortlist` families by `pre`, then ranks them with availability. */
+async function rankFamilies(
+  families: { id: number; name: string; category: string }[],
+  pre: Map<number, number>,
+  shortlistSize: number,
+): Promise<FamilyResult[]> {
+  const shortlist = [...families].sort((a, b) => pre.get(b.id)! - pre.get(a.id)!).slice(0, shortlistSize);
+  if (!shortlist.length) return [];
 
   const packs = await loadPacks([], shortlist.map((f) => f.id));
   const results = shortlist.map((f) => {

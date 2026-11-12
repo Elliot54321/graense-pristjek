@@ -34,15 +34,15 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="da" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col font-sans">
         <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/95 backdrop-blur dark:border-zinc-800 dark:bg-black/90">
-          <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-3 px-4 py-3">
+          <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3">
             <Link href="/" className="text-lg font-semibold tracking-tight">
               {SITE_NAME}
             </Link>
             <BasketLink />
           </div>
         </header>
-        <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 py-5">{children}</div>
-        <footer className="mx-auto w-full max-w-3xl px-4 py-6 text-xs text-zinc-500">
+        <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-5">{children}</div>
+        <footer className="mx-auto w-full max-w-6xl px-4 py-6 text-xs text-zinc-500">
           Priserne er hentet fra butikkernes hjemmesider hver nat og kan afvige fra priserne i butikken.
           <Suspense>
             <Freshness />

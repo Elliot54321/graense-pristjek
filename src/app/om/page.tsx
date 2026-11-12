@@ -14,7 +14,7 @@ const a = "underline underline-offset-2";
 
 export default function AboutPage() {
   return (
-    <main className="text-[15px] leading-relaxed">
+    <main className="mx-auto w-full max-w-3xl text-[15px] leading-relaxed">
       <h1 className="text-2xl font-semibold tracking-tight">Om Prisgrænsen</h1>
       <p className={p}>
         Prisgrænsen sammenligner priserne i grænsebutikkerne, så du kan se, hvor din indkøbsliste bliver billigst – før du

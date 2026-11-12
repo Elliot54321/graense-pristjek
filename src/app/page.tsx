@@ -1,19 +1,13 @@
 import type { Metadata } from "next";
 import { after, connection } from "next/server";
 import { Suspense } from "react";
-import { dealPerPiece, effectivePrice } from "@/catalog/compare";
 import { getShops, searchFamilies } from "@/catalog/data";
-import type { FamilyResult, Offer, Pack, Shop } from "@/catalog/types";
-import { AddToBasket } from "@/components/add-to-basket";
-import { kr, PER_UNIT_LABEL } from "@/lib/format";
-import { CouponBadge, COUPON_NOTE, MultiBuyBadge, OfferBadge } from "@/components/badges";
+import { CategoryRow } from "@/components/category-row";
+import { FamilyList } from "@/components/family-list";
+import { SearchBox } from "@/components/search-box";
 import { logSearch } from "@/db/log";
-import { ReportLink } from "@/components/report-link";
 
 const EXAMPLES = ["cola", "øl", "haribo", "gin", "chips"];
-
-/** Product families shown before "Vis flere varer". */
-const SHOWN = 6;
 
 /**
  * "cola – priser ved grænsen" for a search, so a shared link says what it shows.
@@ -33,34 +27,37 @@ export async function generateMetadata(props: PageProps<"/">): Promise<Metadata>
 export default function Home(props: PageProps<"/">) {
   return (
     <main>
-      <h1 className="text-2xl font-semibold tracking-tight">Hvad skal du handle?</h1>
-      <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-        Søg efter en vare, sæt den på din indkøbsliste, og se hvilken grænsebutik der er billigst.
-      </p>
-      {/* The query comes from the URL, so the form and results render per request. */}
-      <Suspense fallback={<SearchForm query="" />}>
+      {/* The query comes from the URL, so the hero and results render per request. */}
+      <Suspense fallback={<Hero query="" />}>
         <Search searchParams={props.searchParams} />
       </Suspense>
     </main>
   );
 }
 
-function SearchForm({ query }: { query: string }) {
+/**
+ * The big search box. Without a query it's the front page's welcome; with one it
+ * shrinks to just the search field so the results start high on a phone.
+ */
+function Hero({ query }: { query: string }) {
+  if (query) {
+    return (
+      <div className="rounded-2xl bg-zinc-950 p-3 sm:p-4 dark:border dark:border-zinc-800 dark:bg-zinc-900">
+        <SearchBox query={query} />
+      </div>
+    );
+  }
   return (
-    <form action="/" className="mt-4 flex gap-2">
-      <input
-        name="q"
-        defaultValue={query}
-        placeholder="F.eks. cola, øl, haribo…"
-        aria-label="Søg efter en vare"
-        className="min-w-0 flex-1 rounded-md border border-zinc-300 bg-white px-3 py-2.5 text-base dark:border-zinc-700 dark:bg-zinc-900"
-        autoComplete="off"
-        enterKeyHint="search"
-      />
-      <button type="submit" className="rounded-md bg-zinc-900 px-4 py-2.5 font-medium text-white dark:bg-zinc-100 dark:text-zinc-900">
-        Søg
-      </button>
-    </form>
+    <section className="rounded-3xl bg-zinc-950 px-5 py-10 text-center text-white sm:px-10 sm:py-16 dark:border dark:border-zinc-800 dark:bg-zinc-900">
+      <h1 className="text-balance text-3xl font-bold tracking-tight sm:text-5xl">Find det billigste ved grænsen</h1>
+      <p className="mx-auto mt-3 max-w-2xl text-balance text-sm text-zinc-300 sm:mt-4 sm:text-lg">
+        Sammenlign priser hos Fleggaard, Calle, Poetzsch, Scandinavian Park og BorderShop – og se hvor hele din
+        indkøbsliste bliver billigst.
+      </p>
+      <div className="mx-auto mt-6 max-w-2xl sm:mt-8">
+        <SearchBox query="" />
+      </div>
+    </section>
   );
 }
 
@@ -69,13 +66,14 @@ async function Search({ searchParams }: { searchParams: PageProps<"/">["searchPa
   const query = (Array.isArray(raw) ? raw[0] : raw)?.trim() ?? "";
   return (
     <>
-      <SearchForm query={query} />
+      <Hero query={query} />
+      <CategoryRow />
       {query ? (
         <Suspense fallback={<p className="mt-6 text-zinc-500">Søger…</p>}>
           <Results query={query} />
         </Suspense>
       ) : (
-        <Examples title="Prøv f.eks." />
+        <Examples title="Populære søgninger" />
       )}
     </>
   );
@@ -119,186 +117,10 @@ async function Results({ query }: { query: string }) {
       </div>
     );
   }
-  const shopById = new Map(shops.map((s) => [s.id, s]));
-  const page = `/?q=${encodeURIComponent(query)}`;
-  const hasCoupon = families.some((f) => f.packs.some((p) => p.offers.some((o) => o.coupon)));
   return (
     <>
-      <ul className="mt-6 flex flex-col gap-4">
-        {families.slice(0, SHOWN).map((f) => (
-          <FamilyCard key={f.id} family={f} shops={shopById} page={page} />
-        ))}
-      </ul>
-      {/* Broad words ("cola") match many families; the best-ranked come first, the rest one tap away. */}
-      {families.length > SHOWN && (
-        <details className="group mt-4">
-          <summary className="flex min-h-11 cursor-pointer items-center justify-center rounded-lg border border-zinc-300 text-sm font-medium group-open:hidden dark:border-zinc-700">
-            Vis {families.length - SHOWN} flere varer
-          </summary>
-          <ul className="flex flex-col gap-4">
-            {families.slice(SHOWN).map((f) => (
-              <FamilyCard key={f.id} family={f} shops={shopById} page={page} />
-            ))}
-          </ul>
-        </details>
-      )}
-      {hasCoupon && <p className="mt-4 text-xs text-zinc-500">{COUPON_NOTE}</p>}
+      <h1 className="mt-6 text-xl font-semibold tracking-tight">Resultater for “{query}”</h1>
+      <FamilyList families={families} shops={shops} page={`/?q=${encodeURIComponent(query)}`} />
     </>
-  );
-}
-
-/** Short shop name for price rows ("BorderShop Puttgarden"); where the store is lives on /om and the basket. */
-const shopName = (shops: Map<string, Shop>, id: string) => shops.get(id)?.name ?? id;
-
-function FamilyCard({ family, shops, page }: { family: FamilyResult; shops: Map<string, Shop>; page: string }) {
-  const bestPack = family.best ? family.packs.find((p) => p.name === family.best!.productName) : undefined;
-  return (
-    <li className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="text-lg font-semibold leading-snug">{family.name}</h2>
-          {family.best && (
-            <p className="mt-0.5 text-sm text-zinc-700 dark:text-zinc-300">
-              Billigst <strong className="text-emerald-700 dark:text-emerald-400">{kr(family.best.pricePerUnit)} kr. {PER_UNIT_LABEL[family.best.unit]}</strong>{" "}
-              hos {shopName(shops, family.best.shopId)}
-              {family.best.deal && <span className="text-zinc-500"> ved {family.best.deal.quantity} stk.</span>}
-              {family.best.coupon && <CouponBadge />}
-            </p>
-          )}
-        </div>
-        {family.best && bestPack?.contentAmount && (
-          <AddToBasket
-            label="Billigste på listen"
-            className="shrink-0"
-            item={{
-              key: `f-${family.id}`,
-              kind: "family",
-              familyId: family.id,
-              label: family.name,
-              amount: bestPack.contentAmount,
-              step: bestPack.contentAmount,
-              unit: family.best.unit,
-              packLabel: bestPack.packLabel ?? undefined,
-            }}
-          />
-        )}
-      </div>
-      <ul className="mt-3 divide-y divide-zinc-200 border-t border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
-        {family.packs.map((p) => (
-          <PackRow key={p.productId} pack={p} shops={shops} page={page} />
-        ))}
-      </ul>
-    </li>
-  );
-}
-
-/**
- * One pack: photo, the cheapest shop's price, and every shop's price behind a tap,
- * so a long list of shops doesn't bury the answer. page: the search to return to
- * after reporting a price.
- */
-function PackRow({ pack, shops, page }: { pack: Pack; shops: Map<string, Shop>; page: string }) {
-  // Offers are sorted by the price a bulk shopper pays (multi-buy rate when there is one),
-  // so the first is the cheapest; others may tie with it.
-  const [best, ...rest] = pack.offers;
-  const low = effectivePrice(best);
-  const ties = rest.filter((o) => Math.abs(effectivePrice(o) - low) < 0.005).length;
-  return (
-    <li className="py-3">
-      {/* Photo left, text and button right; the button sits under the price so the photo can be large. */}
-      <div className="flex gap-3">
-        <ProductPhoto url={pack.imageUrl} />
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium">
-            {pack.name}
-            {pack.packLabel && <span className="font-normal text-zinc-500"> · {pack.packLabel}</span>}
-          </p>
-          <p className="mt-1 text-sm">
-            <strong className="text-base tabular-nums">
-              {kr(low)} kr.{low < best.price && " stk."}
-            </strong>{" "}
-            hos {shopName(shops, best.shopId)}
-            {ties > 0 && <span className="text-zinc-500"> (+{ties} til samme pris)</span>}
-          </p>
-          <OfferDetails offer={best} pack={pack} page={page} />
-          <AddToBasket
-            label="Sæt på listen"
-            variant="secondary"
-            className="mt-2"
-            item={{ key: `p-${pack.productId}`, kind: "product", productId: pack.productId, label: pack.name, quantity: 1 }}
-          />
-        </div>
-      </div>
-      {rest.length > 0 && (
-        <details className="group mt-1">
-          <summary className="-mx-1 flex min-h-10 cursor-pointer list-none items-center gap-1.5 px-1 text-sm text-zinc-700 [&::-webkit-details-marker]:hidden dark:text-zinc-300">
-            <span aria-hidden className="inline-block text-xs transition-transform group-open:rotate-90">
-              ▶
-            </span>
-            Priser i alle {pack.offers.length} butikker
-          </summary>
-          <ul className="flex flex-col gap-1.5 pb-1">
-            {pack.offers.map((o) => (
-              <li key={`${o.shopId}-${o.url}`} className="text-sm">
-                <div className="flex items-baseline justify-between gap-3">
-                  <a href={o.url} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate underline-offset-2 hover:underline">
-                    {shopName(shops, o.shopId)}
-                  </a>
-                  <strong
-                    className={`shrink-0 tabular-nums ${Math.abs(effectivePrice(o) - low) < 0.005 ? "text-emerald-700 dark:text-emerald-400" : ""}`}
-                  >
-                    {kr(effectivePrice(o))} kr.
-                  </strong>
-                </div>
-                <OfferDetails offer={o} pack={pack} page={page} />
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
-    </li>
-  );
-}
-
-/**
- * Per-liter price, badges and the report link under a price. With a multi-buy deal
- * the price above is the deal rate, so the single price is shown here ("71,99 kr. for 1").
- */
-function OfferDetails({ offer: o, pack, page }: { offer: Offer; pack: Pack; page: string }) {
-  const deal = dealPerPiece(o) !== null ? o.multiBuy : null;
-  return (
-    <div className="text-xs text-zinc-500">
-      {o.pricePerUnit !== null && pack.contentUnit && (
-        <span>
-          {kr((o.pricePerUnit * effectivePrice(o)) / o.price)} kr. {PER_UNIT_LABEL[pack.contentUnit]}
-        </span>
-      )}
-      {deal && <MultiBuyBadge quantity={deal.quantity} price={deal.price} />}
-      {deal && <span className="ml-1 whitespace-nowrap">{kr(o.price)} kr. for 1</span>}
-      {o.onOffer && <OfferBadge endsAt={o.offerEndsAt} />}
-      {o.coupon && <CouponBadge />}
-      {o.savingVsDkPercent !== null && <span className="ml-1">(butikken: spar {o.savingVsDkPercent}% ift. DK)</span>}
-      <ReportLink shop={o.shopId} product={pack.name} price={o.price} page={page} />
-    </div>
-  );
-}
-
-/**
- * The shop's own product photo, linked straight from its site (only the address is
- * stored). A plain <img>: routing shop photos through Next's image optimizer would
- * copy them onto our servers. Newsletter-only products get an empty tile.
- */
-function ProductPhoto({ url }: { url: string | null }) {
-  return (
-    <div
-      className={`flex h-24 w-24 shrink-0 sm:h-28 sm:w-28 items-center justify-center overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-700 ${
-        url ? "bg-white" : "bg-zinc-100 dark:bg-zinc-800"
-      }`}
-    >
-      {url && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={url} alt="" width={112} height={112} loading="lazy" decoding="async" className="h-full w-full object-contain p-1" />
-      )}
-    </div>
   );
 }

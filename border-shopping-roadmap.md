@@ -825,3 +825,12 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   item (`singlePrice`), applies to every shop and re-ranks. Totals with an assumed rate say "ca.", and each such line
   says what the exact quantity costs. Replaces the "Køb 1 mere" tips from earlier the same day. Considered and
   rejected: a "Tag 3 for X" button that sets the quantity - it ties the list's quantity to one shop's deal.
+- **Wider desktop layout, hero and categories (2026-11-12, user request, inspired by price-comparison front pages):**
+  the site is 1152 px wide (was 768); search and category results use two columns on desktop, while /om, /fejl and
+  /liste stay 768 px for readability. The front page opens with a large dark box (headline, shop names, pill-shaped
+  search field); on a results page it shrinks to just the search field. Under it, icon tiles for the seven family
+  categories link to `/kategori/<slug>` (ol, sodavand, vin, spiritus, slik, dagligvarer, husholdning; in the sitemap).
+  Category pages rank families by the common-items list plus how many shops sell them (`familyShopCounts()`), then by
+  availability like search. Weak spot: groceries and household have no common-items entries, so e.g. Husholdning
+  opens with Lip Smacker (sold in several shops) - improve with search/click data in Phase 5. Icons: `lucide-react`.
+  Danish 404 page added.
