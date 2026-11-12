@@ -20,7 +20,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  // Pages set their own title ("Din kurv"); the template adds the site name.
+  // Pages set their own title ("Din indkøbsliste"); the template adds the site name.
   title: { default: `${SITE_NAME} – find den billigste grænsebutik`, template: `%s – ${SITE_NAME}` },
   description: SITE_DESCRIPTION,
   applicationName: SITE_NAME,

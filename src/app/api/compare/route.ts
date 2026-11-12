@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "For mange forespørgsler - prøv igen om lidt." }, { status: 429 });
   }
   const parsed = Body.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return Response.json({ error: "Ugyldig kurv" }, { status: 400 });
+  if (!parsed.success) return Response.json({ error: "Ugyldig indkøbsliste" }, { status: 400 });
 
   const { items } = parsed.data;
   if (!items.length) return Response.json({ results: [], alcohol: {} });

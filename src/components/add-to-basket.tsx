@@ -4,11 +4,11 @@ import { useState } from "react";
 import type { BasketItem } from "@/catalog/types";
 import { addToBasket } from "./basket";
 
-/** "Læg i kurv" button; briefly confirms so the user knows it worked. */
+/** "Sæt på listen" button (adds to the shopping list, kept as "basket" in code); briefly confirms so the user knows it worked. */
 /** variant "secondary": outlined, for the many per-pack buttons so the family's main button stands out. */
 export function AddToBasket({
   item,
-  label = "Læg i kurv",
+  label = "Sæt på listen",
   variant = "primary",
   className = "",
 }: {
@@ -34,7 +34,7 @@ export function AddToBasket({
             : "border border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-transparent dark:text-zinc-100 dark:hover:bg-zinc-800"
       } ${className}`}
     >
-      {added ? "Lagt i kurv ✓" : label}
+      {added ? "På listen ✓" : label}
     </button>
   );
 }

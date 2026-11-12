@@ -800,3 +800,6 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
 - **Small fixes:** the Geist font now actually applies (a `body { font-family: Arial }` rule overrode it); empty
   search and empty basket have a next step; a failed basket pricing has a "Prøv igen" button; /fejl shows prices
   with a Danish decimal comma.
+- **"Kurv" -> "Indkøbsliste" (2026-11-12):** "kurv" sounded like a webshop basket you check out from, but the site
+  sells nothing. The page is now "Din indkøbsliste" at `/liste` (`/kurv` redirects permanently), the header button
+  says "Indkøbsliste" and the add buttons "Sæt på listen" / "Billigste på listen". Code keeps the word "basket".

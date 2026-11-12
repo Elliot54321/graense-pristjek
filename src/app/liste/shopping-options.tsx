@@ -302,7 +302,7 @@ function LineRow({ line: l, shop }: { line: LineResult; shop: Shop | undefined }
           </a>
           <span className="shrink-0 tabular-nums">
             {kr(l.cost!)}
-            {shop && <ReportLink shop={shop.id} product={l.buy.productName} price={l.buy.price} page="/kurv" />}
+            {shop && <ReportLink shop={shop.id} product={l.buy.productName} price={l.buy.price} page="/liste" />}
           </span>
         </>
       ) : l.estimate !== null ? (

@@ -18,7 +18,7 @@ export default function AboutPage() {
       <h1 className="text-2xl font-semibold tracking-tight">Om Prisgrænsen</h1>
       <p className={p}>
         Prisgrænsen sammenligner priserne i grænsebutikkerne, så du kan se, hvor din indkøbsliste bliver billigst – før du
-        kører. Søg efter en vare, læg den i kurven, og se hvilken butik eller tur der giver den laveste pris.
+        kører. Søg efter en vare, sæt den på indkøbslisten, og se hvilken butik eller tur der giver den laveste pris.
       </p>
       <p className={p}>
         Siden er uafhængig og er ikke tilknyttet nogen af butikkerne. Butikkernes navne tilhører butikkerne.
@@ -71,9 +71,9 @@ export default function AboutPage() {
 
       <h2 className={h2}>Dine data</h2>
       <p className={p}>
-        Der er intet login og ingen cookies til sporing eller reklame. Din kurv, dit postnummer og dine indstillinger
+        Der er intet login og ingen cookies til sporing eller reklame. Din indkøbsliste, dit postnummer og dine indstillinger
         gemmes kun i din egen browser og sendes ikke til os – postnummeret bruges kun i browseren til at regne afstanden ud.
-        Når du sammenligner priser, sendes kurvens varer til siden for at finde priserne, men de gemmes ikke.
+        Når du sammenligner priser, sendes listens varer til siden for at finde priserne, men de gemmes ikke.
       </p>
       <p className={p}>
         Vi gemmer, hvad der søges på, og hvor mange varer søgningen fandt – uden IP-adresse eller andet, der kan pege på

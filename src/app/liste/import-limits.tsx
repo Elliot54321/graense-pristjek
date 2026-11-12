@@ -79,7 +79,7 @@ export function ImportLimits({ liters }: { liters: Partial<Record<AlcoholType, n
 
       {over.length > 0 && (
         <p className="mt-3 rounded-lg border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-600 dark:bg-amber-950 dark:text-amber-200">
-          Kurven har mere end de vejledende mængder for {over.map((c) => SHORT[c.type]).join(" og ")}. Det
+          Listen har mere end de vejledende mængder for {over.map((c) => SHORT[c.type]).join(" og ")}. Det
           er tilladt, hvis det er til jeres eget forbrug, men tolden kan bede jer dokumentere det – ellers skal der betales
           dansk afgift.
         </p>

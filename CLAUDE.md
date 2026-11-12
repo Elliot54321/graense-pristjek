@@ -36,7 +36,7 @@ after 8 unattended nightly runs; Phase 2 (matching) is largely done.
 - Matching: EAN plus a full LLM run (families with search words; 117/120 common
   items linked across all shops on 2026-11-05). Review page at `/admin`; going through it is
   deferred to the final stages – don't push the user to review matches before then.
-- Phase 3 started: search (`/`) and basket comparison (`/kurv`) are live at
+- Phase 3 started: search (`/`) and shopping list comparison (`/liste`, was `/kurv`) are live at
   https://www.prisgraensen.dk (Vercel, deploys on every push to `main`; prisgraensen.dk redirects there). Also next: LLM matching for new products in the nightly run. Broad coverage is the goal – comparing
   prices is the whole point of the site.
 
@@ -108,7 +108,7 @@ after 8 unattended nightly runs; Phase 2 (matching) is largely done.
   source and date in the file – recheck yearly), `trips.ts` (shops grouped by crossing, store locations, rough
   distance from a postcode, car-type costs), `plan.ts` (shopping options: every shop plus the best
   split per trip, priced as basket + driving between stores; home driving and ferry are info only), `postcodes.json` (GeoNames, CC BY 4.0), `types.ts`
-- `src/app/page.tsx` – search; `src/app/kurv/` – basket (client; `shopping-options.tsx` is the ranked
+- `src/app/page.tsx` – search; `src/app/liste/` – shopping list ("indkøbsliste"; "basket" in code) (client; `shopping-options.tsx` is the ranked
   list) + `src/app/api/compare/`
 - `src/components/basket.ts` – basket in localStorage (`useBasket`, `addToBasket`, ...)
 - `src/db/public.ts` – read-only Supabase client (publishable key) for website code

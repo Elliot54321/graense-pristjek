@@ -13,4 +13,4 @@ export const SITE_URL = "https://www.prisgraensen.dk";
 export const SITE_NAME = "Prisgrænsen";
 
 export const SITE_DESCRIPTION =
-  "Sammenlign priser på sodavand, øl, vin, slik og spiritus i grænsebutikkerne - Fleggaard, Calle, Poetzsch, Scandinavian Park og BorderShop - og se hvor din kurv bliver billigst.";
+  "Sammenlign priser på sodavand, øl, vin, slik og spiritus i grænsebutikkerne - Fleggaard, Calle, Poetzsch, Scandinavian Park og BorderShop - og se hvor din indkøbsliste bliver billigst.";

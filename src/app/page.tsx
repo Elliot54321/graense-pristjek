@@ -34,7 +34,7 @@ export default function Home(props: PageProps<"/">) {
     <main>
       <h1 className="text-2xl font-semibold tracking-tight">Hvad skal du handle?</h1>
       <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-        Søg efter en vare, læg den i kurven, og se hvilken grænsebutik der er billigst.
+        Søg efter en vare, sæt den på din indkøbsliste, og se hvilken grænsebutik der er billigst.
       </p>
       {/* The query comes from the URL, so the form and results render per request. */}
       <Suspense fallback={<SearchForm query="" />}>
@@ -166,7 +166,7 @@ function FamilyCard({ family, shops, page }: { family: FamilyResult; shops: Map<
         </div>
         {family.best && bestPack?.contentAmount && (
           <AddToBasket
-            label="Billigste i kurv"
+            label="Billigste på listen"
             className="shrink-0"
             item={{
               key: `f-${family.id}`,
@@ -200,7 +200,6 @@ function PackRow({ pack, shops, page }: { pack: Pack; shops: Map<string, Shop>; 
           {pack.packLabel && <span className="font-normal text-zinc-500"> · {pack.packLabel}</span>}
         </p>
         <AddToBasket
-          label="Læg i kurv"
           variant="secondary"
           className="shrink-0"
           item={{ key: `p-${pack.productId}`, kind: "product", productId: pack.productId, label: pack.name, quantity: 1 }}

@@ -51,9 +51,9 @@ export function BasketView() {
   if (!items.length) {
     return (
       <div className="mt-4 rounded-lg border border-dashed border-zinc-300 p-6 text-center dark:border-zinc-700">
-        <p className="font-medium">Kurven er tom</p>
+        <p className="font-medium">Indkøbslisten er tom</p>
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-          Søg efter det, du vil købe, og læg det i kurven. Så viser vi, hvilken butik der er billigst for det hele.
+          Søg efter det, du vil købe, og sæt det på listen. Så viser vi, hvilken butik der er billigst for det hele.
         </p>
         <Link
           href="/"
@@ -77,7 +77,7 @@ export function BasketView() {
           + Tilføj flere varer
         </Link>
         <button type="button" onClick={clearBasket} className="flex min-h-11 items-center text-zinc-500 underline underline-offset-2">
-          Tøm kurven
+          Ryd listen
         </button>
       </div>
 
@@ -90,7 +90,7 @@ export function BasketView() {
         </p>
       )}
       {state.status === "busy" && (
-        <p className="mt-8 text-amber-700 dark:text-amber-400">Du har ændret kurven mange gange på kort tid – vent et øjeblik.</p>
+        <p className="mt-8 text-amber-700 dark:text-amber-400">Du har ændret listen mange gange på kort tid – vent et øjeblik.</p>
       )}
       {state.status === "loading" && !state.results.length && <p className="mt-8 text-zinc-500">Regner priser ud…</p>}
       {state.results.length > 0 && <ShoppingOptions results={state.results} loading={state.status === "loading"} />}
