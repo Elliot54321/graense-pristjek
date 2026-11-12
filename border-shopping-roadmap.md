@@ -773,3 +773,11 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   differs becomes that weight ("Hamburgerryg Pr. 1/2 kg", 0,5 kg), like Calle's. Correct readings keep
   their names (Calle, pick-and-mix per 100 g). Re-import retired the 4 old rows; Hamburgerryg and
   Oksemørbrad joined their Calle twins; Flæskesteg and Rib Eye get matched in the nightly run.
+
+### Bonus packs in product names (2026-11-12)
+- "Nutella 450g +50g gratis" (ScandiPark) was stored as 0,05 kg (669,80 kr./kg): `quantityFromName` takes
+  the last quantity in a name. It now adds a bonus quantity in the same unit ("450g +50g" = 500 g); and
+  ScandiPark's `packFromName` counts "5+1x0,5L" as 6 bottles (Warsteiner was stored as 0,5 l, now 3 l).
+  Checked against every name with "+" on the site (BorderShop's "+ 40 % + 0,7 liter", "Garlic+Herb",
+  "Magnesium 500+B12", "25+ 62000 g" unchanged). The two rows were corrected directly (content and a new
+  price row); the nightly scrape would have done the same, since a changed unit price writes a new row.

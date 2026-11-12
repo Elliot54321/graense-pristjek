@@ -37,8 +37,20 @@ export function parseQuantity(text: string | null | undefined): Quantity | null 
   return text ? quantities(text)[0] ?? null : null;
 }
 
-/** The last quantity in a product name, e.g. "Cava, 0,75L" or "Haribo ... 225g". */
+const BONUS = new RegExp(`(${PRICE_NUMBER})\\s*([a-zA-Z]+)\\s*\\+\\s*(${PRICE_NUMBER})\\s*([a-zA-Z]+)`);
+
+/**
+ * The last quantity in a product name, e.g. "Cava, 0,75L" or "Haribo ... 225g". A bonus on
+ * top counts too: "Nutella 450g +50g gratis" holds 500 g (not the last figure, 50 g).
+ */
 export function quantityFromName(name: string): Quantity | null {
+  const bonus = name.replace(/\u00a0/g, " ").match(BONUS);
+  if (bonus) {
+    const [main, extra] = [toQuantity(bonus[1], bonus[2]), toQuantity(bonus[3], bonus[4])];
+    if (main && extra && main.unit === extra.unit) {
+      return { amount: Math.round((main.amount + extra.amount) * 1e6) / 1e6, unit: main.unit };
+    }
+  }
   return quantities(name).at(-1) ?? null;
 }
 
