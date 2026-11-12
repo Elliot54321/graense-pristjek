@@ -148,6 +148,10 @@ after 8 unattended nightly runs; Phase 2 (matching) is largely done.
   it applies. The declaration is filled out in the shop, so the user needn't prepare anything.
 - **Multi-buy offers** ("Ta' 5 for 99,99") are common – store them separately from
   the single-unit price.
+  Comparisons **assume the deal rate** for every piece, even below the deal quantity (2 of a
+  "3 for 199,99" = 133,33), because border shoppers buy in bulk (decision 2026-11-12). The list's
+  recommendation offers "Brug stk.-pris" per item (`singlePrice`), which prices the exact quantity
+  in every shop and re-ranks. Deals that don't beat the single price are ignored.
 - **Coupon prices** (Calle's "KUPONTILBUD": needs the newsletter coupon, max 1 per household
   per day) are stored per price (`prices.coupon`) and must be disclosed wherever shown.
 - **Compare per unit** (per liter / per kg) – pack sizes differ between shops.

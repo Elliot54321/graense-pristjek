@@ -817,3 +817,11 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   was already right (`costFor` applies the deal to every full group). 91 products had such a deal on 2026-11-12,
   mostly Fleggaard's "3 for" crates. Seen while testing: Royal Pilsner exists as two products (24x0,33L dåse vs
   Royal Pilsner 24 x 0,33 l) - a matching duplicate for the later review.
+- **Decision: assume multi-buy rates (2026-11-12, user):** border shoppers buy in bulk, so every piece is priced at
+  the deal rate when a shop has a deal that beats its single price - 2 crates with "3 for 199,99" count as 133,33,
+  not 143,98. Search ranks and shows offers the same way ("66,66 kr. stk. hos Fleggaard", "3 for 199,99 · 71,99 kr.
+  for 1"; family "Billigst ... ved 3 stk."). Only on the list's recommendation can a shopper switch an item to
+  "Brug stk.-pris" (exact till price for their quantity: deal for full groups, rest single); it's stored on the list
+  item (`singlePrice`), applies to every shop and re-ranks. Totals with an assumed rate say "ca.", and each such line
+  says what the exact quantity costs. Replaces the "Køb 1 mere" tips from earlier the same day. Considered and
+  rejected: a "Tag 3 for X" button that sets the quantity - it ties the list's quantity to one shop's deal.

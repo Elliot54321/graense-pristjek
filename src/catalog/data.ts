@@ -7,7 +7,7 @@
  */
 import { cacheLife } from "next/cache";
 import { publicClient } from "@/db/public";
-import { NEWSLETTER_SHOPS } from "./compare";
+import { dealPerPiece, effectivePrice, NEWSLETTER_SHOPS } from "./compare";
 import type { FamilyInfo } from "./import-limits";
 import { finalScore, preScore } from "./ranking";
 import { packLabel } from "@/lib/format";
@@ -202,7 +202,8 @@ async function loadPacks(productIds: number[], familyIds: number[]): Promise<Pac
         return fits ? packLabel(shape.count, shape.size, shape.unit, content) : packLabel(null, null, p.content_unit, content);
       })(),
       imageUrl: images.get(p.id) ?? null,
-      offers: (offersByProduct.get(p.id) ?? []).sort((a, b) => a.price - b.price),
+      // Cheapest first at the price a bulk shopper pays (multi-buy rate when there is one).
+      offers: (offersByProduct.get(p.id) ?? []).sort((a, b) => effectivePrice(a) - effectivePrice(b) || a.price - b.price),
     }))
     .filter((p) => p.offers.length > 0); // products no shop currently sells are left out
 }
@@ -241,8 +242,11 @@ export async function searchFamilies(rawQuery: string): Promise<FamilyResult[]> 
     for (const pack of own) {
       for (const o of pack.offers) {
         if (o.pricePerUnit === null || !pack.contentUnit) continue;
-        if (!best || o.pricePerUnit < best.pricePerUnit) {
-          best = { pricePerUnit: o.pricePerUnit, unit: pack.contentUnit, shopId: o.shopId, productName: pack.name, coupon: o.coupon };
+        // At the multi-buy rate when there is one, like the basket (compare.ts).
+        const perUnit = (o.pricePerUnit * effectivePrice(o)) / o.price;
+        if (!best || perUnit < best.pricePerUnit) {
+          const deal = dealPerPiece(o) === null ? null : o.multiBuy;
+          best = { pricePerUnit: perUnit, unit: pack.contentUnit, shopId: o.shopId, productName: pack.name, coupon: o.coupon, deal };
         }
       }
     }

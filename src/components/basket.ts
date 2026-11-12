@@ -69,10 +69,11 @@ export function addToBasket(item: BasketItem) {
   );
 }
 
-export function updateBasketItem(key: string, change: { quantity?: number; amount?: number }) {
+export function updateBasketItem(key: string, change: { quantity?: number; amount?: number; singlePrice?: boolean }) {
   write(
     read().map((i) => {
       if (i.key !== key) return i;
+      if (change.singlePrice !== undefined) return { ...i, singlePrice: change.singlePrice || undefined };
       if (i.kind === "product" && change.quantity !== undefined) return { ...i, quantity: change.quantity };
       if (i.kind === "family" && change.amount !== undefined) return { ...i, amount: change.amount };
       return i;

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { after, connection } from "next/server";
 import { Suspense } from "react";
+import { dealPerPiece, effectivePrice } from "@/catalog/compare";
 import { getShops, searchFamilies } from "@/catalog/data";
 import type { FamilyResult, Offer, Pack, Shop } from "@/catalog/types";
 import { AddToBasket } from "@/components/add-to-basket";
@@ -160,6 +161,7 @@ function FamilyCard({ family, shops, page }: { family: FamilyResult; shops: Map<
             <p className="mt-0.5 text-sm text-zinc-700 dark:text-zinc-300">
               Billigst <strong className="text-emerald-700 dark:text-emerald-400">{kr(family.best.pricePerUnit)} kr. {PER_UNIT_LABEL[family.best.unit]}</strong>{" "}
               hos {shopName(shops, family.best.shopId)}
+              {family.best.deal && <span className="text-zinc-500"> ved {family.best.deal.quantity} stk.</span>}
               {family.best.coupon && <CouponBadge />}
             </p>
           )}
@@ -196,10 +198,11 @@ function FamilyCard({ family, shops, page }: { family: FamilyResult; shops: Map<
  * after reporting a price.
  */
 function PackRow({ pack, shops, page }: { pack: Pack; shops: Map<string, Shop>; page: string }) {
-  // Offers are sorted by price, so the first is the cheapest (others may tie with it).
+  // Offers are sorted by the price a bulk shopper pays (multi-buy rate when there is one),
+  // so the first is the cheapest; others may tie with it.
   const [best, ...rest] = pack.offers;
-  const ties = rest.filter((o) => o.price === best.price).length;
-  const deal = bestDeal(pack.offers, best.price);
+  const low = effectivePrice(best);
+  const ties = rest.filter((o) => Math.abs(effectivePrice(o) - low) < 0.005).length;
   return (
     <li className="py-3">
       {/* Photo left, text and button right; the button sits under the price so the photo can be large. */}
@@ -211,16 +214,13 @@ function PackRow({ pack, shops, page }: { pack: Pack; shops: Map<string, Shop>; 
             {pack.packLabel && <span className="font-normal text-zinc-500"> · {pack.packLabel}</span>}
           </p>
           <p className="mt-1 text-sm">
-            <strong className="text-base tabular-nums">{kr(best.price)} kr.</strong> hos {shopName(shops, best.shopId)}
+            <strong className="text-base tabular-nums">
+              {kr(low)} kr.{low < best.price && " stk."}
+            </strong>{" "}
+            hos {shopName(shops, best.shopId)}
             {ties > 0 && <span className="text-zinc-500"> (+{ties} til samme pris)</span>}
           </p>
           <OfferDetails offer={best} pack={pack} page={page} />
-          {deal && (
-            <p className="mt-1 text-sm text-sky-800 dark:text-sky-300">
-              Køb {deal.quantity} for {kr(deal.price)} kr.{deal.shopId !== best.shopId && <> hos {shopName(shops, deal.shopId)}</>} –{" "}
-              {kr(deal.perPiece)} kr. stk.
-            </p>
-          )}
           <AddToBasket
             label="Sæt på listen"
             variant="secondary"
@@ -244,8 +244,10 @@ function PackRow({ pack, shops, page }: { pack: Pack; shops: Map<string, Shop>; 
                   <a href={o.url} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate underline-offset-2 hover:underline">
                     {shopName(shops, o.shopId)}
                   </a>
-                  <strong className={`shrink-0 tabular-nums ${o.price === best.price ? "text-emerald-700 dark:text-emerald-400" : ""}`}>
-                    {kr(o.price)} kr.
+                  <strong
+                    className={`shrink-0 tabular-nums ${Math.abs(effectivePrice(o) - low) < 0.005 ? "text-emerald-700 dark:text-emerald-400" : ""}`}
+                  >
+                    {kr(effectivePrice(o))} kr.
                   </strong>
                 </div>
                 <OfferDetails offer={o} pack={pack} page={page} />
@@ -259,32 +261,21 @@ function PackRow({ pack, shops, page }: { pack: Pack; shops: Map<string, Shop>; 
 }
 
 /**
- * The multi-buy deal ("Køb 2 for 119,98") worth pointing out: the lowest price per
- * piece, and only if it beats the cheapest single price - otherwise it saves nothing.
+ * Per-liter price, badges and the report link under a price. With a multi-buy deal
+ * the price above is the deal rate, so the single price is shown here ("71,99 kr. for 1").
  */
-function bestDeal(offers: Offer[], cheapestSingle: number) {
-  let best: { shopId: string; quantity: number; price: number; perPiece: number } | null = null;
-  for (const o of offers) {
-    if (!o.multiBuy || o.multiBuy.quantity < 2) continue;
-    const perPiece = o.multiBuy.price / o.multiBuy.quantity;
-    if (perPiece < cheapestSingle - 0.005 && (!best || perPiece < best.perPiece)) {
-      best = { shopId: o.shopId, quantity: o.multiBuy.quantity, price: o.multiBuy.price, perPiece };
-    }
-  }
-  return best;
-}
-
-/** Per-liter price, badges and the report link under a price. */
 function OfferDetails({ offer: o, pack, page }: { offer: Offer; pack: Pack; page: string }) {
+  const deal = dealPerPiece(o) !== null ? o.multiBuy : null;
   return (
     <div className="text-xs text-zinc-500">
       {o.pricePerUnit !== null && pack.contentUnit && (
         <span>
-          {kr(o.pricePerUnit)} kr. {PER_UNIT_LABEL[pack.contentUnit]}
+          {kr((o.pricePerUnit * effectivePrice(o)) / o.price)} kr. {PER_UNIT_LABEL[pack.contentUnit]}
         </span>
       )}
+      {deal && <MultiBuyBadge quantity={deal.quantity} price={deal.price} />}
+      {deal && <span className="ml-1 whitespace-nowrap">{kr(o.price)} kr. for 1</span>}
       {o.onOffer && <OfferBadge endsAt={o.offerEndsAt} />}
-      {o.multiBuy && <MultiBuyBadge quantity={o.multiBuy.quantity} price={o.multiBuy.price} />}
       {o.coupon && <CouponBadge />}
       {o.savingVsDkPercent !== null && <span className="ml-1">(butikken: spar {o.savingVsDkPercent}% ift. DK)</span>}
       <ReportLink shop={o.shopId} product={pack.name} price={o.price} page={page} />

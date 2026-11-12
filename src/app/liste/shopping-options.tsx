@@ -5,6 +5,7 @@ import { MIN_SAVING_PER_EXTRA_STORE, shoppingOptions, type ShoppingOption } from
 import { CAR_TYPES, type CarType, oneWayKm, oneWayMinutes, regionOf } from "@/catalog/trips";
 import type { LineResult, Shop, ShopResult } from "@/catalog/types";
 import { CouponBadge, MultiBuyBadge, OfferBadge } from "@/components/badges";
+import { updateBasketItem } from "@/components/basket";
 import { ReportLink } from "@/components/report-link";
 import { duration, kr, krRound } from "@/lib/format";
 
@@ -137,7 +138,9 @@ export function ShoppingOptions({ results, loading }: { results: ShopResult[]; l
           {CAR_TYPES[carType].label.toLowerCase()}) og færgen, hvis turen kræver en – færgeprisen er Scandlines&apos; laveste
           pris for en dagsbillet, og den rigtige pris afhænger af afgangen. Turen hjemmefra er ikke med, da den afhænger af,
           hvor du bor – afstand og tid er estimater. Vi foreslår kun flere butikker, når det sparer mindst{" "}
-          {MIN_SAVING_PER_EXTRA_STORE} kr. pr. ekstra butik. Postnumre:{" "}
+          {MIN_SAVING_PER_EXTRA_STORE} kr. pr. ekstra butik. Har en butik mængderabat (fx 3 for 199,99), regner vi med
+          rabatprisen for hver vare, også hvis du har færre på listen – tryk &quot;Brug stk.-pris&quot; ved varen for at regne med
+          præcis din mængde. Postnumre:{" "}
           <a href="https://www.geonames.org" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
             GeoNames
           </a>{" "}
@@ -168,6 +171,8 @@ function OptionCard({
     o.stops.reduce((n, s) => n + s.lines.filter((l) => l.cost === null && l.estimate !== null).length, 0);
   const km = home && typeof home !== "string" ? oneWayKm(home.point, home.region, o.area) : null;
   const split = o.stops.length > 1;
+  // A line priced at an assumed multi-buy rate isn't what the till charges for the exact quantity.
+  const dealRate = o.stops.some((s) => s.lines.some((l) => l.buy && l.cost !== null && Math.abs(l.cost - l.buy.exactCost) > 0.005));
   const items = o.missing.length + o.stops.reduce((n, s) => n + s.lines.length, 0);
   const diff = compare ? Math.round(Math.abs(compare.total - o.total)) : 0;
   const compareName = compare?.stops.map((s) => s.name).join(" + ");
@@ -191,7 +196,7 @@ function OptionCard({
         </div>
         <div className="shrink-0 text-right">
           <p className="whitespace-nowrap text-xl font-semibold tabular-nums">
-            {(estimated > 0 || split || o.ferryCost > 0) && "ca. "}
+            {(estimated > 0 || split || o.ferryCost > 0 || dealRate) && "ca. "}
             {krRound(o.total)} kr.
           </p>
           {compare && !best && diff > 0 && (
@@ -287,18 +292,35 @@ function CheckLinks({ shops }: { shops: Shop[] }) {
 }
 
 /**
- * Under a line with a multi-buy deal: what the deal saved, or how many more to buy
- * to get it ("Køb 1 mere: 2 for 119,98"). Only when the deal beats the single price.
+ * Under a line whose shop has a multi-buy deal. By default the deal rate is assumed
+ * (compare.ts), so the line says so and offers "Brug stk.-pris": the price for exactly
+ * the quantity on the list. The choice is per item and re-prices every shop.
  */
-function DealNote({ buy, cost }: { buy: NonNullable<LineResult["buy"]>; cost: number }) {
+function DealNote({ itemKey, buy }: { itemKey: string; buy: NonNullable<LineResult["buy"]> }) {
   const deal = buy.deal;
-  if (!deal || deal.quantity < 2 || deal.price >= deal.quantity * buy.price - 0.005) return null;
-  const saved = buy.quantity * buy.price - cost;
-  const short = deal.quantity - (buy.quantity % deal.quantity);
+  if (!deal) return null;
+  // Whole deal groups cost the same either way, so there's nothing to choose.
+  if (buy.quantity % deal.quantity === 0) return null;
+  const toggle = (singlePrice: boolean) => updateBasketItem(itemKey, { singlePrice });
+  // Inline so it flows with the sentence; the vertical padding enlarges the tap area without moving text.
+  const link = "ml-1 py-2 font-medium underline underline-offset-2";
   return (
     <span className="block text-xs text-sky-800 dark:text-sky-300">
-      {saved > 0.005 && `Sparer ${kr(saved)} kr. med ${deal.quantity} for ${kr(deal.price)}. `}
-      {short < deal.quantity && `Køb ${short} mere: ${deal.quantity} for ${kr(deal.price)} (${kr(deal.price / deal.quantity)} kr. stk.)`}
+      {buy.singlePrice ? (
+        <>
+          Stk.-pris for {buy.quantity} stk.
+          <button type="button" onClick={() => toggle(false)} className={link}>
+            Regn med {deal.quantity} for {kr(deal.price)}
+          </button>
+        </>
+      ) : (
+        <>
+          Regnet med {deal.quantity} for {kr(deal.price)} – køber du {buy.quantity} stk., koster det {kr(buy.exactCost)}.
+          <button type="button" onClick={() => toggle(true)} className={link}>
+            Brug stk.-pris
+          </button>
+        </>
+      )}
     </span>
   );
 }
@@ -311,13 +333,15 @@ function LineRow({ line: l, shop }: { line: LineResult; shop: Shop | undefined }
     <li className="flex justify-between gap-3 py-1">
       {l.buy ? (
         <>
-          <a href={l.buy.url} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 hover:underline">
-            {l.buy.quantity} × {l.buy.productName}
+          <div className="min-w-0 flex-1">
+            <a href={l.buy.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
+              {l.buy.quantity} × {l.buy.productName}
+            </a>
             {l.buy.onOffer && <OfferBadge endsAt={l.buy.offerEndsAt} />}
             {l.buy.multiBuy && <MultiBuyBadge quantity={l.buy.multiBuy.quantity} price={l.buy.multiBuy.price} />}
             {l.buy.coupon && <CouponBadge />}
-            <DealNote buy={l.buy} cost={l.cost!} />
-          </a>
+            <DealNote itemKey={l.key} buy={l.buy} />
+          </div>
           <span className="shrink-0 tabular-nums">
             {kr(l.cost!)}
             {shop && <ReportLink shop={shop.id} product={l.buy.productName} price={l.buy.price} page="/liste" />}

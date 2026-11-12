@@ -48,7 +48,15 @@ export interface FamilyResult {
   name: string;
   category: string;
   /** Cheapest price per liter/kg/piece across all packs and shops. */
-  best: { pricePerUnit: number; unit: Unit; shopId: string; productName: string; coupon: boolean } | null;
+  /** deal: set when the price is a multi-buy rate ("ved 3 stk."). */
+  best: {
+    pricePerUnit: number;
+    unit: Unit;
+    shopId: string;
+    productName: string;
+    coupon: boolean;
+    deal: { quantity: number; price: number } | null;
+  } | null;
   packs: Pack[];
 }
 
@@ -56,8 +64,9 @@ export interface FamilyResult {
 export type BasketItem =
   /** step = how much one "+" adds: the pack size the family was added with. */
   /** packLabel: the pack one step is ("24 x 0,33 l"), shown instead of liters; missing in older baskets. */
-  | { key: string; kind: "family"; familyId: number; label: string; amount: number; step: number; unit: Unit; packLabel?: string }
-  | { key: string; kind: "product"; productId: number; label: string; quantity: number };
+  /** singlePrice: price the exact quantity at the till instead of assuming the multi-buy rate (see compare.ts). */
+  | { key: string; kind: "family"; familyId: number; label: string; amount: number; step: number; unit: Unit; packLabel?: string; singlePrice?: boolean }
+  | { key: string; kind: "product"; productId: number; label: string; quantity: number; singlePrice?: boolean };
 
 export interface LineResult {
   key: string;
@@ -70,10 +79,14 @@ export interface LineResult {
     url: string;
     onOffer: boolean;
     offerEndsAt: string | null;
-    /** Set when a multi-buy deal was used for (part of) the quantity. */
+    /** Set when a multi-buy deal lowered the price (at the deal rate, or for full groups with singlePrice). */
     multiBuy: { quantity: number; price: number } | null;
-    /** The shop's multi-buy deal for this item, used or not (for "buy 1 more" tips). */
+    /** The shop's multi-buy deal if it beats the single price, used or not. */
     deal: { quantity: number; price: number } | null;
+    /** What the till charges for exactly this quantity (differs from cost when the deal rate is assumed). */
+    exactCost: number;
+    /** The item is marked "Brug stk.-pris" on the list. */
+    singlePrice: boolean;
     coupon: boolean;
   } | null;
   cost: number | null;

@@ -25,6 +25,7 @@ const Item = z.discriminatedUnion("kind", [
     step: z.number().positive().max(10_000),
     unit: z.enum(["l", "kg", "piece"]),
     packLabel: z.string().max(40).optional(),
+    singlePrice: z.boolean().optional(),
   }),
   z.object({
     key: z.string().max(100),
@@ -32,6 +33,7 @@ const Item = z.discriminatedUnion("kind", [
     productId: z.number().int().positive(),
     label: z.string().max(200),
     quantity: z.number().int().positive().max(1000),
+    singlePrice: z.boolean().optional(),
   }),
 ]);
 const Body = z.object({ items: z.array(Item).max(MAX_ITEMS) });
