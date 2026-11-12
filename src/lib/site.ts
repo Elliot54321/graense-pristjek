@@ -10,7 +10,7 @@ export const CONTACT_EMAIL: string | null = "prisgraensen@gmail.com";
 /** The site's public address - change it here when the real domain is ready. */
 export const SITE_URL = "https://www.prisgraensen.dk";
 
-export const SITE_NAME = "Grænse Pris";
+export const SITE_NAME = "Prisgrænsen";
 
 export const SITE_DESCRIPTION =
   "Sammenlign priser på sodavand, øl, vin, slik og spiritus i grænsebutikkerne - Fleggaard, Calle, Poetzsch, Scandinavian Park og BorderShop - og se hvor din kurv bliver billigst.";

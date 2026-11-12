@@ -1,7 +1,8 @@
 import { ImageResponse } from "next/og";
+import { SITE_NAME } from "@/lib/site";
 
 /** The card shown when a link to the site is shared (Facebook, Messenger, ...). */
-export const alt = "Grænse Pris – find den billigste grænsebutik";
+export const alt = `${SITE_NAME} – find den billigste grænsebutik`;
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -22,7 +23,7 @@ export default function Image() {
           color: "#fafafa",
         }}
       >
-        <div style={{ display: "flex", fontSize: 40, color: "#34d399", fontWeight: 600 }}>Grænse Pris</div>
+        <div style={{ display: "flex", fontSize: 40, color: "#34d399", fontWeight: 600 }}>{SITE_NAME}</div>
         <div style={{ display: "flex", flexDirection: "column" }}>
           <div style={{ fontSize: 84, fontWeight: 700, lineHeight: 1.05 }}>Find den billigste</div>
           <div style={{ fontSize: 84, fontWeight: 700, lineHeight: 1.05 }}>grænsebutik</div>

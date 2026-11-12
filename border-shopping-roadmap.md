@@ -782,3 +782,21 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   "Magnesium 500+B12", "25+ 62000 g" unchanged). The two rows were corrected directly (content and a new
   price row); the nightly scrape would have done the same, since a changed unit price writes a new row.
 - **Own domain (2026-11-12):** prisgraensen.dk registered at Simply.com ("Kun domæner": 64,95 kr. setup + 9 kr. first year, then 119 kr./year; no email included). DNS at Simply points to Vercel (A record for the bare domain, CNAME for www); Vercel serves www.prisgraensen.dk and redirects the bare domain there (308), so `SITE_URL` is the www address. The æ version prisgrænsen.dk (punycode xn--prisgrnsen-i6a.dk) is meant to redirect to it, but the .dk registry had no entry for it yet on 2026-11-12. The old graense-pristjek.vercel.app address keeps working.
+
+### UI review at phone width (2026-11-12)
+
+- **Name:** the site is now called **Prisgrænsen** (`SITE_NAME`), matching the domain; header, /om and the
+  share image use it. The browser storage keys still say `graense-pris-*` on purpose, so existing baskets survive.
+- **Basket:** every shopping option shows how much more it costs than the cheapest ("+3 kr."), the cheapest says
+  how much it saves over the runner-up, and estimated prices get their own line ("1 af 3 varer har ingen pris her")
+  instead of hiding in the green badge. Seen in the review: a 3-item basket had Calle first at 175 kr. only 3 kr.
+  ahead, with one item estimated in every shop - the old badge made that hard to see.
+- **Search:** one row per shop with the price right-aligned and the cheapest (ties too) in green, short shop names,
+  per-liter price and badges on a second line. Only the first 6 families show; the rest sit behind "Vis X flere varer"
+  ("cola" matched 30).
+- **Consistency and tap targets:** offer, multi-buy and coupon badges are one shared component (`components/badges.tsx`)
+  that never wraps mid-badge; "Fejl?", "Se varerne", the basket links and the steppers are now >= 40 px to tap.
+  Fine print on /kurv folds into "Sådan regner vi prisen" and "Hvor ligger butikkerne?".
+- **Small fixes:** the Geist font now actually applies (a `body { font-family: Arial }` rule overrode it); empty
+  search and empty basket have a next step; a failed basket pricing has a "Prøv igen" button; /fejl shows prices
+  with a Danish decimal comma.

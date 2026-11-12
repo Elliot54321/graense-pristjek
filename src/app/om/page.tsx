@@ -4,7 +4,7 @@ import { CONTACT_EMAIL } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Om siden",
-  description: "Hvor priserne kommer fra, hvor præcise de er, og hvordan Grænse Pris håndterer dine data.",
+  description: "Hvor priserne kommer fra, hvor præcise de er, og hvordan Prisgrænsen håndterer dine data.",
 };
 
 const h2 = "mt-8 text-lg font-semibold tracking-tight";
@@ -15,9 +15,9 @@ const a = "underline underline-offset-2";
 export default function AboutPage() {
   return (
     <main className="text-[15px] leading-relaxed">
-      <h1 className="text-2xl font-semibold tracking-tight">Om Grænse Pris</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Om Prisgrænsen</h1>
       <p className={p}>
-        Grænse Pris sammenligner priserne i grænsebutikkerne, så du kan se, hvor din indkøbsliste bliver billigst – før du
+        Prisgrænsen sammenligner priserne i grænsebutikkerne, så du kan se, hvor din indkøbsliste bliver billigst – før du
         kører. Søg efter en vare, læg den i kurven, og se hvilken butik eller tur der giver den laveste pris.
       </p>
       <p className={p}>

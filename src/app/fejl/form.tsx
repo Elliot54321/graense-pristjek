@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
+import { kr } from "@/lib/format";
 import { type FeedbackState, sendFeedback } from "./actions";
 
 export interface Context {
@@ -34,7 +35,7 @@ export function FeedbackForm({ context }: { context: Context }) {
         <p className="rounded-lg border border-zinc-200 p-3 text-sm dark:border-zinc-800">
           Det drejer sig om: <strong>{context.product ?? "en vare"}</strong>
           {context.shopName && <> hos {context.shopName}</>}
-          {context.price && <> til {context.price} kr.</>}
+          {context.price && <> til {Number.isFinite(Number(context.price)) ? kr(Number(context.price)) : context.price} kr.</>}
         </p>
       )}
       <input type="hidden" name="shop" value={context.shop ?? ""} />

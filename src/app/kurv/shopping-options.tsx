@@ -4,9 +4,9 @@ import { NEWSLETTER_SHOPS } from "@/catalog/compare";
 import { MIN_SAVING_PER_EXTRA_STORE, shoppingOptions, type ShoppingOption } from "@/catalog/plan";
 import { CAR_TYPES, type CarType, oneWayKm, oneWayMinutes, regionOf } from "@/catalog/trips";
 import type { LineResult, Shop, ShopResult } from "@/catalog/types";
-import { CouponBadge } from "@/components/coupon-badge";
+import { CouponBadge, MultiBuyBadge, OfferBadge } from "@/components/badges";
 import { ReportLink } from "@/components/report-link";
-import { day, duration, kr, krRound } from "@/lib/format";
+import { duration, kr, krRound } from "@/lib/format";
 
 type Home = { point: [number, number]; place: string; region: NonNullable<ReturnType<typeof regionOf>> };
 
@@ -109,25 +109,41 @@ export function ShoppingOptions({ results, loading }: { results: ShopResult[]; l
 
       <ol className={`mt-4 flex flex-col gap-4 ${loading ? "opacity-60" : ""}`}>
         {shown.map((o, i) => (
-          <OptionCard key={o.key} option={o} best={i === 0 && options.length > 1} home={home} shops={shops} carType={carType} />
+          <OptionCard
+            key={o.key}
+            option={o}
+            best={i === 0 && options.length > 1}
+            // The cheapest card says how much it saves over the runner-up; the others how much more they cost.
+            compare={i === 0 ? options[1] : options[0]}
+            home={home}
+            shops={shops}
+            carType={carType}
+          />
         ))}
       </ol>
       {options.length > SHOWN && (
-        <button type="button" onClick={() => setShowAll(!showAll)} className="mt-3 text-sm underline underline-offset-2">
+        <button
+          type="button"
+          onClick={() => setShowAll(!showAll)}
+          className="mt-3 flex min-h-11 w-full items-center justify-center rounded-lg border border-zinc-300 text-sm font-medium dark:border-zinc-700"
+        >
           {showAll ? "Vis færre" : `Vis alle ${options.length} muligheder`}
         </button>
       )}
-      <p className="mt-2 text-xs text-zinc-500">
-        Prisen er varerne plus kørsel mellem butikkerne (ca. {kr(CAR_TYPES[carType].krPerKm)} kr./km for en gennemsnitlig{" "}
-        {CAR_TYPES[carType].label.toLowerCase()}) og færgen, hvis turen kræver en – færgeprisen er Scandlines&apos; laveste
-        pris for en dagsbillet, og den rigtige pris afhænger af afgangen. Turen hjemmefra er ikke med, da den afhænger af,
-        hvor du bor – afstand og tid er estimater. Vi foreslår kun flere butikker, når det sparer mindst{" "}
-        {MIN_SAVING_PER_EXTRA_STORE} kr. pr. ekstra butik. Postnumre:{" "}
-        <a href="https://www.geonames.org" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
-          GeoNames
-        </a>{" "}
-        (CC BY 4.0).
-      </p>
+      <details className="mt-3 text-xs text-zinc-500">
+        <summary className="flex min-h-10 cursor-pointer items-center underline underline-offset-2">Sådan regner vi prisen</summary>
+        <p>
+          Prisen er varerne plus kørsel mellem butikkerne (ca. {kr(CAR_TYPES[carType].krPerKm)} kr./km for en gennemsnitlig{" "}
+          {CAR_TYPES[carType].label.toLowerCase()}) og færgen, hvis turen kræver en – færgeprisen er Scandlines&apos; laveste
+          pris for en dagsbillet, og den rigtige pris afhænger af afgangen. Turen hjemmefra er ikke med, da den afhænger af,
+          hvor du bor – afstand og tid er estimater. Vi foreslår kun flere butikker, når det sparer mindst{" "}
+          {MIN_SAVING_PER_EXTRA_STORE} kr. pr. ekstra butik. Postnumre:{" "}
+          <a href="https://www.geonames.org" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
+            GeoNames
+          </a>{" "}
+          (CC BY 4.0).
+        </p>
+      </details>
     </section>
   );
 }
@@ -135,12 +151,14 @@ export function ShoppingOptions({ results, loading }: { results: ShopResult[]; l
 function OptionCard({
   option: o,
   best,
+  compare,
   home,
   shops,
   carType,
 }: {
   option: ShoppingOption;
   best: boolean;
+  compare: ShoppingOption | undefined;
   home: Home | "unknown" | "bornholm" | null;
   shops: Map<string, Shop>;
   carType: CarType;
@@ -150,6 +168,9 @@ function OptionCard({
     o.stops.reduce((n, s) => n + s.lines.filter((l) => l.cost === null && l.estimate !== null).length, 0);
   const km = home && typeof home !== "string" ? oneWayKm(home.point, home.region, o.area) : null;
   const split = o.stops.length > 1;
+  const items = o.missing.length + o.stops.reduce((n, s) => n + s.lines.length, 0);
+  const diff = compare ? Math.round(Math.abs(compare.total - o.total)) : 0;
+  const compareName = compare?.stops.map((s) => s.name).join(" + ");
 
   return (
     <li className={`rounded-lg border p-4 ${best ? "border-emerald-500 ring-1 ring-emerald-500" : "border-zinc-200 dark:border-zinc-800"}`}>
@@ -159,7 +180,7 @@ function OptionCard({
             {o.stops.map((s) => s.name).join(" + ")}
             {best && (
               <span className="ml-2 inline-block whitespace-nowrap rounded bg-emerald-600 px-1.5 py-0.5 text-xs font-medium text-white">
-                Billigst{estimated > 0 && ` – inkl. ${estimated} ${estimated === 1 ? "estimeret pris" : "estimerede priser"}`}
+                Billigst
               </span>
             )}
           </h3>
@@ -168,11 +189,26 @@ function OptionCard({
             {km !== null && ` · ${km} km hjemmefra, ca. ${duration(oneWayMinutes(km, o.area))}`}
           </p>
         </div>
-        <p className="shrink-0 whitespace-nowrap text-right text-xl font-semibold tabular-nums">
-          {(estimated > 0 || split || o.ferryCost > 0) && "ca. "}
-          {krRound(o.total)} kr.
-        </p>
+        <div className="shrink-0 text-right">
+          <p className="whitespace-nowrap text-xl font-semibold tabular-nums">
+            {(estimated > 0 || split || o.ferryCost > 0) && "ca. "}
+            {krRound(o.total)} kr.
+          </p>
+          {compare && !best && diff > 0 && (
+            <p className="whitespace-nowrap text-sm text-zinc-600 tabular-nums dark:text-zinc-400">+{krRound(diff)} kr.</p>
+          )}
+        </div>
       </div>
+      {best && compare && (
+        <p className="mt-2 text-sm font-medium text-emerald-700 dark:text-emerald-400">
+          {diff > 0 ? `${krRound(diff)} kr. billigere end ${compareName}` : `Samme pris som ${compareName}`}
+        </p>
+      )}
+      {estimated > 0 && (
+        <p className="mt-1 text-sm text-amber-700 dark:text-amber-400">
+          {estimated} af {items} varer har ingen pris her – regnet med en estimeret pris
+        </p>
+      )}
       {o.area.ferry && (
         <p className="mt-1 text-xs text-zinc-500">
           Inkl. færge {o.area.ferry.route} tur/retur, ca. {krRound(o.ferryCost)} kr. (Scandlines dagsbillet fra{" "}
@@ -184,8 +220,11 @@ function OptionCard({
         </p>
       )}
 
-      <details open={best} className="mt-2 text-sm">
-        <summary className="cursor-pointer text-zinc-600 dark:text-zinc-400">
+      <details open={best} className="group mt-2 text-sm">
+        <summary className="-mx-1 flex min-h-10 cursor-pointer list-none items-center gap-1.5 [&::-webkit-details-marker]:hidden px-1 font-medium text-zinc-700 dark:text-zinc-300">
+          <span aria-hidden className="inline-block text-xs transition-transform group-open:rotate-90">
+            ▶
+          </span>
           {split ? `Varer fordelt på ${o.stops.length} butikker` : "Se varerne"}
         </summary>
         {o.stops.map((s) => (
@@ -252,22 +291,14 @@ function LineRow({ line: l, shop }: { line: LineResult; shop: Shop | undefined }
   // Newsletter shops only show part of their range, so the item is probably there.
   const newsletter = !!shop && NEWSLETTER_SHOPS.has(shop.id);
   return (
-    <li className="flex justify-between gap-3 py-0.5">
+    <li className="flex justify-between gap-3 py-1">
       {l.buy ? (
         <>
           <a href={l.buy.url} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 hover:underline">
             {l.buy.quantity} × {l.buy.productName}
-            {l.buy.multiBuy && (
-              <span className="ml-1 text-xs text-sky-700 dark:text-sky-400">
-                ({l.buy.multiBuy.quantity} for {kr(l.buy.multiBuy.price)})
-              </span>
-            )}
+            {l.buy.onOffer && <OfferBadge endsAt={l.buy.offerEndsAt} />}
+            {l.buy.multiBuy && <MultiBuyBadge quantity={l.buy.multiBuy.quantity} price={l.buy.multiBuy.price} />}
             {l.buy.coupon && <CouponBadge />}
-            {l.buy.onOffer && (
-              <span className="ml-1 text-xs text-amber-700 dark:text-amber-400">
-                tilbud{l.buy.offerEndsAt ? ` til ${day(l.buy.offerEndsAt)}` : ""}
-              </span>
-            )}
           </a>
           <span className="shrink-0 tabular-nums">
             {kr(l.cost!)}

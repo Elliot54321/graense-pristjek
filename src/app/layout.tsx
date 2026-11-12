@@ -36,7 +36,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/95 backdrop-blur dark:border-zinc-800 dark:bg-black/90">
           <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-3 px-4 py-3">
             <Link href="/" className="text-lg font-semibold tracking-tight">
-              Grænse Pris
+              {SITE_NAME}
             </Link>
             <BasketLink />
           </div>

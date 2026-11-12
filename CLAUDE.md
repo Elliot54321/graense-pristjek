@@ -1,4 +1,4 @@
-# Grænse Pris – border shopping price comparison
+# Prisgrænsen (formerly Grænse Pris) – border shopping price comparison
 
 @AGENTS.md
 

@@ -5,7 +5,18 @@ import type { BasketItem } from "@/catalog/types";
 import { addToBasket } from "./basket";
 
 /** "Læg i kurv" button; briefly confirms so the user knows it worked. */
-export function AddToBasket({ item, label = "Læg i kurv", className = "" }: { item: BasketItem; label?: string; className?: string }) {
+/** variant "secondary": outlined, for the many per-pack buttons so the family's main button stands out. */
+export function AddToBasket({
+  item,
+  label = "Læg i kurv",
+  variant = "primary",
+  className = "",
+}: {
+  item: BasketItem;
+  label?: string;
+  variant?: "primary" | "secondary";
+  className?: string;
+}) {
   const [added, setAdded] = useState(false);
   return (
     <button
@@ -15,8 +26,12 @@ export function AddToBasket({ item, label = "Læg i kurv", className = "" }: { i
         setAdded(true);
         setTimeout(() => setAdded(false), 1500);
       }}
-      className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-        added ? "bg-emerald-600 text-white" : "bg-zinc-900 text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+      className={`min-h-10 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+        added
+          ? "border border-emerald-600 bg-emerald-600 text-white"
+          : variant === "primary"
+            ? "border border-zinc-900 bg-zinc-900 text-white hover:bg-zinc-700 dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+            : "border border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-transparent dark:text-zinc-100 dark:hover:bg-zinc-800"
       } ${className}`}
     >
       {added ? "Lagt i kurv ✓" : label}
