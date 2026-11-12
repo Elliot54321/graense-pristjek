@@ -181,7 +181,7 @@ after 8 unattended nightly runs; Phase 2 (matching) is largely done.
 
 - UI text is in **Danish**; code, comments and commit messages in **English**.
 - Mobile-first UI – people use this on their phone, in the car or in the shop.
-- The Claude API key expires around 2026-11-18 and lives in `.env.local` **and** as a GitHub
+- The Claude API key expires around 2026-12-11 (renewed 2026-11-12) and lives in `.env.local` **and** as a GitHub
   secret (nightly `match-new`) – replace both (see roadmap "Keys and accounts to renew").
 - Never commit secrets. Keys go in `.env.local` (git-ignored) locally and in GitHub
   repository secrets for the workflow. **The repo is public** – never commit

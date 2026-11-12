@@ -302,7 +302,7 @@ Choose based on what Phase 5 showed:
 
 ### Keys and accounts to renew
 
-- **Claude API key** (`ANTHROPIC_API_KEY` in `.env.local` **and** the GitHub repository secret of the same name, created 2026-10-18 at platform.claude.com) **expires around 2026-11-18.** Before then: create a new key in the Console (Settings -> API Keys) and replace it in both places - otherwise the nightly `match-new` job starts failing. Prepaid API credit at creation: $8.76.
+- **Claude API key** (`ANTHROPIC_API_KEY` in `.env.local` **and** the GitHub repository secret of the same name, created 2026-10-18 at platform.claude.com, renewed 2026-11-12) **expires around 2026-12-11.** Before then: create a new key in the Console (Settings -> API Keys) and replace it in both places - otherwise the nightly `match-new` job starts failing. Prepaid API credit at creation: $8.76.
 
 ### Phase 2: LLM matching test (2026-10-18)
 
@@ -410,7 +410,7 @@ Choose based on what Phase 5 showed:
 - New products per night over the first week: 0-19 (about 6 on average).
 - **The nightly workflow now has a third job, `match-new`** (after `scrape` and `match`): `npm run match:new` gives new products a family and links them across shops, so they appear in search the next day. Same safety rules; doubtful links become suggestions for `/admin`. Nights without new products make no API calls. Expected cost about $0.001 per product, ~$0.20/month. It's a separate job, so if it fails (expired key, no credit) the prices are still saved and GitHub emails the failure. The run's link list is kept as an artifact for a week.
 - Considered and rejected: waiting until N new products pile up. Cost depends on the number of products, not runs, so it would save almost nothing and delay new (often seasonal) products by 1-2 weeks.
-- `ANTHROPIC_API_KEY` is now also a GitHub repository secret - **renew it there too** when the key is replaced (~2026-11-18).
+- `ANTHROPIC_API_KEY` is now also a GitHub repository secret - **renew it there too** when the key is replaced (next: before ~2026-12-11).
 
 ### Search ranking (2026-10-25)
 
