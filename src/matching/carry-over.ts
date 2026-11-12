@@ -106,7 +106,7 @@ export async function carryOverReviewed(db: SupabaseClient, dryRun: boolean): Pr
  * site, 0.8+), else the side with its own product (a weak link is hidden anyway, so it
  * shouldn't hide its twin too), else Fleggaard's. The
  * moved twin takes over the winner's method, confidence and review, so one review
- * covers both. Twins reviewed two different ways are left alone and listed.
+ * covers both. A new, unmatched offer whose twin is matched simply joins it (no API call). Twins reviewed two different ways are left alone and listed.
  */
 export async function linkNewsletterTwins(db: SupabaseClient, dryRun: boolean): Promise<number> {
   const today = new Date().toISOString().slice(0, 10);
@@ -128,7 +128,7 @@ export async function linkNewsletterTwins(db: SupabaseClient, dryRun: boolean): 
   const wording = (r: Row) => keyOf({ ...r, shop_id: "" });
   const byShop = (shop: string) => {
     const map = new Map<string, Row[]>();
-    for (const r of rows) if (r.shop_id === shop && matchOf(r)) map.set(wording(r), [...(map.get(wording(r)) ?? []), r]);
+    for (const r of rows) if (r.shop_id === shop) map.set(wording(r), [...(map.get(wording(r)) ?? []), r]);
     return map;
   };
   const [fleggaard, calle] = [byShop("fleggaard"), byShop("calle")];
@@ -138,11 +138,26 @@ export async function linkNewsletterTwins(db: SupabaseClient, dryRun: boolean): 
     const cs = calle.get(key);
     if (!cs || fs.length !== 1 || cs.length !== 1) continue; // only unambiguous pairs
     const [f, c] = [fs[0], cs[0]];
-    const [mf, mc] = [matchOf(f)!, matchOf(c)!];
-    if (mf.product_id === mc.product_id) continue;
     const [pf, pc] = [priceOf.get(f.id), priceOf.get(c.id)];
     if (pf && pc && Math.max(pf, pc) / Math.min(pf, pc) > MAX_PRICE_RATIO) continue;
     const isHuman = (m: NonNullable<ReturnType<typeof matchOf>>) => m.reviewed || m.method === "manual";
+    const [mf, mc] = [matchOf(f), matchOf(c)];
+    if (!mf || !mc) {
+      // One side is new: it joins its matched twin.
+      if (!mf && !mc) continue;
+      const [win, lose, winRow] = mf ? [mf, c, f] : [mc!, f, c];
+      updates.push({
+        shop_product_id: lose.id,
+        product_id: win.product_id,
+        method: win.method,
+        confidence: Number(win.confidence),
+        reviewed: isHuman(win),
+        note: `Same newsletter offer as ${winRow.shop_id} #${winRow.id} ("${winRow.name}")`,
+      });
+      console.log(`  twin (new): "${lose.name}" ${lose.shop_id} -> #${win.product_id} (${win.method}${isHuman(win) ? ", reviewed" : ""})`);
+      continue;
+    }
+    if (mf.product_id === mc.product_id) continue;
     if (isHuman(mf) && isHuman(mc)) {
       console.log(`  twins decided two ways, left alone: "${f.name}" fleggaard #${mf.product_id} / calle #${mc.product_id}`);
       continue;

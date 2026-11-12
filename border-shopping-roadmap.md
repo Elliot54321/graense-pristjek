@@ -749,3 +749,17 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   text and added to `limit_note` in the offers file (the reviewed input), then re-imported: 34 price rows.
 - `flyer:import` now warns about every multi-buy offer without a printed single price ("! p56 ..."), so the
   next issue's gaps get checked before they reach the site (`printedSingle` in `src/flyers/prices.ts`).
+
+### Deals read as packs at Calle (2026-11-12)
+- Yum Yum Nudler: both print 5,99 per packet, 30 for 99,99. Fleggaard was stored as the packet + deal;
+  Calle as "30 stk. x 60 g." for 99,99 with no deal (separate product, no single price). Same for Calle's
+  Galle & Jessen Pålægschokolade ("3 pk. x 324 g." 99,99, "Pr. pk. 39,99"), whose extraction also lost the
+  size (unit "stk", no size; fixed by hand in the offers file to 0,324 kg).
+- `singlesWithDeal` (`import.ts`) now also turns "N x item" with no deal into the single item + deal
+  when the small print has a single price and "v/merkøb" (only deals print that) and N x single > price.
+  Coca-Cola "v/ køb af 6 fl." isn't caught (no "merkøb"; its pack price is handled by `packPrice`).
+- `flyer:import` now retires rows of the same issue a re-import no longer produces (listed until
+  yesterday, last seen 4 days ago), so a corrected re-read doesn't leave the wrong rows on the site.
+- `linkNewsletterTwins` now also lets a new, unmatched offer join its matched Fleggaard/Calle twin.
+  Joined: Yum Yum, Galle & Jessen, A+ Pure (equal after the Fleggaard single-price fix). Yum Yum Chicken
+  and Shrimp are Calle-only, matched in the nightly run.

@@ -86,17 +86,33 @@ function printedText(o: Offer): string {
     .join(" · ");
 }
 
+/** "12 x ", "30 stk. x ", "3 pk. x " at the start of a pack text. */
+const COUNT_PREFIX = /^\s*\d+\s*(?:stk|pk)?\.?\s*[x×]\s*/i;
+
 /**
- * "12 x 55 g." priced "12 stk. 149,99" with multi-buy 12 for 149,99 is not a 12-pack: the
- * shop sells single bars ("Pr. stk. 16,99"), 12 for 149,99. The same offer was read that way
- * at Calle, and as a 12-pack at Fleggaard (then priced 16,99 for all 12 bars). Store it as
- * the single item with the deal, so both shops get the same product and the basket uses
- * the deal for every full 12.
+ * Deals read as packs. Newsletters print "N for X" offers on single items in two ways, and
+ * the extraction reads the same offer differently at Fleggaard and Calle:
+ *  - "12 x 55 g." with price and multi-buy both "12 for 149,99" (Fleggaard's Barebells):
+ *    the single price is in the small print ("Pr. stk. 16,99");
+ *  - "30 stk. x 60 g." for 99,99 with no multi-buy, but "Pr. stk. 5,99. Pr. kg v/merkøb"
+ *    in the small print (Calle's Yum Yum) - "v/merkøb" ("when buying more") marks a deal.
+ * Both become the single item with the deal (55 g at 16,99, 12 for 149,99), so the same
+ * offer gets the same product at both shops and the basket uses the deal per full group.
  */
 function singlesWithDeal(o: Offer): Offer {
+  const n = o.unit_count ?? 0;
+  if (n < 2) return o;
   const deal = o.multi_buy;
-  if (!deal || (o.unit_count ?? 0) < 2 || o.unit_count !== deal.quantity || Math.abs(o.price - deal.total_price) >= 0.005) return o;
-  return { ...o, pack: o.pack.replace(/^\s*\d+\s*[x×]\s*/i, ""), unit_count: 1 };
+  const single = { ...o, pack: o.pack.replace(COUNT_PREFIX, ""), unit_count: 1 };
+  if (deal) {
+    return n === deal.quantity && Math.abs(o.price - deal.total_price) < 0.005 ? single : o;
+  }
+  const note = o.limit_note ?? "";
+  const printed = note.match(/Pr\.\s*(?:stk|pk|ks|fl|ps|ds|bk|pose)\.?\s*(\d+(?:[.,]\d+)?)/i);
+  const each = printed ? Number(printed[1].replace(",", ".")) : NaN;
+  if (!/merkøb/i.test(note) || !(each * n > o.price * 1.05)) return o;
+  // The printed per-kg/l is the deal's ("v/merkøb"), so let the import compute the single one.
+  return { ...single, price: each, price_per_liter_or_kg: null, multi_buy: { quantity: n, total_price: o.price } };
 }
 
 export function offersToProducts(
@@ -195,6 +211,7 @@ async function main() {
     summary.warnings.push(...result.warnings);
     await finishRun(db, runId, summary);
     console.log(`Saved: ${result.priceChanges} new price rows (run #${runId}). Next: npm run match:new`);
+    await retireDropped(db, shop, issue, products);
     if (!args.includes("--no-pages")) {
       const pdf = file.replace(/\.offers\.json$/, ".pdf");
       const pages = [...new Set(products.map((p) => p.source!.page))].sort((a, b) => a - b);
@@ -205,6 +222,35 @@ async function main() {
     await finishRun(db, runId, summary, String(e));
     throw e;
   }
+}
+
+/**
+ * Products this issue no longer produces - after a corrected re-import, e.g. a deal first
+ * read as "30 stk. x 60 g." - are taken off the site: listed until yesterday and last seen
+ * more than 3 days ago (the website shows products seen in the last 3 days or still listed).
+ */
+async function retireDropped(db: ReturnType<typeof adminClient>, shop: string, issue: string, products: ScrapedProduct[]) {
+  const keep = new Set(products.map((p) => p.shopProductId));
+  const today = new Date().toISOString().slice(0, 10);
+  const { data, error } = await db
+    .from("shop_products")
+    .select("id, shop_product_id, name")
+    .eq("shop_id", shop)
+    .eq("source_issue", issue)
+    .gte("listed_until", today); // still listed: not retired already
+  if (error) throw error;
+  const dropped = (data ?? []).filter((r) => !keep.has(r.shop_product_id));
+  if (!dropped.length) return;
+  const day = 24 * 3600 * 1000;
+  const { error: updateError } = await db
+    .from("shop_products")
+    .update({
+      listed_until: new Date(Date.now() - day).toISOString().slice(0, 10),
+      last_seen_at: new Date(Date.now() - 4 * day).toISOString(),
+    })
+    .in("id", dropped.map((r) => r.id));
+  if (updateError) throw updateError;
+  console.log(`Retired ${dropped.length} products no longer in this issue: ${dropped.map((r) => r.name).join("; ")}`);
 }
 
 main().catch((e) => {

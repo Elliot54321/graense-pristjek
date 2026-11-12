@@ -95,7 +95,8 @@ after 8 unattended nightly runs; Phase 2 (matching) is largely done.
 - `src/matching/llm-new.ts` – `npm run match:new [-- --dry-run]`: matches unmatched shop products
   (and products without family) against existing products with Sonnet 5.5; shared safety
   rules in `src/matching/safety.ts`. First copies reviewed newsletter decisions onto reworded offers
-  and joins identical Fleggaard/Calle offers into one product (`carry-over.ts`). Unreviewed LLM links below 0.8 confidence are held back from the site (`matched_prices`).
+  and joins identical Fleggaard/Calle offers into one product, or a new offer to its matched twin
+  (`carry-over.ts`). Unreviewed LLM links below 0.8 confidence are held back from the site (`matched_prices`).
 - `src/flyers/extract.ts` – reads a PDF newsletter page by page with Claude vision
   (`npm run flyer:extract -- <pdf> [--pages ...] [--direct]`), writes `<pdf>.offers.json` for review.
   Uses the Batch API by default (half price; waits for the result, rerun the same command to resume);
