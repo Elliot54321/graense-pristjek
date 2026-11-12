@@ -809,3 +809,11 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   plain `<img>` links to the shops' own sites (lazy-loaded, not copied or proxied through Vercel). Coverage on
   2026-11-12: Poetzsch 3,940/4,000, BorderShop ~3,700 per store, Scandinavian Park 5,005/7,212; Calle and
   Fleggaard (newsletters) have none and show an empty tile.
+- **Quantities and multi-buy (2026-11-12, user request):** once something is on the list, its "Sæt på listen"
+  button in search turns into a − / + stepper (`components/item-stepper.tsx`, shared with the list). Search shows
+  "Køb 3 for 199,99 kr. hos Fleggaard – 66,66 kr. stk." when a multi-buy beats the cheapest single price. On the
+  list, each shop line says what a used deal saved ("Sparer 15,98 kr. med 3 for 199,99") or how many more trigger
+  it ("Køb 1 mere: 3 for 209,99"); `LineResult.buy.deal` carries the shop's deal even when unused. Pricing itself
+  was already right (`costFor` applies the deal to every full group). 91 products had such a deal on 2026-11-12,
+  mostly Fleggaard's "3 for" crates. Seen while testing: Royal Pilsner exists as two products (24x0,33L dåse vs
+  Royal Pilsner 24 x 0,33 l) - a matching duplicate for the later review.

@@ -1,11 +1,14 @@
 "use client";
 
-import { useState } from "react";
 import type { BasketItem } from "@/catalog/types";
-import { addToBasket } from "./basket";
+import { addToBasket, useBasket } from "./basket";
+import { ItemStepper } from "./item-stepper";
 
-/** "Sæt på listen" button (adds to the shopping list, kept as "basket" in code); briefly confirms so the user knows it worked. */
-/** variant "secondary": outlined, for the many per-pack buttons so the family's main button stands out. */
+/**
+ * "Sæt på listen" (the shopping list is called "basket" in code). Once the item is on
+ * the list, the button turns into − / + so the quantity can be set right there.
+ * variant "secondary": outlined, for the many per-pack buttons so the family's main button stands out.
+ */
 export function AddToBasket({
   item,
   label = "Sæt på listen",
@@ -17,24 +20,26 @@ export function AddToBasket({
   variant?: "primary" | "secondary";
   className?: string;
 }) {
-  const [added, setAdded] = useState(false);
+  const onList = useBasket().find((i) => i.key === item.key);
+  if (onList) {
+    return (
+      <div className={className}>
+        <ItemStepper item={onList} />
+        <p className="mt-0.5 text-xs text-emerald-700 dark:text-emerald-400">På listen ✓</p>
+      </div>
+    );
+  }
   return (
     <button
       type="button"
-      onClick={() => {
-        addToBasket(item);
-        setAdded(true);
-        setTimeout(() => setAdded(false), 1500);
-      }}
+      onClick={() => addToBasket(item)}
       className={`min-h-10 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-        added
-          ? "border border-emerald-600 bg-emerald-600 text-white"
-          : variant === "primary"
-            ? "border border-zinc-900 bg-zinc-900 text-white hover:bg-zinc-700 dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
-            : "border border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-transparent dark:text-zinc-100 dark:hover:bg-zinc-800"
+        variant === "primary"
+          ? "border border-zinc-900 bg-zinc-900 text-white hover:bg-zinc-700 dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+          : "border border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-transparent dark:text-zinc-100 dark:hover:bg-zinc-800"
       } ${className}`}
     >
-      {added ? "På listen ✓" : label}
+      {label}
     </button>
   );
 }

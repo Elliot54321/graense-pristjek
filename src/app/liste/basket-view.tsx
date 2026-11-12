@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { AlcoholType } from "@/catalog/import-limits";
 import type { BasketItem, ShopResult } from "@/catalog/types";
-import { clearBasket, removeFromBasket, updateBasketItem, useBasket } from "@/components/basket";
+import { clearBasket, useBasket } from "@/components/basket";
+import { ItemStepper } from "@/components/item-stepper";
 import { amount, UNIT_LABEL } from "@/lib/format";
 import { COUPON_NOTE } from "@/components/badges";
 import { ImportLimits } from "./import-limits";
@@ -111,54 +112,18 @@ export function BasketView() {
 }
 
 function BasketRow({ item }: { item: BasketItem }) {
-  if (item.kind === "product") {
-    return (
-      <li className="flex items-center justify-between gap-3 px-3 py-2.5">
-        <p className="min-w-0 flex-1 text-sm">{item.label}</p>
-        <Stepper
-          value={`${item.quantity} stk.`}
-          onMinus={() => (item.quantity > 1 ? updateBasketItem(item.key, { quantity: item.quantity - 1 }) : removeFromBasket(item.key))}
-          onPlus={() => updateBasketItem(item.key, { quantity: item.quantity + 1 })}
-        />
-      </li>
-    );
-  }
-  // Families are bought by amount; each step is the pack size the family was added with.
-  const step = item.step;
-  // Shown as packs ("5 × 24 x 0,33 l") when the amount is whole packs of the added size.
-  const packs = item.packLabel && Math.abs(item.amount / step - Math.round(item.amount / step)) < 1e-6 ? Math.round(item.amount / step) : null;
   return (
     <li className="flex items-center justify-between gap-3 px-3 py-2.5">
       <div className="min-w-0 flex-1">
         <p className="text-sm">{item.label}</p>
-        <p className="text-xs text-zinc-500">
-          {amount(item.amount)} {UNIT_LABEL[item.unit]} · billigste pakning
-        </p>
+        {/* Families are bought by amount: we pick the cheapest pack size in each shop. */}
+        {item.kind === "family" && (
+          <p className="text-xs text-zinc-500">
+            {amount(item.amount)} {UNIT_LABEL[item.unit]} · billigste pakning
+          </p>
+        )}
       </div>
-      <Stepper
-        value={packs !== null ? `${amount(packs)} × ${item.packLabel!.replace(" x ", "×")}` : `${amount(item.amount)} ${UNIT_LABEL[item.unit]}`}
-        onMinus={() =>
-          item.amount - step > 0.0001 ? updateBasketItem(item.key, { amount: round(item.amount - step) }) : removeFromBasket(item.key)
-        }
-        onPlus={() => updateBasketItem(item.key, { amount: round(item.amount + step) })}
-      />
+      <ItemStepper item={item} />
     </li>
-  );
-}
-
-const round = (n: number) => Math.round(n * 1000) / 1000;
-
-function Stepper({ value, onMinus, onPlus }: { value: string; onMinus: () => void; onPlus: () => void }) {
-  const btn = "h-10 w-10 rounded-md border border-zinc-300 text-lg leading-none dark:border-zinc-700";
-  return (
-    <div className="flex shrink-0 items-center gap-2">
-      <button type="button" onClick={onMinus} className={btn} aria-label="Færre">
-        −
-      </button>
-      <span className="min-w-16 text-center text-sm tabular-nums">{value}</span>
-      <button type="button" onClick={onPlus} className={btn} aria-label="Flere">
-        +
-      </button>
-    </div>
   );
 }

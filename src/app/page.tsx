@@ -199,6 +199,7 @@ function PackRow({ pack, shops, page }: { pack: Pack; shops: Map<string, Shop>; 
   // Offers are sorted by price, so the first is the cheapest (others may tie with it).
   const [best, ...rest] = pack.offers;
   const ties = rest.filter((o) => o.price === best.price).length;
+  const deal = bestDeal(pack.offers, best.price);
   return (
     <li className="py-3">
       {/* Photo left, text and button right; the button sits under the price so the photo can be large. */}
@@ -214,6 +215,12 @@ function PackRow({ pack, shops, page }: { pack: Pack; shops: Map<string, Shop>; 
             {ties > 0 && <span className="text-zinc-500"> (+{ties} til samme pris)</span>}
           </p>
           <OfferDetails offer={best} pack={pack} page={page} />
+          {deal && (
+            <p className="mt-1 text-sm text-sky-800 dark:text-sky-300">
+              Køb {deal.quantity} for {kr(deal.price)} kr.{deal.shopId !== best.shopId && <> hos {shopName(shops, deal.shopId)}</>} –{" "}
+              {kr(deal.perPiece)} kr. stk.
+            </p>
+          )}
           <AddToBasket
             label="Sæt på listen"
             variant="secondary"
@@ -249,6 +256,22 @@ function PackRow({ pack, shops, page }: { pack: Pack; shops: Map<string, Shop>; 
       )}
     </li>
   );
+}
+
+/**
+ * The multi-buy deal ("Køb 2 for 119,98") worth pointing out: the lowest price per
+ * piece, and only if it beats the cheapest single price - otherwise it saves nothing.
+ */
+function bestDeal(offers: Offer[], cheapestSingle: number) {
+  let best: { shopId: string; quantity: number; price: number; perPiece: number } | null = null;
+  for (const o of offers) {
+    if (!o.multiBuy || o.multiBuy.quantity < 2) continue;
+    const perPiece = o.multiBuy.price / o.multiBuy.quantity;
+    if (perPiece < cheapestSingle - 0.005 && (!best || perPiece < best.perPiece)) {
+      best = { shopId: o.shopId, quantity: o.multiBuy.quantity, price: o.multiBuy.price, perPiece };
+    }
+  }
+  return best;
 }
 
 /** Per-liter price, badges and the report link under a price. */

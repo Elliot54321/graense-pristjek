@@ -286,6 +286,23 @@ function CheckLinks({ shops }: { shops: Shop[] }) {
   );
 }
 
+/**
+ * Under a line with a multi-buy deal: what the deal saved, or how many more to buy
+ * to get it ("Køb 1 mere: 2 for 119,98"). Only when the deal beats the single price.
+ */
+function DealNote({ buy, cost }: { buy: NonNullable<LineResult["buy"]>; cost: number }) {
+  const deal = buy.deal;
+  if (!deal || deal.quantity < 2 || deal.price >= deal.quantity * buy.price - 0.005) return null;
+  const saved = buy.quantity * buy.price - cost;
+  const short = deal.quantity - (buy.quantity % deal.quantity);
+  return (
+    <span className="block text-xs text-sky-800 dark:text-sky-300">
+      {saved > 0.005 && `Sparer ${kr(saved)} kr. med ${deal.quantity} for ${kr(deal.price)}. `}
+      {short < deal.quantity && `Køb ${short} mere: ${deal.quantity} for ${kr(deal.price)} (${kr(deal.price / deal.quantity)} kr. stk.)`}
+    </span>
+  );
+}
+
 /** One basket item in one shop: what to buy, or the estimate when the shop lacks it. */
 function LineRow({ line: l, shop }: { line: LineResult; shop: Shop | undefined }) {
   // Newsletter shops only show part of their range, so the item is probably there.
@@ -299,6 +316,7 @@ function LineRow({ line: l, shop }: { line: LineResult; shop: Shop | undefined }
             {l.buy.onOffer && <OfferBadge endsAt={l.buy.offerEndsAt} />}
             {l.buy.multiBuy && <MultiBuyBadge quantity={l.buy.multiBuy.quantity} price={l.buy.multiBuy.price} />}
             {l.buy.coupon && <CouponBadge />}
+            <DealNote buy={l.buy} cost={l.cost!} />
           </a>
           <span className="shrink-0 tabular-nums">
             {kr(l.cost!)}

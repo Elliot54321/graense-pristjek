@@ -72,6 +72,8 @@ export interface LineResult {
     offerEndsAt: string | null;
     /** Set when a multi-buy deal was used for (part of) the quantity. */
     multiBuy: { quantity: number; price: number } | null;
+    /** The shop's multi-buy deal for this item, used or not (for "buy 1 more" tips). */
+    deal: { quantity: number; price: number } | null;
     coupon: boolean;
   } | null;
   cost: number | null;
