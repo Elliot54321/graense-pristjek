@@ -115,6 +115,25 @@ function singlesWithDeal(o: Offer): Offer {
   return { ...single, price: each, price_per_liter_or_kg: null, multi_buy: { quantity: n, total_price: o.price } };
 }
 
+/** "Pr. 1/2 kg", "Pr. kg", "Pr. 100 g" - a price for a weight, not for the pack. */
+const PER_WEIGHT = /^\s*pr\.?\s*(1\/2|½|\d+(?:[.,]\d+)?)?\s*(kg|g)\.?\s*$/i;
+
+/**
+ * Meat and pick-and-mix are priced per weight. Fleggaard's Hamburgerryg was read as pack
+ * "1,9 kg." (the piece) at "19,99 Pr. 1/2 kg", i.e. 19,99 for 1,9 kg = 10,52 kr./kg - and its
+ * steaks with no weight at all. When the stored weight isn't the priced weight, the product
+ * becomes that weight ("Hamburgerryg Pr. 1/2 kg", 0,5 kg), like Calle's reading of the same offer.
+ */
+function pricedByWeight(o: Offer): Offer {
+  const m = (o.price_unit ?? "").match(PER_WEIGHT);
+  if (!m) return o;
+  const amount = m[1] === "1/2" || m[1] === "½" ? 0.5 : Number((m[1] ?? "1").replace(",", "."));
+  const kg = m[2].toLowerCase() === "g" ? amount / 1000 : amount;
+  const stored = (o.unit_count ?? 1) * (o.unit_size ?? 0);
+  if (o.unit === "kg" && Math.abs(stored - kg) < 1e-9) return o;
+  return { ...o, pack: o.price_unit!.trim(), unit: "kg", unit_size: kg, unit_count: 1, price_per_liter_or_kg: null };
+}
+
 export function offersToProducts(
   data: Extracted,
   shop: string,
@@ -127,7 +146,7 @@ export function offersToProducts(
   for (const { page, result } of data.pages) {
     const until = sections.find((s) => page >= s.from && page <= s.to)?.validTo ?? validTo;
     for (const read of result.offers) {
-      const o = singlesWithDeal(read);
+      const o = pricedByWeight(singlesWithDeal(read));
       if (o.multi_buy && Math.abs(o.price - o.multi_buy.total_price) < 0.005 && printedSingle(o) === null) {
         console.warn(
           `  ! p${page} "${o.products[0]}": deal ${o.multi_buy.quantity} for ${o.multi_buy.total_price} without a printed single price - ` +

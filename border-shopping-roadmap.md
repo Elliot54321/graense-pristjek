@@ -763,3 +763,13 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
 - `linkNewsletterTwins` now also lets a new, unmatched offer join its matched Fleggaard/Calle twin.
   Joined: Yum Yum, Galle & Jessen, A+ Pure (equal after the Fleggaard single-price fix). Yum Yum Chicken
   and Shrimp are Calle-only, matched in the nightly run.
+
+### Prices per ½ kg (2026-11-12)
+- Hamburgerryg: Calle prints "Pr. 1/2 kg 19,99, Pr. kg 39,98" (stored right: 0,5 kg at 19,99). Fleggaard
+  prints the same 19,99 per ½ kg plus "1,9 kg." and "Pr. kg 42,10" (probably a whole ~1,9 kg piece at
+  79,99 - the page contradicts itself); it was stored as 19,99 for 1,9 kg = 10,52 kr./kg, a false cheapest.
+  Fleggaard's Flæskesteg, Rib Eye and Oksemørbrad on the same page had no weight at all.
+- `import.ts` (`pricedByWeight`): a price "Pr. 1/2 kg" / "Pr. kg" / "Pr. 100 g" whose stored weight
+  differs becomes that weight ("Hamburgerryg Pr. 1/2 kg", 0,5 kg), like Calle's. Correct readings keep
+  their names (Calle, pick-and-mix per 100 g). Re-import retired the 4 old rows; Hamburgerryg and
+  Oksemørbrad joined their Calle twins; Flæskesteg and Rib Eye get matched in the nightly run.
