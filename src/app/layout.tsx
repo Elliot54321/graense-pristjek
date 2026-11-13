@@ -35,8 +35,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="flex min-h-full flex-col font-sans">
         <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/95 backdrop-blur dark:border-zinc-800 dark:bg-black/90">
           <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3">
-            <Link href="/" className="text-lg font-semibold tracking-tight">
-              {SITE_NAME}
+            {/* One word like the domain, but two-toned so "Pris" and "grænsen" read apart. */}
+            <Link href="/" aria-label={SITE_NAME} className="text-2xl font-bold tracking-tight sm:text-3xl">
+              <span aria-hidden>
+                Pris<span className="text-emerald-600">grænsen</span>
+              </span>
             </Link>
             <BasketLink />
           </div>

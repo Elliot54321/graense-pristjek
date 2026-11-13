@@ -23,7 +23,10 @@ export default function Image() {
           color: "#fafafa",
         }}
       >
-        <div style={{ display: "flex", fontSize: 40, color: "#34d399", fontWeight: 600 }}>{SITE_NAME}</div>
+        {/* Same two-tone wordmark as the header: "Pris" plain, "grænsen" green. */}
+        <div style={{ display: "flex", fontSize: 44, fontWeight: 700 }}>
+          Pris<span style={{ color: "#34d399" }}>grænsen</span>
+        </div>
         <div style={{ display: "flex", flexDirection: "column" }}>
           <div style={{ fontSize: 84, fontWeight: 700, lineHeight: 1.05 }}>Find den billigste</div>
           <div style={{ fontSize: 84, fontWeight: 700, lineHeight: 1.05 }}>grænsebutik</div>
