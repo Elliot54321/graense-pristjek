@@ -860,3 +860,7 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   estimated item is one we have no listing for. The (i) text was shortened the same day. Found while testing:
   Poetzsch and Scandinavian Park both sell "Haribo Matador Mix 1 kg" although our list showed it as missing there -
   matching gaps for the later review.
+- **Always light (2026-11-13, user decision):** the site followed the device's dark-mode setting; it's now always
+  black on white (`globals.css`: Tailwind's `dark:` variant only applies under a `.dark` class nothing sets, plus
+  `color-scheme: light`). The `dark:` classes stay in the code, so a dark mode could return later as a toggle. The
+  front page's search box stays a dark block by design.

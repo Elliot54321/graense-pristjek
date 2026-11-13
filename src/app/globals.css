@@ -1,8 +1,18 @@
 @import "tailwindcss";
 
+/*
+ * The site is always black on white (user decision 2026-11-13), whatever the device's
+ * dark-mode setting. Tailwind's `dark:` styles in the components only apply under a
+ * `.dark` class that nothing sets, so they're switched off but kept - a dark mode could
+ * come back later as a toggle by setting that class.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  /* Light form controls and scrollbars even when the device is in dark mode. */
+  color-scheme: light;
 }
 
 @theme inline {
@@ -10,13 +20,6 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
