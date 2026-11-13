@@ -59,7 +59,7 @@ export function FeedbackForm({ context }: { context: Context }) {
       {state.status === "error" && <p className="text-sm text-red-700 dark:text-red-400">{state.message}</p>}
       <button
         disabled={pending}
-        className="rounded-lg bg-zinc-900 px-4 py-3 font-medium text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+        className="rounded-lg bg-zinc-700 px-4 py-3 font-medium text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
       >
         {pending ? "Sender…" : "Send"}
       </button>

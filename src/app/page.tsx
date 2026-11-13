@@ -42,13 +42,13 @@ export default function Home(props: PageProps<"/">) {
 function Hero({ query }: { query: string }) {
   if (query) {
     return (
-      <div className="rounded-2xl bg-zinc-950 p-3 sm:p-4 dark:border dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="rounded-2xl bg-zinc-700 p-3 sm:p-4 dark:border dark:border-zinc-800 dark:bg-zinc-900">
         <SearchBox query={query} />
       </div>
     );
   }
   return (
-    <section className="rounded-3xl bg-zinc-950 px-5 py-10 text-center text-white sm:px-10 sm:py-16 dark:border dark:border-zinc-800 dark:bg-zinc-900">
+    <section className="rounded-3xl bg-zinc-700 px-5 py-10 text-center text-white sm:px-10 sm:py-16 dark:border dark:border-zinc-800 dark:bg-zinc-900">
       <h1 className="text-balance text-3xl font-bold tracking-tight sm:text-5xl">Find det billigste ved grænsen</h1>
       <p className="mx-auto mt-3 max-w-2xl text-balance text-sm text-zinc-300 sm:mt-4 sm:text-lg">
         Sammenlign priser hos Fleggaard, Calle, Poetzsch, Scandinavian Park og BorderShop – og se hvor hele din

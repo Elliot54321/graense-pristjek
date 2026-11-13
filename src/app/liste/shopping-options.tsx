@@ -180,7 +180,7 @@ function OptionCard({
   const compareName = compare?.stops.map((s) => s.name).join(" + ");
 
   return (
-    <li className={`rounded-lg border p-4 ${best ? "border-emerald-500 ring-1 ring-emerald-500" : "border-zinc-200 dark:border-zinc-800"}`}>
+    <li className={`rounded-xl border bg-zinc-100 p-4 ${best ? "border-emerald-500 ring-1 ring-emerald-500" : "border-zinc-200 dark:border-zinc-800"}`}>
       <div className="flex items-baseline justify-between gap-3">
         <div className="min-w-0">
           <h3 className="font-semibold">

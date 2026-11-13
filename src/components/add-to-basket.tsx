@@ -35,7 +35,7 @@ export function AddToBasket({
       onClick={() => addToBasket(item)}
       className={`min-h-10 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
         variant === "primary"
-          ? "border border-zinc-900 bg-zinc-900 text-white hover:bg-zinc-700 dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+          ? "border border-zinc-700 bg-zinc-700 text-white hover:bg-zinc-600 dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
           : "border border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-transparent dark:text-zinc-100 dark:hover:bg-zinc-800"
       } ${className}`}
     >

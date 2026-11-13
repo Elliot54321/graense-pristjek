@@ -46,7 +46,7 @@ function FamilyCard({ family, shops, page }: { family: FamilyResult; shops: Map<
   const shown = bestPack ?? family.packs[0];
   const others = family.packs.filter((p) => p !== shown);
   return (
-    <li className="flex flex-col rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+    <li className="flex flex-col rounded-xl border border-zinc-200 bg-zinc-100 p-4 dark:border-zinc-800">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-lg font-semibold leading-snug">{family.name}</h2>
@@ -76,20 +76,20 @@ function FamilyCard({ family, shops, page }: { family: FamilyResult; shops: Map<
           />
         )}
       </div>
-      <ul className="mt-3 border-t border-zinc-200 dark:border-zinc-800">
+      <ul className="mt-3 border-t border-zinc-300 dark:border-zinc-800">
         <PackRow pack={shown} shops={shops} page={page} />
       </ul>
       {others.length > 0 && (
         // Right under the pack, not pinned to the card's bottom: when a neighbour in the row opens
         // and this card stretches, the toggle should stay next to its pack.
-        <details className="group/sizes border-t border-zinc-200 dark:border-zinc-800">
+        <details className="group/sizes border-t border-zinc-300 dark:border-zinc-800">
           <summary className="-mx-1 flex min-h-11 cursor-pointer list-none items-center gap-1.5 px-1 text-sm font-medium [&::-webkit-details-marker]:hidden">
             <span aria-hidden className="inline-block text-xs transition-transform group-open/sizes:rotate-90">
               ▶
             </span>
             Andre varianter ({others.length})
           </summary>
-          <ul className="divide-y divide-zinc-200 border-t border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+          <ul className="divide-y divide-zinc-300 border-t border-zinc-300 dark:divide-zinc-800 dark:border-zinc-800">
             {others.map((p) => (
               <PackRow key={p.productId} pack={p} shops={shops} page={page} />
             ))}
@@ -225,7 +225,7 @@ function ProductPhoto({ url }: { url: string | null }) {
   return (
     <div
       className={`flex h-24 w-24 shrink-0 sm:h-28 sm:w-28 items-center justify-center overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-700 ${
-        url ? "bg-white" : "bg-zinc-100 dark:bg-zinc-800"
+        url ? "bg-white" : "bg-zinc-200 dark:bg-zinc-800"
       }`}
     >
       {url && (
