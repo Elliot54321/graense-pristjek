@@ -42,7 +42,7 @@ const shopName = (shops: Map<string, Shop>, id: string) => shops.get(id)?.name ?
 function FamilyCard({ family, shops, page }: { family: FamilyResult; shops: Map<string, Shop>; page: string }) {
   const bestPack = family.best ? family.packs.find((p) => p.name === family.best!.productName) : undefined;
   // One pack per card - the cheapest per liter/kg, which "Billigste på listen" adds too -
-  // so cards in the grid line up; the other sizes are one tap away.
+  // so cards in the grid line up; the other variants (sizes, cans vs bottles) are one tap away.
   const shown = bestPack ?? family.packs[0];
   const others = family.packs.filter((p) => p !== shown);
   return (
@@ -87,7 +87,7 @@ function FamilyCard({ family, shops, page }: { family: FamilyResult; shops: Map<
             <span aria-hidden className="inline-block text-xs transition-transform group-open/sizes:rotate-90">
               ▶
             </span>
-            Andre størrelser ({others.length})
+            Andre varianter ({others.length})
           </summary>
           <ul className="divide-y divide-zinc-200 border-t border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
             {others.map((p) => (
