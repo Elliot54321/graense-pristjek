@@ -845,3 +845,9 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   ("8,83 kr. pr. liter", "ved 3 stk." for deal rates) and the pack price under it ("69,95 kr. for 24 x 0,33 l hos
   BorderShop Puttgarden"); green stays reserved for the card's cheapest. Products without a liter/kg content keep the
   pack price as the headline. "Priser i alle butikker" and the list page still show kroner (same pack / chosen amount).
+- **Estimated-price explanation (2026-11-13, user request):** an (i) icon after "1 af 2 varer har ingen pris her"
+  (`components/info-tip.tsx`) explains why: newsletter shops ("Priserne fra Fleggaard kommer fra butikkens avis, som
+  kun viser en del af sortimentet") or webshops ("... nogle varer findes ikke i webshoppen, selv om butikken kan have
+  dem"), that the highest price elsewhere is used so the total isn't too low, and to check the real price via the
+  link. Opens on mouse hover and on tap (phones have no hover); placed from the icon's screen position so it stays
+  inside a 375 px screen.

@@ -6,6 +6,7 @@ import { CAR_TYPES, type CarType, oneWayKm, oneWayMinutes, regionOf } from "@/ca
 import type { LineResult, Shop, ShopResult } from "@/catalog/types";
 import { CouponBadge, MultiBuyBadge, OfferBadge } from "@/components/badges";
 import { updateBasketItem } from "@/components/basket";
+import { InfoTip } from "@/components/info-tip";
 import { ReportLink } from "@/components/report-link";
 import { duration, kr, krRound } from "@/lib/format";
 
@@ -211,7 +212,10 @@ function OptionCard({
       )}
       {estimated > 0 && (
         <p className="mt-1 text-sm text-amber-700 dark:text-amber-400">
-          {estimated} af {items} varer har ingen pris her – regnet med en estimeret pris
+          {estimated} af {items} varer har ingen pris her – regnet med en estimeret pris{" "}
+          <InfoTip label="Hvad er en estimeret pris?">
+            <EstimateExplanation shops={o.stops.flatMap((st) => shops.get(st.shopId) ?? [])} />
+          </InfoTip>
         </p>
       )}
       {o.area.ferry && (
@@ -270,6 +274,25 @@ function OptionCard({
         )}
       </details>
     </li>
+  );
+}
+
+/**
+ * Why a price is estimated. Newsletter shops (Fleggaard, Calle) only show part of their
+ * range in the newsletter; the others are read from their webshop, which can lack items
+ * the store has.
+ */
+function EstimateExplanation({ shops }: { shops: Shop[] }) {
+  const names = shops.map((s) => s.name).join(" og ");
+  const newsletter = shops.length > 0 && shops.every((s) => NEWSLETTER_SHOPS.has(s.id));
+  return (
+    <>
+      {newsletter
+        ? `Priserne fra ${names} kommer fra ${shops.length > 1 ? "deres aviser" : "butikkens avis"}, som kun viser en del af sortimentet.`
+        : `Vi har ikke priser fra ${names} på alle varer – nogle varer findes ikke i webshoppen, selv om butikken kan have dem.`}{" "}
+      Derfor regner vi med den højeste pris i de andre butikker, så totalen ikke ser for billig ud. Tjek den rigtige pris
+      via linket ved varen.
+    </>
   );
 }
 
