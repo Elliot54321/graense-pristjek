@@ -9,8 +9,8 @@ import { kr, PER_UNIT_LABEL } from "@/lib/format";
 export function FamilyList({ families, shops, page, shown = 6 }: { families: FamilyResult[]; shops: Shop[]; page: string; shown?: number }) {
   const shopById = new Map(shops.map((s) => [s.id, s]));
   const hasCoupon = families.some((f) => f.packs.some((p) => p.offers.some((o) => o.coupon)));
-  // Two columns on wide screens; cards keep their own height (items-start).
-  const grid = "grid items-start gap-4 lg:grid-cols-2";
+  // Two columns on wide screens; cards in a row stretch to the same height so the borders line up.
+  const grid = "grid gap-4 lg:grid-cols-2";
   return (
     <>
       <ul className={`mt-6 ${grid}`}>
@@ -20,8 +20,8 @@ export function FamilyList({ families, shops, page, shown = 6 }: { families: Fam
       </ul>
       {/* Broad words ("cola") match many families; the best-ranked come first, the rest one tap away. */}
       {families.length > shown && (
-        <details className="group mt-4">
-          <summary className="mx-auto flex min-h-11 max-w-md cursor-pointer items-center justify-center rounded-lg border border-zinc-300 text-sm font-medium group-open:hidden dark:border-zinc-700">
+        <details className="group/more mt-4">
+          <summary className="mx-auto flex min-h-11 max-w-md cursor-pointer items-center justify-center rounded-lg border border-zinc-300 text-sm font-medium group-open/more:hidden dark:border-zinc-700">
             Vis {families.length - shown} flere varer
           </summary>
           <ul className={grid}>
@@ -41,8 +41,12 @@ const shopName = (shops: Map<string, Shop>, id: string) => shops.get(id)?.name ?
 
 function FamilyCard({ family, shops, page }: { family: FamilyResult; shops: Map<string, Shop>; page: string }) {
   const bestPack = family.best ? family.packs.find((p) => p.name === family.best!.productName) : undefined;
+  // One pack per card - the cheapest per liter/kg, which "Billigste på listen" adds too -
+  // so cards in the grid line up; the other sizes are one tap away.
+  const shown = bestPack ?? family.packs[0];
+  const others = family.packs.filter((p) => p !== shown);
   return (
-    <li className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+    <li className="flex flex-col rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-lg font-semibold leading-snug">{family.name}</h2>
@@ -72,11 +76,26 @@ function FamilyCard({ family, shops, page }: { family: FamilyResult; shops: Map<
           />
         )}
       </div>
-      <ul className="mt-3 divide-y divide-zinc-200 border-t border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
-        {family.packs.map((p) => (
-          <PackRow key={p.productId} pack={p} shops={shops} page={page} />
-        ))}
+      <ul className="mt-3 border-t border-zinc-200 dark:border-zinc-800">
+        <PackRow pack={shown} shops={shops} page={page} />
       </ul>
+      {others.length > 0 && (
+        // Right under the pack, not pinned to the card's bottom: when a neighbour in the row opens
+        // and this card stretches, the toggle should stay next to its pack.
+        <details className="group/sizes border-t border-zinc-200 dark:border-zinc-800">
+          <summary className="-mx-1 flex min-h-11 cursor-pointer list-none items-center gap-1.5 px-1 text-sm font-medium [&::-webkit-details-marker]:hidden">
+            <span aria-hidden className="inline-block text-xs transition-transform group-open/sizes:rotate-90">
+              ▶
+            </span>
+            Andre størrelser ({others.length})
+          </summary>
+          <ul className="divide-y divide-zinc-200 border-t border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+            {others.map((p) => (
+              <PackRow key={p.productId} pack={p} shops={shops} page={page} />
+            ))}
+          </ul>
+        </details>
+      )}
     </li>
   );
 }
@@ -119,9 +138,9 @@ function PackRow({ pack, shops, page }: { pack: Pack; shops: Map<string, Shop>; 
         </div>
       </div>
       {rest.length > 0 && (
-        <details className="group mt-1">
+        <details className="group/shops mt-1">
           <summary className="-mx-1 flex min-h-10 cursor-pointer list-none items-center gap-1.5 px-1 text-sm text-zinc-700 [&::-webkit-details-marker]:hidden dark:text-zinc-300">
-            <span aria-hidden className="inline-block text-xs transition-transform group-open:rotate-90">
+            <span aria-hidden className="inline-block text-xs transition-transform group-open/shops:rotate-90">
               ▶
             </span>
             Priser i alle {pack.offers.length} butikker

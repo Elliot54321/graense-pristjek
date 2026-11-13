@@ -834,3 +834,9 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   availability like search. Weak spot: groceries and household have no common-items entries, so e.g. Husholdning
   opens with Lip Smacker (sold in several shops) - improve with search/click data in Phase 5. Icons: `lucide-react`.
   Danish 404 page added.
+- **One pack per result card (2026-11-13, user request):** families have 1-7 packs, so cards in the two-column grid
+  had very different heights. Each card now shows only the pack that's cheapest per liter/kg (the one "Billigste på
+  listen" adds), with the rest under "Andre størrelser (N)"; cards in a row stretch to equal height. An expandable list
+  was chosen over a `<select>` dropdown, which can't show photos or prices and covers the page on phones. Fixed in
+  passing: nested "Vis flere varer" / "Priser i alle butikker" toggles shared one Tailwind `group`, so opening the outer
+  one turned every inner arrow; they now use named groups.
