@@ -3,7 +3,7 @@ import { SOURCE_URL as TOLD_URL } from "@/catalog/import-limits";
 import { CONTACT_EMAIL } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: "Om siden",
+  title: "Om os",
   description: "Hvor priserne kommer fra, hvor præcise de er, og hvordan Prisgrænsen håndterer dine data.",
 };
 
@@ -97,7 +97,7 @@ export default function AboutPage() {
         ) : (
           <>
             Kontaktoplysninger følger snart. Indtil da kan du{" "}
-            <a href="/fejl" className={a}>
+            <a href="/kontakt" className={a}>
               rapportere en fejl her
             </a>
             .

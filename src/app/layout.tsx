@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { BasketLink } from "@/components/basket-link";
 import { Freshness } from "@/components/freshness";
+import { MobileMenu, SiteNav } from "@/components/site-nav";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
 import "./globals.css";
 
@@ -34,14 +35,18 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="da" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col font-sans">
         <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/95 backdrop-blur dark:border-zinc-800 dark:bg-black/90">
-          <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3">
+          <div className="relative mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3">
             {/* One word like the domain, but two-toned so "Pris" and "grænsen" read apart. */}
             <Link href="/" aria-label={SITE_NAME} className="text-2xl font-bold tracking-tight sm:text-3xl">
               <span aria-hidden>
                 Pris<span className="text-emerald-600">grænsen</span>
               </span>
             </Link>
-            <BasketLink />
+            <SiteNav />
+            <div className="flex items-center gap-2 md:ml-auto">
+              <BasketLink />
+              <MobileMenu />
+            </div>
           </div>
         </header>
         <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-5">{children}</div>
@@ -51,12 +56,16 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <Freshness />
           </Suspense>
           <p className="mt-2">
+            <Link href="/guide" className="underline underline-offset-2">
+              Sådan gør du
+            </Link>
+            {" · "}
             <Link href="/om" className="underline underline-offset-2">
-              Om siden
+              Om os
             </Link>{" "}
-            – hvor priserne kommer fra, og hvordan vi håndterer dine data.{" "}
-            <Link href="/fejl" className="underline underline-offset-2">
-              Fundet en fejl?
+            – hvor priserne kommer fra, og hvordan vi håndterer dine data.{" · "}
+            <Link href="/kontakt" className="underline underline-offset-2">
+              Kontakt
             </Link>
           </p>
         </footer>

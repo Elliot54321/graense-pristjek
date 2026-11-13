@@ -13,7 +13,8 @@ export interface Context {
   page?: string;
 }
 
-export function FeedbackForm({ context }: { context: Context }) {
+/** general: a contact message rather than a report about a specific price. */
+export function FeedbackForm({ context, general = false }: { context: Context; general?: boolean }) {
   const [state, action, pending] = useActionState<FeedbackState, FormData>(sendFeedback, { status: "idle" });
 
   if (state.status === "sent") {
@@ -45,7 +46,7 @@ export function FeedbackForm({ context }: { context: Context }) {
       {/* Bot trap: hidden from people, so only bots fill it in. */}
       <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden className="hidden" />
       <label className="flex flex-col gap-1 text-sm">
-        Hvad er forkert? (fx forkert pris, forkert vare, eller varen findes ikke længere)
+        {general ? "Din besked" : "Hvad er forkert? (fx forkert pris, forkert vare, eller varen findes ikke længere)"}
         <textarea
           name="message"
           required

@@ -870,3 +870,10 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
 - **Logo (2026-11-13):** the header wordmark is bigger (24 px, 30 px on wider screens) and two-toned - "Pris" black,
   "grænsen" green - so it reads as two parts while staying one word like the domain (two words were considered:
   "Pris Grænsen" no longer matches prisgraensen.dk). The share image uses the same two-tone wordmark.
+- **Header menu, guide and contact (2026-11-13, user request):** next to the logo: "Sådan gør du" (`/guide`, six
+  steps: find items, put them on the list, see where it's cheapest, multi-buy and coupons, estimated prices, import
+  rules), "Om os" (`/om`) and "Kontakt" (`/kontakt`). On phones the links sit behind a menu button next to
+  "Indkøbsliste". `/fejl` became `/kontakt`: a general message form plus the contact email, and the same page shows
+  "Fundet en fejl?" with the shop/product/price when opened from a "Fejl?" link (`/fejl` redirects, keeping the
+  query). Messages land in the same `feedback` table as reports. Dev-server quirk seen while testing: the pre-filled
+  form sometimes stayed hidden behind its loading placeholder under `next dev`; the production build shows it fine.

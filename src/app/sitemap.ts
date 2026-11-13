@@ -7,6 +7,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
   return [
     { url: SITE_URL, changeFrequency: "daily", priority: 1 },
     ...CATEGORIES.map((c) => ({ url: `${SITE_URL}/kategori/${c.slug}`, changeFrequency: "daily" as const, priority: 0.8 })),
+    { url: `${SITE_URL}/guide`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${SITE_URL}/om`, changeFrequency: "monthly", priority: 0.5 },
+    { url: `${SITE_URL}/kontakt`, changeFrequency: "yearly", priority: 0.3 },
   ];
 }
