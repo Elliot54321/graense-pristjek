@@ -25,7 +25,7 @@ export default function CategoryPage(props: PageProps<"/kategori/[slug]">) {
   // The slug is read inside Suspense, so the page shell (search box) shows instantly.
   return (
     <main>
-      <div className="rounded-2xl bg-zinc-700 p-3 sm:p-4 dark:border dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="rounded-2xl bg-zinc-800 p-3 sm:p-4 dark:border dark:border-zinc-800 dark:bg-zinc-900">
         <SearchBox query="" />
       </div>
       <Suspense fallback={<CategoryRow />}>

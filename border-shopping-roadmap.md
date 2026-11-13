@@ -865,5 +865,5 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   `color-scheme: light`). The `dark:` classes stay in the code, so a dark mode could return later as a toggle. The
   front page's search box stays a dark block by design.
 - **Softer colours (2026-11-13, user request):** the search box, the "Indkøbsliste" button and other dark buttons
-  went from near-black (zinc-900/950) to dark grey (zinc-700); product cards and the shop recommendation cards on
+  went from near-black (zinc-900/950) to dark grey (zinc-700; the search box itself one step darker, zinc-800); product cards and the shop recommendation cards on
   /liste are light grey (zinc-100) so they stand out from the white page, with slightly darker dividers inside.
