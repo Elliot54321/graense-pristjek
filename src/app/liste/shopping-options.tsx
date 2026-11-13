@@ -7,6 +7,7 @@ import type { LineResult, Shop, ShopResult } from "@/catalog/types";
 import { CouponBadge, MultiBuyBadge, OfferBadge } from "@/components/badges";
 import { updateBasketItem } from "@/components/basket";
 import { InfoTip } from "@/components/info-tip";
+import { shopSearchUrl } from "@/catalog/shop-search";
 import { ReportLink } from "@/components/report-link";
 import { duration, kr, krRound } from "@/lib/format";
 
@@ -257,7 +258,7 @@ function OptionCard({
               <li key={m.label} className="flex justify-between gap-3 py-0.5 text-zinc-500">
                 <span className="min-w-0 flex-1">
                   {m.label}: ikke fundet i disse butikker – estimeret pris{" "}
-                  <CheckLinks shops={o.stops.flatMap((st) => shops.get(st.shopId) ?? [])} />
+                  <CheckLinks shops={o.stops.flatMap((st) => shops.get(st.shopId) ?? [])} item={m.label} />
                 </span>
                 <span className="tabular-nums">{m.estimate === null ? "–" : `~${kr(m.estimate)}`}</span>
               </li>
@@ -277,38 +278,45 @@ function OptionCard({
   );
 }
 
-/**
- * Why a price is estimated. Newsletter shops (Fleggaard, Calle) only show part of their
- * range in the newsletter; the others are read from their webshop, which can lack items
- * the store has.
- */
+/** Why a price is estimated: we don't have every price (newsletters show part of the range, webshops lack some items). */
 function EstimateExplanation({ shops }: { shops: Shop[] }) {
-  const names = shops.map((s) => s.name).join(" og ");
-  const newsletter = shops.length > 0 && shops.every((s) => NEWSLETTER_SHOPS.has(s.id));
   return (
     <>
-      {newsletter
-        ? `Priserne fra ${names} kommer fra ${shops.length > 1 ? "deres aviser" : "butikkens avis"}, som kun viser en del af sortimentet.`
-        : `Vi har ikke priser fra ${names} på alle varer – nogle varer findes ikke i webshoppen, selv om butikken kan have dem.`}{" "}
-      Derfor regner vi med den højeste pris i de andre butikker, så totalen ikke ser for billig ud. Tjek den rigtige pris
-      via linket ved varen.
+      Vi har ikke alle priser fra {shops.map((s) => s.name).join(" og ")}, men butikken kan stadig have varen. Vi regner med
+      den højeste pris fra de andre butikker – tjek den rigtige pris via linket ved varen.
     </>
   );
 }
 
-/** "(tjek calle.dk, poetzsch-padborg.dk)" - where to double-check an estimated price. */
-function CheckLinks({ shops }: { shops: Shop[] }) {
+/**
+ * Where to check an estimated price: the shop's own search for the item ("søg hos Poetzsch
+ * Padborg"), or its website when it has no search address ("tjek fleggaard.dk").
+ */
+function CheckLinks({ shops, item }: { shops: Shop[]; item: string }) {
+  const link = "underline underline-offset-2";
   return (
     <>
-      (tjek{" "}
-      {shops.map((shop, i) => (
-        <span key={shop.id}>
-          {i > 0 && ", "}
-          <a href={shop.website} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
-            {shop.website.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "")}
-          </a>
-        </span>
-      ))}
+      (
+      {shops.map((shop, i) => {
+        const search = shopSearchUrl(shop.id, item);
+        return (
+          <span key={shop.id}>
+            {i > 0 && ", "}
+            {search ? (
+              <a href={search} target="_blank" rel="noopener noreferrer" className={link}>
+                søg hos {shop.name}
+              </a>
+            ) : (
+              <>
+                tjek{" "}
+                <a href={shop.website} target="_blank" rel="noopener noreferrer" className={link}>
+                  {shop.website.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "")}
+                </a>
+              </>
+            )}
+          </span>
+        );
+      })}
       )
     </>
   );
@@ -374,7 +382,7 @@ function LineRow({ line: l, shop }: { line: LineResult; shop: Shop | undefined }
         <>
           <span className="min-w-0 flex-1 text-zinc-500">
             {l.label}: {newsletter ? "ikke i avisen" : "ikke i webshoppen"} – estimeret pris{" "}
-            {shop && <CheckLinks shops={[shop]} />}
+            {shop && <CheckLinks shops={[shop]} item={l.label} />}
           </span>
           <span className="tabular-nums text-zinc-500">~{kr(l.estimate)}</span>
         </>

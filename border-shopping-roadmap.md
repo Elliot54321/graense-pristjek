@@ -851,3 +851,12 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   dem"), that the highest price elsewhere is used so the total isn't too low, and to check the real price via the
   link. Opens on mouse hover and on tap (phones have no hover); placed from the icon's screen position so it stays
   inside a 375 px screen.
+- **Search links for estimated items (2026-11-13, user request):** "(tjek poetzsch-padborg.dk)" became "(søg hos
+  Poetzsch Padborg)", opening the shop's own search for the item (`src/catalog/shop-search.ts`; first two words of
+  the item name without sizes, e.g. "Haribo Matador"). Search addresses checked by hand: Poetzsch `/search?search=`,
+  BorderShop `/da/puttgarden|rostock/search?text=`, Scandinavian Park `/?qs=`. Fleggaard and Calle search only via
+  JavaScript (no search address found; Fleggaard's form just adds `?q=` to the front page), so they keep their front
+  page link - if someone finds a working search address, add it to `SEARCH`. A product page link isn't possible: an
+  estimated item is one we have no listing for. The (i) text was shortened the same day. Found while testing:
+  Poetzsch and Scandinavian Park both sell "Haribo Matador Mix 1 kg" although our list showed it as missing there -
+  matching gaps for the later review.
