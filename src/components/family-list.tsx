@@ -111,6 +111,15 @@ function PackRow({ pack, shops, page }: { pack: Pack; shops: Map<string, Shop>; 
   const [best, ...rest] = pack.offers;
   const low = effectivePrice(best);
   const ties = rest.filter((o) => Math.abs(effectivePrice(o) - low) < 0.005).length;
+  // The headline is the price per liter/kg: packs differ in size, so it's the number to compare
+  // between variants (a 9 kr. bottle vs a 69 kr. crate). The pack price is what you pay, shown under it.
+  const perUnit = best.pricePerUnit !== null && pack.contentUnit ? (best.pricePerUnit * low) / best.price : null;
+  const deal = dealPerPiece(best) !== null ? best.multiBuy : null;
+  const packPrice = (
+    <>
+      {kr(low)} kr.{low < best.price && " stk."}
+    </>
+  );
   return (
     <li className="py-3">
       {/* Photo left, text and button right; the button sits under the price so the photo can be large. */}
@@ -119,16 +128,31 @@ function PackRow({ pack, shops, page }: { pack: Pack; shops: Map<string, Shop>; 
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium">
             {pack.name}
-            {pack.packLabel && <span className="font-normal text-zinc-500"> · {pack.packLabel}</span>}
+            {/* The pack size is in the price line below ("69,95 kr. for 24 x 0,33 l") when there is one. */}
+            {pack.packLabel && perUnit === null && <span className="font-normal text-zinc-500"> · {pack.packLabel}</span>}
           </p>
-          <p className="mt-1 text-sm">
-            <strong className="text-base tabular-nums">
-              {kr(low)} kr.{low < best.price && " stk."}
-            </strong>{" "}
-            hos {shopName(shops, best.shopId)}
-            {ties > 0 && <span className="text-zinc-500"> (+{ties} til samme pris)</span>}
-          </p>
-          <OfferDetails offer={best} pack={pack} page={page} />
+          {perUnit !== null && pack.contentUnit ? (
+            <>
+              <p className="mt-1">
+                <strong className="text-lg tabular-nums">{kr(perUnit)} kr.</strong>{" "}
+                <span className="text-sm font-medium">{PER_UNIT_LABEL[pack.contentUnit]}</span>
+                {deal && <span className="text-sm text-zinc-500"> ved {deal.quantity} stk.</span>}
+              </p>
+              <p className="text-sm text-zinc-700 dark:text-zinc-300">
+                {/* "ved 3 stk." in the headline already says this is the deal rate. */}
+                <span className="tabular-nums">{kr(low)} kr.</span>
+                {pack.packLabel && <> for {pack.packLabel}</>} hos {shopName(shops, best.shopId)}
+                {ties > 0 && <span className="text-zinc-500"> (+{ties} til samme pris)</span>}
+              </p>
+            </>
+          ) : (
+            // Nothing to measure per liter/kg: the pack price is the comparison.
+            <p className="mt-1 text-sm">
+              <strong className="text-lg tabular-nums">{packPrice}</strong> hos {shopName(shops, best.shopId)}
+              {ties > 0 && <span className="text-zinc-500"> (+{ties} til samme pris)</span>}
+            </p>
+          )}
+          <OfferDetails offer={best} pack={pack} page={page} perUnit={false} />
           <AddToBasket
             label="Sæt på listen"
             variant="secondary"
@@ -172,11 +196,12 @@ function PackRow({ pack, shops, page }: { pack: Pack; shops: Map<string, Shop>; 
  * Per-liter price, badges and the report link under a price. With a multi-buy deal
  * the price above is the deal rate, so the single price is shown here ("71,99 kr. for 1").
  */
-function OfferDetails({ offer: o, pack, page }: { offer: Offer; pack: Pack; page: string }) {
+/** perUnit: false where the price per liter/kg is already the headline above. */
+function OfferDetails({ offer: o, pack, page, perUnit = true }: { offer: Offer; pack: Pack; page: string; perUnit?: boolean }) {
   const deal = dealPerPiece(o) !== null ? o.multiBuy : null;
   return (
     <div className="text-xs text-zinc-500">
-      {o.pricePerUnit !== null && pack.contentUnit && (
+      {perUnit && o.pricePerUnit !== null && pack.contentUnit && (
         <span>
           {kr((o.pricePerUnit * effectivePrice(o)) / o.price)} kr. {PER_UNIT_LABEL[pack.contentUnit]}
         </span>

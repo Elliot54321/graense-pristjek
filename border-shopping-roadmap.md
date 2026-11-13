@@ -840,3 +840,8 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   was chosen over a `<select>` dropdown, which can't show photos or prices and covers the page on phones. Fixed in
   passing: nested "Vis flere varer" / "Priser i alle butikker" toggles shared one Tailwind `group`, so opening the outer
   one turned every inner arrow; they now use named groups.
+- **Price per liter as the headline (2026-11-13, user request):** pack prices drew the eye, so cola variants read as
+  "9 kr. vs 69 kr." although per liter they're close. Each variant now leads with the price per liter/kg in large bold
+  ("8,83 kr. pr. liter", "ved 3 stk." for deal rates) and the pack price under it ("69,95 kr. for 24 x 0,33 l hos
+  BorderShop Puttgarden"); green stays reserved for the card's cheapest. Products without a liter/kg content keep the
+  pack price as the headline. "Priser i alle butikker" and the list page still show kroner (same pack / chosen amount).
