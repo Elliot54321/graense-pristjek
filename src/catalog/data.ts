@@ -12,13 +12,11 @@ import type { FamilyInfo } from "./import-limits";
 import { COMMON_ITEMS } from "@/matching/common-items";
 import { commonTier, finalScore, preScore } from "./ranking";
 import { packLabel } from "@/lib/format";
+import { POPULAR_PAGE, RESULTS_PAGE } from "./pages";
 import type { FamilyResult, Offer, Pack, Shop, Unit } from "./types";
 
+/** Most families rankFamilies() returns (pages are smaller; see RESULTS_PAGE and POPULAR_PAGE). */
 const MAX_FAMILIES = 30;
-/** Families fetched for a query before ranking (broad words like "øl" match hundreds). */
-const MAX_CANDIDATES = 400;
-/** Families whose prices are loaded for a category page before ranking. */
-const CATEGORY_SHORTLIST = 90;
 
 interface ProductRow {
   id: number;
@@ -211,61 +209,82 @@ async function loadPacks(productIds: number[], familyIds: number[]): Promise<Pac
     .filter((p) => p.offers.length > 0); // products no shop currently sells are left out
 }
 
+
 /**
- * Families whose name has a word starting with the query (spaces and hyphens
- * match each other), or whose search words contain every query word. Many
- * families can match a broad word like "øl", so up to MAX_CANDIDATES are
- * pre-ranked on name and search words, and only the best get prices loaded.
- * Ranking: see ranking.ts.
+ * Search: families whose name has a word starting with the query (spaces and hyphens
+ * match each other), or whose search words contain every query word - all of them,
+ * page by page ("rødvin" matched 727 families on 2026-11-14; it used to stop at 30).
+ * The order comes from name and search words (ranking.ts); within a page, prices are
+ * loaded and availability (shops, packs) breaks near-ties. Families nobody sells right
+ * now are left out, so a page can have fewer than RESULTS_PAGE.
  */
-export async function searchFamilies(rawQuery: string): Promise<FamilyResult[]> {
+export async function searchFamilies(rawQuery: string, page = 0): Promise<FamilyResult[]> {
   "use cache";
   cacheLife("hours");
-  const q = cleanQuery(rawQuery);
-  if (q.length < 2) return [];
+  const order = await searchOrder(cleanQuery(rawQuery));
+  return pageOf(order, page);
+}
 
+/** Whether a search has results after page `page` (pages can be short, so their size doesn't tell). */
+export async function searchHasMore(rawQuery: string, page: number): Promise<boolean> {
+  return (await searchOrder(cleanQuery(rawQuery))).length > (page + 1) * RESULTS_PAGE;
+}
+
+/** Whether a category has results after page `page`. */
+export async function categoryHasMore(category: string, page: number): Promise<boolean> {
+  return (await categoryOrder(category)).length > (page + 1) * RESULTS_PAGE;
+}
+
+/** Every family matching the query, best first by name and search words. */
+async function searchOrder(q: string): Promise<(FamilyRow & { pre: number })[]> {
+  "use cache";
+  cacheLife("hours");
+  if (q.length < 2) return [];
   const words = q.split(/[ -]/).filter(Boolean);
   // "_" matches any single character, so "coca cola" also finds "Coca-Cola".
   const pattern = q.replace(/[ -]/g, "_");
-  const { data: families, error } = await publicClient()
-    .from("product_families")
-    .select("id, name, category, search_words")
-    .or(`name.ilike.${pattern}*,name.ilike.* ${pattern}*,name.ilike.*-${pattern}*,search_words.cs.{${words.join(",")}}`)
-    .limit(MAX_CANDIDATES);
-  if (error) throw error;
-  if (!families.length) return [];
+  const families = await readAll<FamilyRow & { search_words: string[] | null }>(
+    "product_families",
+    "id, name, category, search_words",
+    ["id"],
+    (query) => query.or(`name.ilike.${pattern}*,name.ilike.* ${pattern}*,name.ilike.*-${pattern}*,search_words.cs.{${words.join(",")}}`),
+  );
+  return families
+    .map((f) => ({ id: f.id, name: f.name, category: f.category, pre: preScore(f.name, f.search_words ?? [], q) }))
+    .sort((a, b) => b.pre - a.pre || a.name.length - b.name.length);
+}
 
-  const pre = new Map(families.map((f) => [f.id, preScore(f.name, f.search_words ?? [], q)]));
-  return rankFamilies(families, pre, MAX_FAMILIES * 2);
+/** One page of an ordered family list, with prices; ranked by availability within the page. */
+async function pageOf(order: (FamilyRow & { pre: number })[], page: number): Promise<FamilyResult[]> {
+  const slice = order.slice(page * RESULTS_PAGE, (page + 1) * RESULTS_PAGE);
+  return rankFamilies(slice, new Map(slice.map((f) => [f.id, f.pre])), slice.length);
 }
 
 /**
- * The best families in a category (the category pages): with no query, the
- * hand-made list of common border items decides first, then shorter (more
- * generic) names; prices are loaded for the shortlist and availability ranks it.
+ * A category page: all its families, page by page. Without a query, "what people buy" is
+ * guessed from the common-items list and from how many shops sell the family (widely
+ * sold = mainstream); within a page, availability breaks near-ties.
  */
-export async function categoryFamilies(category: string): Promise<FamilyResult[]> {
+export async function categoryFamilies(category: string, page = 0): Promise<FamilyResult[]> {
   "use cache";
   cacheLife("hours");
-  const families: { id: number; name: string; category: string }[] = [];
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await publicClient()
-      .from("product_families")
-      .select("id, name, category")
-      .eq("category", category)
-      .order("id")
-      .range(from, from + 999);
-    if (error) throw error;
-    families.push(...data);
-    if (data.length < 1000) break;
-  }
-  // Without a query, "what people buy" is guessed from the common-items list and
-  // from how many shops sell the family (widely sold = mainstream).
-  const shops = await familyShopCounts();
-  const pre = new Map(
-    families.map((f) => [f.id, 40 * commonTier(f.name) + 12 * (shops.get(f.id) ?? 0) - 2 * Math.min(f.name.split(" ").length, 8)]),
-  );
-  return rankFamilies(families, pre, CATEGORY_SHORTLIST);
+  return pageOf(await categoryOrder(category), page);
+}
+
+async function categoryOrder(category: string): Promise<(FamilyRow & { pre: number })[]> {
+  "use cache";
+  cacheLife("hours");
+  const [families, shops] = await Promise.all([
+    readAll<FamilyRow>("product_families", "id, name, category", ["id"], (query) => query.eq("category", category)),
+    familyShopCounts(),
+  ]);
+  return families
+    .filter((f) => (shops.get(f.id) ?? 0) > 0) // nobody sells it right now
+    .map((f) => ({
+      ...f,
+      pre: 40 * commonTier(f.name) + 12 * (shops.get(f.id) ?? 0) - 2 * Math.min(f.name.split(" ").length, 8),
+    }))
+    .sort((a, b) => b.pre - a.pre || a.name.length - b.name.length);
 }
 
 /**
@@ -273,24 +292,30 @@ export async function categoryFamilies(category: string): Promise<FamilyResult[]
  * request also asks for the row count and the remaining pages are fetched in parallel -
  * one after another took ~2.7 s for matched_prices' 17,500 rows (2026-11-14).
  */
-async function readAll<T>(table: string, columns: string, orderBy: string[]): Promise<T[]> {
+async function readAll<T>(
+  table: string,
+  columns: string,
+  orderBy: string[],
+  // Narrows the rows, e.g. (q) => q.eq("category", "wine"). Typed loosely: Supabase's builder types don't survive a callback.
+  filter: (query: any) => any = (query) => query, // eslint-disable-line @typescript-eslint/no-explicit-any
+): Promise<T[]> {
   const PAGE = 1000;
   // orderBy must make rows unique (add a tiebreak column), or pages can overlap or skip rows.
   const page = (from: number, count = false) => {
-    let q = publicClient().from(table).select(columns, count ? { count: "exact" } : undefined);
+    let q = filter(publicClient().from(table).select(columns, count ? { count: "exact" } : undefined));
     for (const column of orderBy) q = q.order(column);
-    return q.range(from, from + PAGE - 1);
+    return q.range(from, from + PAGE - 1) as PromiseLike<{ data: T[] | null; error: Error | null; count: number | null }>;
   };
   const first = await page(0, true);
   if (first.error) throw first.error;
-  const total = first.count ?? first.data.length;
+  const total = first.count ?? first.data?.length ?? 0;
   const rest = await Promise.all(
     Array.from({ length: Math.max(0, Math.ceil(total / PAGE) - 1) }, (_, i) => page((i + 1) * PAGE)),
   );
-  const rows = [...(first.data as T[])];
+  const rows = [...(first.data ?? [])];
   for (const r of rest) {
     if (r.error) throw r.error;
-    rows.push(...(r.data as T[]));
+    rows.push(...(r.data ?? []));
   }
   return rows;
 }
@@ -314,8 +339,6 @@ async function familyShopCounts(): Promise<Map<number, number>> {
 
 type FamilyRow = { id: number; name: string; category: string };
 
-/** Popular items per page of the front page grid ("Vis flere varer" loads the next). */
-export const POPULAR_PAGE = 12;
 
 /**
  * The front page's popular items, page by page, in this order:

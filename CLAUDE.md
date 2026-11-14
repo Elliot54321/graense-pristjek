@@ -110,7 +110,7 @@ after 8 unattended nightly runs; Phase 2 (matching) is largely done.
   split per trip, priced as basket + driving between stores; home driving and ferry are info only), `postcodes.json` (GeoNames, CC BY 4.0), `types.ts`
 - `src/app/page.tsx` – front page (hero, category row, popular items; static - it must not read the URL, so it stays
   prerendered); `src/app/sog/` – search results (`/sog?q=`; `/?q=` redirects); `/api/popular` – further popular pages,
-  CDN-cached; `src/app/kategori/[slug]/` – category
+  CDN-cached; `/api/families` – further search/category result pages (12 per page, `src/catalog/pages.ts`), CDN-cached; `src/app/kategori/[slug]/` – category
   pages (`src/catalog/categories.ts` maps Danish slugs to `product_families.category`; result cards in
   `src/components/family-list.tsx`); `src/app/liste/` – shopping list ("indkøbsliste"; "basket" in code) (client; `shopping-options.tsx` is the ranked
   list) + `src/app/api/compare/`

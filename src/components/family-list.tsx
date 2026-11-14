@@ -5,34 +5,46 @@ import { CouponBadge, COUPON_NOTE, MultiBuyBadge, OfferBadge } from "@/component
 import { ReportLink } from "@/components/report-link";
 import { ChevronDown } from "lucide-react";
 import { kr, PER_UNIT_LABEL } from "@/lib/format";
+import { FamilyMore, type ResultSource } from "./family-more";
 
-/** SHOWN families are listed; the rest sit behind "Vis X flere varer". page: where "Fejl?" returns to. */
-export function FamilyList({ families, shops, page, shown = 6 }: { families: FamilyResult[]; shops: Shop[]; page: string; shown?: number }) {
+/** The two-column result grid; each card spans three rows through a subgrid (see FamilyCard). */
+export const RESULT_GRID = "grid gap-x-4 gap-y-4 lg:grid-cols-2";
+
+/**
+ * The first page of search or category results, then "Vis flere resultater" for the rest
+ * (FamilyMore). page: where "Fejl?" returns to.
+ */
+export function FamilyList({
+  families,
+  shops,
+  page,
+  source,
+  hasMore,
+}: {
+  families: FamilyResult[];
+  shops: Shop[];
+  page: string;
+  source: ResultSource;
+  /** Results exist after this first page. */
+  hasMore: boolean;
+}) {
   const shopById = new Map(shops.map((s) => [s.id, s]));
   const hasCoupon = families.some((f) => f.packs.some((p) => p.offers.some((o) => o.coupon)));
-  // Two columns on wide screens. Each card spans three rows of this grid (header, pack, variants)
-  // through a subgrid, so those parts line up with the card next to it.
-  const grid = "grid gap-x-4 gap-y-4 lg:grid-cols-2";
   return (
     <>
-      <ul className={`mt-6 ${grid}`}>
-        {families.slice(0, shown).map((f) => (
+      <ul className={`mt-6 ${RESULT_GRID}`}>
+        {families.map((f) => (
           <FamilyCard key={f.id} family={f} shops={shopById} page={page} />
         ))}
       </ul>
-      {/* Broad words ("cola") match many families; the best-ranked come first, the rest one tap away. */}
-      {families.length > shown && (
-        <details className="group/more mt-4">
-          <summary className="mx-auto flex min-h-11 max-w-md cursor-pointer items-center justify-center rounded-lg border border-zinc-300 text-sm font-medium group-open/more:hidden dark:border-zinc-700">
-            Vis {families.length - shown} flere varer
-          </summary>
-          <ul className={grid}>
-            {families.slice(shown).map((f) => (
-              <FamilyCard key={f.id} family={f} shops={shopById} page={page} />
-            ))}
-          </ul>
-        </details>
-      )}
+      {/* Keyed by the search/category: moving from Øl to Vin starts a fresh list instead of keeping beer pages. */}
+      <FamilyMore
+        key={JSON.stringify(source)}
+        source={source}
+        shops={shops}
+        page={page}
+        hasMore={hasMore}
+      />
       {hasCoupon && <p className="mt-4 text-xs text-zinc-500">{COUPON_NOTE}</p>}
     </>
   );
@@ -41,7 +53,7 @@ export function FamilyList({ families, shops, page, shown = 6 }: { families: Fam
 /** Short shop name for price rows ("BorderShop Puttgarden"); where the store is lives on /om and the basket. */
 const shopName = (shops: Map<string, Shop>, id: string) => shops.get(id)?.name ?? id;
 
-function FamilyCard({ family, shops, page }: { family: FamilyResult; shops: Map<string, Shop>; page: string }) {
+export function FamilyCard({ family, shops, page }: { family: FamilyResult; shops: Map<string, Shop>; page: string }) {
   const bestPack = family.best ? family.packs.find((p) => p.name === family.best!.productName) : undefined;
   // One pack per card - the cheapest per liter/kg, which "Billigste på listen" adds too -
   // so cards in the grid line up; the other variants (sizes, cans vs bottles) are one tap away.

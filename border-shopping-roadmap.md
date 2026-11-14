@@ -922,3 +922,9 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   half the width. It's now a light grey band with a line on top: the wordmark, one sentence about the site and the
   price update info on the left, a "Sider" column (Sådan gør du, Om os, Kontakt, Din indkøbsliste) on the right;
   stacked on phones.
+- **All results, not just 30 (2026-11-14, user request):** search showed at most 30 families from the first 400
+  matches ("rødvin" matches 727), and category pages stopped at 30. Both now rank every match and show 12 per page
+  with "Vis flere resultater" (`/api/families?q=|kategori=&side=N`, CDN-cached, next page fetched ahead; the server
+  says whether more pages exist, since pages are shorter where items aren't sold right now). Search order = name and
+  search words (`preScore`); availability only reorders within a page. "rødvin" now runs to page 60. Search pages
+  still load in ~0.5-0.9 s (locally, first time). The old "Vis X flere varer" fold within a page is gone.
