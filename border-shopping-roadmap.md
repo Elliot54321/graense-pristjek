@@ -934,3 +934,7 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   count (~3.7 s for all three tables, fine since it only runs when a cached page is rebuilt), and the front page is
   built without popular items if the fetch fails - the browser then loads them - so a slow database can't block a
   deploy. Long-term option: a database view counting shops per family (needs a migration).
+- **Full pages of 12 (2026-11-14, user report):** "rødvin" pages had 5-12 results, because families nobody sells
+  right now were dropped after a page was cut. Pages now keep taking candidates until 12 sold families are found and
+  return a cursor (`next` = position in the ranked list) that "Vis flere resultater" sends back
+  (`/api/families?...&fra=N`). "rødvin": 590 sold red wines, every page 12 except the last, no repeats.

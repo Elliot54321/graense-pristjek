@@ -13,7 +13,7 @@ import { COMMON_ITEMS } from "@/matching/common-items";
 import { commonTier, finalScore, preScore } from "./ranking";
 import { packLabel } from "@/lib/format";
 import { POPULAR_PAGE, RESULTS_PAGE } from "./pages";
-import type { FamilyResult, Offer, Pack, Shop, Unit } from "./types";
+import type { FamilyResult, Offer, Pack, ResultPage, Shop, Unit } from "./types";
 
 /** Most families rankFamilies() returns (pages are smaller; see RESULTS_PAGE and POPULAR_PAGE). */
 const MAX_FAMILIES = 30;
@@ -218,21 +218,10 @@ async function loadPacks(productIds: number[], familyIds: number[]): Promise<Pac
  * loaded and availability (shops, packs) breaks near-ties. Families nobody sells right
  * now are left out, so a page can have fewer than RESULTS_PAGE.
  */
-export async function searchFamilies(rawQuery: string, page = 0): Promise<FamilyResult[]> {
+export async function searchFamilies(rawQuery: string, from = 0): Promise<ResultPage> {
   "use cache";
   cacheLife("hours");
-  const order = await searchOrder(cleanQuery(rawQuery));
-  return pageOf(order, page);
-}
-
-/** Whether a search has results after page `page` (pages can be short, so their size doesn't tell). */
-export async function searchHasMore(rawQuery: string, page: number): Promise<boolean> {
-  return (await searchOrder(cleanQuery(rawQuery))).length > (page + 1) * RESULTS_PAGE;
-}
-
-/** Whether a category has results after page `page`. */
-export async function categoryHasMore(category: string, page: number): Promise<boolean> {
-  return (await categoryOrder(category)).length > (page + 1) * RESULTS_PAGE;
+  return pageFrom(await searchOrder(cleanQuery(rawQuery)), from);
 }
 
 /** Every family matching the query, best first by name and search words. */
@@ -254,10 +243,26 @@ async function searchOrder(q: string): Promise<(FamilyRow & { pre: number })[]> 
     .sort((a, b) => b.pre - a.pre || a.name.length - b.name.length);
 }
 
-/** One page of an ordered family list, with prices; ranked by availability within the page. */
-async function pageOf(order: (FamilyRow & { pre: number })[], page: number): Promise<FamilyResult[]> {
-  const slice = order.slice(page * RESULTS_PAGE, (page + 1) * RESULTS_PAGE);
-  return rankFamilies(slice, new Map(slice.map((f) => [f.id, f.pre])), slice.length);
+/**
+ * One page of an ordered family list, starting at position `from`: the next RESULTS_PAGE
+ * families someone sells right now (unsold ones are skipped, so every page but the last is
+ * full), ranked by availability within the page. `next` is where the following page starts,
+ * or null at the end - "Vis flere resultater" passes it back.
+ */
+async function pageFrom(order: (FamilyRow & { pre: number })[], from: number): Promise<ResultPage> {
+  const pre = new Map(order.map((f) => [f.id, f.pre]));
+  const taken: Scored[] = [];
+  let pos = from;
+  while (taken.length < RESULTS_PAGE && pos < order.length) {
+    // Twice what's missing per round: some families aren't sold right now.
+    const window = order.slice(pos, pos + Math.max(6, 2 * (RESULTS_PAGE - taken.length)));
+    for (const r of await priceFamilies(window, pre)) {
+      pos++;
+      if (r.result.packs.length) taken.push(r);
+      if (taken.length === RESULTS_PAGE) break;
+    }
+  }
+  return { families: taken.sort(byScore).map((r) => r.result), next: pos < order.length ? pos : null };
 }
 
 /**
@@ -265,10 +270,10 @@ async function pageOf(order: (FamilyRow & { pre: number })[], page: number): Pro
  * guessed from the common-items list and from how many shops sell the family (widely
  * sold = mainstream); within a page, availability breaks near-ties.
  */
-export async function categoryFamilies(category: string, page = 0): Promise<FamilyResult[]> {
+export async function categoryFamilies(category: string, from = 0): Promise<ResultPage> {
   "use cache";
   cacheLife("hours");
-  return pageOf(await categoryOrder(category), page);
+  return pageFrom(await categoryOrder(category), from);
 }
 
 async function categoryOrder(category: string): Promise<(FamilyRow & { pre: number })[]> {
@@ -401,10 +406,27 @@ async function rankFamilies(
   shortlistSize: number,
 ): Promise<FamilyResult[]> {
   const shortlist = [...families].sort((a, b) => pre.get(b.id)! - pre.get(a.id)!).slice(0, shortlistSize);
-  if (!shortlist.length) return [];
+  const results = await priceFamilies(shortlist, pre);
 
-  const packs = await loadPacks([], shortlist.map((f) => f.id));
-  const results = shortlist.map((f) => {
+  // Families nobody sells right now are dropped.
+  return results
+    .filter((r) => r.result.packs.length > 0)
+    .sort(byScore)
+    .slice(0, MAX_FAMILIES)
+    .map((r) => r.result);
+}
+
+type Scored = { result: FamilyResult; score: number };
+const byScore = (a: Scored, b: Scored) => b.score - a.score || a.result.name.length - b.result.name.length;
+
+/**
+ * Prices and the cheapest price per liter/kg for each family, in the given order, with a
+ * score (pre + availability). A family nobody sells right now comes back with no packs.
+ */
+async function priceFamilies(families: FamilyRow[], pre: Map<number, number>): Promise<Scored[]> {
+  if (!families.length) return [];
+  const packs = await loadPacks([], families.map((f) => f.id));
+  return families.map((f) => {
     const own = packs.filter((p) => p.familyId === f.id);
     let best: FamilyResult["best"] = null;
     for (const pack of own) {
@@ -422,13 +444,6 @@ async function rankFamilies(
     const result: FamilyResult = { id: f.id, name: f.name, category: f.category, best, packs: own };
     return { result, score: finalScore(pre.get(f.id)!, shops, own.length) };
   });
-
-  // Families nobody sells right now are dropped.
-  return results
-    .filter((r) => r.result.packs.length > 0)
-    .sort((a, b) => b.score - a.score || a.result.name.length - b.result.name.length)
-    .slice(0, MAX_FAMILIES)
-    .map((r) => r.result);
 }
 
 /** Everything the basket comparison needs: the basket's exact products and all packs of its families. */

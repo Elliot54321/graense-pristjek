@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { after, connection } from "next/server";
 import { Suspense } from "react";
-import { getShops, searchFamilies, searchHasMore } from "@/catalog/data";
+import { getShops, searchFamilies } from "@/catalog/data";
 import { CategoryRow } from "@/components/category-row";
 import { FamilyList } from "@/components/family-list";
 import { SearchBox } from "@/components/search-box";
@@ -84,7 +84,7 @@ function Examples({ title }: { title: string }) {
 }
 
 async function Results({ query }: { query: string }) {
-  const [families, hasMore, shops] = await Promise.all([searchFamilies(query), searchHasMore(query, 0), getShops()]);
+  const [{ families, next }, shops] = await Promise.all([searchFamilies(query), getShops()]);
   // Logged after the page is sent, so it never slows the search down - and only for
   // real requests, never while Next.js prerenders the page.
   await connection();
@@ -103,7 +103,7 @@ async function Results({ query }: { query: string }) {
   return (
     <>
       <h1 className="mt-6 text-xl font-semibold tracking-tight">Resultater for “{query}”</h1>
-      <FamilyList families={families} shops={shops} page={`/sog?q=${encodeURIComponent(query)}`} source={{ q: query }} hasMore={hasMore} />
+      <FamilyList families={families} shops={shops} page={`/sog?q=${encodeURIComponent(query)}`} source={{ q: query }} next={next} />
     </>
   );
 }

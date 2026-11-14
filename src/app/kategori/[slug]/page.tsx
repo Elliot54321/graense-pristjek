@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { CATEGORIES, categoryBySlug } from "@/catalog/categories";
-import { categoryFamilies, categoryHasMore, getShops } from "@/catalog/data";
+import { categoryFamilies, getShops } from "@/catalog/data";
 import { CategoryRow } from "@/components/category-row";
 import { FamilyList } from "@/components/family-list";
 import { SearchBox } from "@/components/search-box";
@@ -53,7 +53,7 @@ async function Category({ params }: { params: PageProps<"/kategori/[slug]">["par
 }
 
 async function Families({ id, slug }: { id: string; slug: string }) {
-  const [families, hasMore, shops] = await Promise.all([categoryFamilies(id), categoryHasMore(id, 0), getShops()]);
+  const [{ families, next }, shops] = await Promise.all([categoryFamilies(id), getShops()]);
   if (!families.length) return <p className="mt-6 text-zinc-600 dark:text-zinc-400">Ingen varer i denne kategori lige nu.</p>;
-  return <FamilyList families={families} shops={shops} page={`/kategori/${slug}`} source={{ kategori: slug }} hasMore={hasMore} />;
+  return <FamilyList families={families} shops={shops} page={`/kategori/${slug}`} source={{ kategori: slug }} next={next} />;
 }

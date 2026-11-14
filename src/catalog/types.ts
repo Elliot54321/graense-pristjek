@@ -60,6 +60,12 @@ export interface FamilyResult {
   packs: Pack[];
 }
 
+/** A page of search or category results; `next` is where the following page starts (null: the end). */
+export interface ResultPage {
+  families: FamilyResult[];
+  next: number | null;
+}
+
 /** What the browser keeps in its basket. */
 export type BasketItem =
   /** step = how much one "+" adds: the pack size the family was added with. */

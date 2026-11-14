@@ -19,14 +19,14 @@ export function FamilyList({
   shops,
   page,
   source,
-  hasMore,
+  next,
 }: {
   families: FamilyResult[];
   shops: Shop[];
   page: string;
   source: ResultSource;
-  /** Results exist after this first page. */
-  hasMore: boolean;
+  /** Where the second page starts; null when this page held everything. */
+  next: number | null;
 }) {
   const shopById = new Map(shops.map((s) => [s.id, s]));
   const hasCoupon = families.some((f) => f.packs.some((p) => p.offers.some((o) => o.coupon)));
@@ -43,7 +43,7 @@ export function FamilyList({
         source={source}
         shops={shops}
         page={page}
-        hasMore={hasMore}
+        next={next}
       />
       {hasCoupon && <p className="mt-4 text-xs text-zinc-500">{COUPON_NOTE}</p>}
     </>
