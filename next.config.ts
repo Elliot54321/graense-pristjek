@@ -7,6 +7,8 @@ const nextConfig: NextConfig = {
       { source: "/kurv", destination: "/liste", permanent: true },
       // The contact page was /fejl (error reports only) until 2026-11-13; the query (shop, product, price) is kept.
       { source: "/fejl", destination: "/kontakt", permanent: true },
+      // Search results were on the front page (/?q=cola) until 2026-11-14; the query is kept.
+      { source: "/", has: [{ type: "query", key: "q" }], destination: "/sog", permanent: true },
     ];
   },
   cacheComponents: true,

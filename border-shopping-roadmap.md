@@ -905,3 +905,16 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   with a tiebreak column so parallel pages don't overlap). The button also fetches the next page in the background,
   so a press shows it in ~20 ms. Not done: `'use cache: remote'` (shared cache, but Vercel charges for it) or a
   database view counting shops per family (needs a migration) - options if it's still too slow.
+- **Popular items from Vercel's CDN (2026-11-14):** the push of 60db1b3 never reached Vercel (no deployment, no
+  GitHub status); an empty commit (4e1612e) triggered it. Live after the parallel reads: ~2.4 s per page (was ~3.5).
+  Since the serverless functions recompute each time, `/api/popular` now sends `Cache-Control: public,
+  s-maxage=3600, stale-while-revalidate=86400`, so Vercel's CDN (part of the hosting, no extra service) serves
+  stored pages and refreshes them in the background; the front page's first 12 items also come from this API (grey
+  placeholder cards while loading) instead of being rendered on the server.
+- **Static front page, search on /sog (2026-11-14, user decision):** replaces the client-loaded first page above
+  (never committed). Search results moved from `/?q=` to `/sog?q=` (308 redirect keeps the query), so the front page
+  no longer reads the URL and Next.js prerenders it, popular items included, and rebuilds it in the background when
+  the cached data is an hour old - locally served in ~2 ms with the items in the HTML (good for search engines). Only
+  "Vis flere varer" pages come from the CDN-cached `/api/popular`, fetched ahead. A nightly job writing the ranking to
+  a table was considered: same effect, but a new table, migration and pipeline step - only worth it if the ranking
+  gets much heavier.

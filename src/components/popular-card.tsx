@@ -14,7 +14,7 @@ export function PopularCard({ family: f, shopName }: { family: FamilyResult; sho
   return (
     <li>
       <Link
-        href={`/?q=${encodeURIComponent(f.name)}`}
+        href={`/sog?q=${encodeURIComponent(f.name)}`}
         className="flex h-full flex-col rounded-xl border border-zinc-200 bg-zinc-100 p-3 hover:border-zinc-400"
       >
         <div className="flex aspect-square items-center justify-center overflow-hidden rounded-lg bg-white">

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { FamilyResult } from "@/catalog/types";
 import { PopularCard } from "./popular-card";
 
-const GRID = "grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4";
+const GRID = "mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4";
 
 const fetchPage = async (page: number): Promise<FamilyResult[]> => {
   const res = await fetch(`/api/popular?side=${page}`);
@@ -14,8 +14,9 @@ const fetchPage = async (page: number): Promise<FamilyResult[]> => {
 
 /**
  * "Vis flere varer": shows the next page of popular items each time it's pressed, until
- * the list runs out. The next page is fetched in the background as soon as the previous
- * one is shown, so a press is usually instant instead of waiting for the server.
+ * the list runs out. Pages come from /api/popular, which Vercel's CDN caches, and the next
+ * page is fetched in the background as soon as the previous one shows - so a press is
+ * usually instant.
  */
 export function PopularMore({ shopNames }: { shopNames: Record<string, string> }) {
   const [families, setFamilies] = useState<FamilyResult[]>([]);
@@ -35,7 +36,7 @@ export function PopularMore({ shopNames }: { shopNames: Record<string, string> }
     return ahead.current.result;
   };
 
-  // Start fetching the first extra page right away; the visitor is likely to want it.
+  // Fetch the first extra page right away; the visitor is likely to want it.
   useEffect(() => {
     prefetch(1);
   }, []); // once, on first show
@@ -68,7 +69,7 @@ export function PopularMore({ shopNames }: { shopNames: Record<string, string> }
   return (
     <>
       {families.length > 0 && (
-        <ul className={`mt-3 ${GRID}`}>
+        <ul className={GRID}>
           {families.map((f) => (
             <PopularCard key={f.id} family={f} shopName={(id) => shopNames[id] ?? id} />
           ))}

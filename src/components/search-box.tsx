@@ -3,7 +3,7 @@ import { ArrowRight, Search } from "lucide-react";
 /** The pill-shaped search field used in the hero (a plain GET form, works without JavaScript). */
 export function SearchBox({ query }: { query: string }) {
   return (
-    <form action="/" role="search" className="flex items-center gap-2 rounded-full bg-white p-1.5 pl-4 text-zinc-900 shadow-sm">
+    <form action="/sog" role="search" className="flex items-center gap-2 rounded-full bg-white p-1.5 pl-4 text-zinc-900 shadow-sm">
       <Search aria-hidden className="h-5 w-5 shrink-0 text-zinc-500" />
       <input
         name="q"

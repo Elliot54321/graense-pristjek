@@ -3,8 +3,9 @@ import { PopularCard } from "./popular-card";
 import { PopularMore } from "./popular-more";
 
 /**
- * The front page's popular items: the first page is rendered here, "Vis flere varer"
- * loads the rest a page at a time (/api/popular). Two columns on phones, four on wide screens.
+ * The front page's popular items. The first page is part of the prerendered front page;
+ * "Vis flere varer" loads the rest from /api/popular (cached on Vercel's CDN).
+ * Two columns on phones, four on wide screens.
  */
 export function PopularGrid({ families, shops }: { families: FamilyResult[]; shops: Shop[] }) {
   const shopNames = Object.fromEntries(shops.map((s) => [s.id, s.name]));
