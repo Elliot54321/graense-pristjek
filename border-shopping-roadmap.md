@@ -889,3 +889,7 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   items per press (`/api/popular?side=N`, cached an hour). Order: the bestsellers first, then every family sold in at
   least two shops - common items first, then by number of shops, categories taking turns. Page 40 still had 12 items
   on 2026-11-14. Phones now show all 12 of the first page too.
+- **Inviting variants button (2026-11-14, user request):** "Andre varianter (N)" was a small text toggle; it's now a
+  white button-row with up to three overlapping photos of the other variants (+N for the rest), "Se N andre
+  varianter" and the pack sizes on offer ("24 x 0,33 l, 0,5 l, 4 x 1,5 l og flere"); open, it says "Skjul andre
+  varianter". The cards got `min-w-0` so the one-line size summary can't widen the page on phones.

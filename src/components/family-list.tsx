@@ -3,6 +3,7 @@ import type { FamilyResult, Offer, Pack, Shop } from "@/catalog/types";
 import { AddToBasket } from "@/components/add-to-basket";
 import { CouponBadge, COUPON_NOTE, MultiBuyBadge, OfferBadge } from "@/components/badges";
 import { ReportLink } from "@/components/report-link";
+import { ChevronDown } from "lucide-react";
 import { kr, PER_UNIT_LABEL } from "@/lib/format";
 
 /** SHOWN families are listed; the rest sit behind "Vis X flere varer". page: where "Fejl?" returns to. */
@@ -46,7 +47,7 @@ function FamilyCard({ family, shops, page }: { family: FamilyResult; shops: Map<
   const shown = bestPack ?? family.packs[0];
   const others = family.packs.filter((p) => p !== shown);
   return (
-    <li className="flex flex-col rounded-xl border border-zinc-200 bg-zinc-100 p-4 dark:border-zinc-800">
+    <li className="flex min-w-0 flex-col rounded-xl border border-zinc-200 bg-zinc-100 p-4 dark:border-zinc-800">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-lg font-semibold leading-snug">{family.name}</h2>
@@ -82,12 +83,19 @@ function FamilyCard({ family, shops, page }: { family: FamilyResult; shops: Map<
       {others.length > 0 && (
         // Right under the pack, not pinned to the card's bottom: when a neighbour in the row opens
         // and this card stretches, the toggle should stay next to its pack.
-        <details className="group/sizes border-t border-zinc-300 dark:border-zinc-800">
-          <summary className="-mx-1 flex min-h-11 cursor-pointer list-none items-center gap-1.5 px-1 text-sm font-medium [&::-webkit-details-marker]:hidden">
-            <span aria-hidden className="inline-block text-xs transition-transform group-open/sizes:rotate-90">
-              ▶
+        <details className="group/sizes mt-1 min-w-0">
+          {/* A preview, not just a label: photos and pack sizes show there's more to see.
+              min-w-0 on the card and here lets the one-line size summary shrink instead of widening the page. */}
+          <summary className="flex cursor-pointer list-none items-center gap-3 rounded-lg border border-zinc-300 bg-white p-2 pr-3 hover:border-zinc-400 group-open/sizes:mb-1 [&::-webkit-details-marker]:hidden">
+            <VariantThumbs packs={others} />
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold">
+                <span className="group-open/sizes:hidden">Se {others.length} andre varianter</span>
+                <span className="hidden group-open/sizes:inline">Skjul andre varianter</span>
+              </span>
+              <span className="block truncate text-xs text-zinc-600">{variantSummary(others)}</span>
             </span>
-            Andre varianter ({others.length})
+            <ChevronDown aria-hidden className="h-5 w-5 shrink-0 text-zinc-500 transition-transform group-open/sizes:rotate-180" />
           </summary>
           <ul className="divide-y divide-zinc-300 border-t border-zinc-300 dark:divide-zinc-800 dark:border-zinc-800">
             {others.map((p) => (
@@ -214,6 +222,35 @@ function OfferDetails({ offer: o, pack, page, perUnit = true }: { offer: Offer; 
       <ReportLink shop={o.shopId} product={pack.name} price={o.price} page={page} />
     </div>
   );
+}
+
+/** Up to three overlapping photos of the other variants, with "+N" for the rest. */
+function VariantThumbs({ packs }: { packs: Pack[] }) {
+  const photos = packs.flatMap((p) => (p.imageUrl ? [p.imageUrl] : [])).slice(0, 3);
+  const more = packs.length - photos.length;
+  return (
+    <span aria-hidden className="flex shrink-0 -space-x-3">
+      {photos.map((url, i) => (
+        // Index key: two variants can share a photo.
+        <span key={i} className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-md border border-zinc-200 bg-white">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={url} alt="" loading="lazy" decoding="async" className="h-full w-full object-contain p-0.5" />
+        </span>
+      ))}
+      {more > 0 && (
+        <span className="flex h-11 w-11 items-center justify-center rounded-md border border-zinc-200 bg-zinc-200 text-xs font-semibold text-zinc-700">
+          +{more}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/** "24 x 0,33 l, 0,5 l, 4 x 1,5 l og flere" - the pack sizes on offer, so people see the choice. */
+function variantSummary(packs: Pack[]): string {
+  const labels = [...new Set(packs.flatMap((p) => (p.packLabel ? [p.packLabel] : [])))];
+  if (!labels.length) return "Andre pakninger og størrelser";
+  return labels.slice(0, 3).join(", ") + (labels.length > 3 ? " og flere" : "");
 }
 
 /**
