@@ -938,3 +938,7 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   right now were dropped after a page was cut. Pages now keep taking candidates until 12 sold families are found and
   return a cursor (`next` = position in the ranked list) that "Vis flere resultater" sends back
   (`/api/families?...&fra=N`). "rødvin": 590 sold red wines, every page 12 except the last, no repeats.
+
+### Working setup: architect and area chats (2026-11-14)
+
+- **Working setup (2026-11-14):** the project now runs as one architect chat plus area chats (UI, Admin, Data & newsletters, Matching, Catalog & small features), each owning its own files in the shared folder - see "How we work" in CLAUDE.md. Chosen over separate worktrees/branches: one person, so no merging is simpler; the file-ownership rule prevents two chats overwriting each other.

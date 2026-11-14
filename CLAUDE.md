@@ -197,3 +197,29 @@ after 8 unattended nightly runs; Phase 2 (matching) is largely done.
   repository secrets for the workflow. **The repo is public** – never commit
   anything you wouldn't want the shops or the internet to read.
 - Work in small, testable steps and explain non-obvious code.
+
+## How we work (chats)
+
+The project runs as one **architect chat** plus **area chats** (set up 2026-11-14).
+
+- **Architect chat:** decides what's next from the roadmap, writes the brief for each area chat
+  (starting it as a linked session), checks what comes back, and keeps CLAUDE.md and the roadmap
+  true. It does little hands-on work itself.
+- **Area chats** each own a set of files and only edit those. All chats share this one folder
+  (no worktrees), so two chats must never edit the same file at the same time:
+
+  | Area | Owns |
+  |---|---|
+  | UI | `src/app/` pages except `admin/` and `api/` (`page.tsx`, `sog/`, `kategori/`, `liste/`, `om/`, `guide/`, `kontakt/`, `layout.tsx`, `globals.css`, OG image), `src/components/` |
+  | Admin | `src/app/admin/` |
+  | Data & newsletters | `src/scrapers/`, `src/flyers/`, `src/monitoring/`, `.github/workflows/`, monthly newsletter imports |
+  | Matching | `src/matching/` |
+  | Catalog & small features | `src/catalog/`, `src/app/api/`, `src/db/`, `src/lib/`, `supabase/migrations/` – one task at a time |
+
+  A task that needs another area's files: finish what you're doing, then ask the user (or the
+  architect) instead of editing them.
+- **Everyone** reads CLAUDE.md and `border-shopping-roadmap.md` first; chats forget, those files
+  don't. Record findings and decisions in the roadmap with the work, and pull/commit in small steps
+  so other chats see a clean tree (`git status` before starting; never commit another chat's
+  uncommitted files).
+- Ask the user before committing, as always.
