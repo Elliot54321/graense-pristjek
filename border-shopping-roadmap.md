@@ -893,3 +893,7 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   white button-row with up to three overlapping photos of the other variants (+N for the rest), "Se N andre
   varianter" and the pack sizes on offer ("24 x 0,33 l, 0,5 l, 4 x 1,5 l og flere"); open, it says "Skjul andre
   varianter". The cards got `min-w-0` so the one-line size summary can't widen the page on phones.
+- **Aligned variants buttons (2026-11-14, user request):** the result cards use a CSS subgrid (each card spans three
+  rows of the list grid: header, pack, variants), so the "Se N andre varianter" buttons in a row sit at the same
+  height even when the packs above differ (badges, long names); the buttons also share one minimum height. Opening
+  one only grows the last row; the neighbour's button stays where it was.

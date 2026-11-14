@@ -10,8 +10,9 @@ import { kr, PER_UNIT_LABEL } from "@/lib/format";
 export function FamilyList({ families, shops, page, shown = 6 }: { families: FamilyResult[]; shops: Shop[]; page: string; shown?: number }) {
   const shopById = new Map(shops.map((s) => [s.id, s]));
   const hasCoupon = families.some((f) => f.packs.some((p) => p.offers.some((o) => o.coupon)));
-  // Two columns on wide screens; cards in a row stretch to the same height so the borders line up.
-  const grid = "grid gap-4 lg:grid-cols-2";
+  // Two columns on wide screens. Each card spans three rows of this grid (header, pack, variants)
+  // through a subgrid, so those parts line up with the card next to it.
+  const grid = "grid gap-x-4 gap-y-4 lg:grid-cols-2";
   return (
     <>
       <ul className={`mt-6 ${grid}`}>
@@ -47,7 +48,10 @@ function FamilyCard({ family, shops, page }: { family: FamilyResult; shops: Map<
   const shown = bestPack ?? family.packs[0];
   const others = family.packs.filter((p) => p !== shown);
   return (
-    <li className="flex min-w-0 flex-col rounded-xl border border-zinc-200 bg-zinc-100 p-4 dark:border-zinc-800">
+    // Subgrid: the card's three parts (header, pack, variants) share rows with its neighbour, so the
+    // variants buttons sit at the same height; opening one only grows the last row. gap-y-0: the
+    // parts are spaced by their own margins, not the list's gap.
+    <li className="row-span-3 grid min-w-0 grid-rows-subgrid gap-y-0 rounded-xl border border-zinc-200 bg-zinc-100 p-4 dark:border-zinc-800">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-lg font-semibold leading-snug">{family.name}</h2>
@@ -80,13 +84,11 @@ function FamilyCard({ family, shops, page }: { family: FamilyResult; shops: Map<
       <ul className="mt-3 border-t border-zinc-300 dark:border-zinc-800">
         <PackRow pack={shown} shops={shops} page={page} />
       </ul>
-      {others.length > 0 && (
-        // Right under the pack, not pinned to the card's bottom: when a neighbour in the row opens
-        // and this card stretches, the toggle should stay next to its pack.
-        <details className="group/sizes mt-1 min-w-0">
+      {others.length > 0 ? (
+        <details className="group/sizes mt-1 min-w-0 self-start">
           {/* A preview, not just a label: photos and pack sizes show there's more to see.
               min-w-0 on the card and here lets the one-line size summary shrink instead of widening the page. */}
-          <summary className="flex cursor-pointer list-none items-center gap-3 rounded-lg border border-zinc-300 bg-white p-2 pr-3 hover:border-zinc-400 group-open/sizes:mb-1 [&::-webkit-details-marker]:hidden">
+          <summary className="flex min-h-[3.875rem] cursor-pointer list-none items-center gap-3 rounded-lg border border-zinc-300 bg-white p-2 pr-3 hover:border-zinc-400 group-open/sizes:mb-1 [&::-webkit-details-marker]:hidden">
             <VariantThumbs packs={others} />
             <span className="min-w-0 flex-1">
               <span className="block text-sm font-semibold">
@@ -103,6 +105,9 @@ function FamilyCard({ family, shops, page }: { family: FamilyResult; shops: Map<
             ))}
           </ul>
         </details>
+      ) : (
+        // Keeps the third row filled so the subgrid stays three rows.
+        <div />
       )}
     </li>
   );
