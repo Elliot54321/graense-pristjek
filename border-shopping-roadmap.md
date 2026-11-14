@@ -877,3 +877,11 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   "Fundet en fejl?" with the shop/product/price when opened from a "Fejl?" link (`/fejl` redirects, keeping the
   query). Messages land in the same `feedback` table as reports. Dev-server quirk seen while testing: the pre-filled
   form sometimes stayed hidden behind its loading placeholder under `next dev`; the production build shows it fine.
+- **Popular items on the front page (2026-11-14, user request):** "Populære varer" replaces the example-search chips:
+  12 cards (8 on phones) with photo, name and cheapest price per liter/kg + shop, each opening that item's search.
+  `popularFamilies()` takes each bestseller from `common-items.ts`, picks the matching family sold in the most shops,
+  and mixes categories (cola, beer, spirit, sweets, ...). The photo is the most widely sold pack's (the cheapest per
+  liter can be an odd size, e.g. Jägermeister's 3 l bottle). Swap the guessed bestsellers for real search counts
+  (`search_log`) once there's enough data. Considered and set aside: one "månedens tilbud" section per shop - it
+  sorts by shop instead of comparing, and would mostly republish the newsletters; a shop-neutral "Ugens bedste
+  tilbud" (biggest savings right now) is the better version if the front page needs more.

@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { after, connection } from "next/server";
 import { Suspense } from "react";
-import { getShops, searchFamilies } from "@/catalog/data";
+import { getShops, popularFamilies, searchFamilies } from "@/catalog/data";
 import { CategoryRow } from "@/components/category-row";
 import { FamilyList } from "@/components/family-list";
+import { PopularGrid } from "@/components/popular-grid";
 import { SearchBox } from "@/components/search-box";
 import { logSearch } from "@/db/log";
 
@@ -73,7 +74,9 @@ async function Search({ searchParams }: { searchParams: PageProps<"/">["searchPa
           <Results query={query} />
         </Suspense>
       ) : (
-        <Examples title="Populære søgninger" />
+        <Suspense fallback={<p className="mt-8 text-zinc-500">Henter populære varer…</p>}>
+          <Popular />
+        </Suspense>
       )}
     </>
   );
@@ -98,6 +101,12 @@ function Examples({ title }: { title: string }) {
       </ul>
     </div>
   );
+}
+
+async function Popular() {
+  const [families, shops] = await Promise.all([popularFamilies(), getShops()]);
+  if (!families.length) return <Examples title="Prøv f.eks." />;
+  return <PopularGrid families={families} shops={shops} />;
 }
 
 async function Results({ query }: { query: string }) {

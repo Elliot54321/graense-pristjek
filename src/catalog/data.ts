@@ -9,6 +9,7 @@ import { cacheLife } from "next/cache";
 import { publicClient } from "@/db/public";
 import { dealPerPiece, effectivePrice, NEWSLETTER_SHOPS } from "./compare";
 import type { FamilyInfo } from "./import-limits";
+import { COMMON_ITEMS } from "@/matching/common-items";
 import { commonTier, finalScore, preScore } from "./ranking";
 import { packLabel } from "@/lib/format";
 import type { FamilyResult, Offer, Pack, Shop, Unit } from "./types";
@@ -294,6 +295,42 @@ async function familyShopCounts(): Promise<Map<number, number>> {
     if (family) shops.set(family, (shops.get(family) ?? new Set()).add(p.shop_id));
   }
   return new Map([...shops].map(([id, set]) => [id, set.size]));
+}
+
+/**
+ * The front page's popular items: for each bestseller on the hand-made common-items
+ * list, the matching family sold in the most shops. Mixed across categories (a soda,
+ * a beer, a spirit, ...) so the grid isn't all cola. Replace the guess with real
+ * search counts (search_log) once there's enough data.
+ */
+export async function popularFamilies(limit = 12): Promise<FamilyResult[]> {
+  "use cache";
+  cacheLife("hours");
+  const families: { id: number; name: string; category: string }[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await publicClient().from("product_families").select("id, name, category").order("id").range(from, from + 999);
+    if (error) throw error;
+    families.push(...data);
+    if (data.length < 1000) break;
+  }
+  const shops = await familyShopCounts();
+  const picked: { id: number; name: string; category: string }[] = [];
+  for (const item of COMMON_ITEMS.filter((i) => i.bestseller)) {
+    const best = families
+      .filter((f) => item.include.test(f.name) && !item.exclude?.test(f.name) && !picked.includes(f))
+      .sort((a, b) => (shops.get(b.id) ?? 0) - (shops.get(a.id) ?? 0) || a.name.length - b.name.length)[0];
+    if (best && (shops.get(best.id) ?? 0) > 0) picked.push(best);
+  }
+  // Round-robin over categories, keeping the list's order within each.
+  const byCategory = Map.groupBy(picked, (f) => f.category);
+  const mixed: typeof picked = [];
+  while (mixed.length < picked.length) {
+    for (const list of byCategory.values()) if (list.length) mixed.push(list.shift()!);
+  }
+  const order = mixed.slice(0, limit);
+  // A large gap per position keeps this order; availability only breaks near-ties.
+  const pre = new Map(order.map((f, i) => [f.id, 10_000 - 100 * i]));
+  return rankFamilies(order, pre, order.length);
 }
 
 /** Loads prices for the best `shortlist` families by `pre`, then ranks them with availability. */
