@@ -897,3 +897,11 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   rows of the list grid: header, pack, variants), so the "Se N andre varianter" buttons in a row sit at the same
   height even when the packs above differ (badges, long names); the buttons also share one minimum height. Opening
   one only grows the last row; the neighbour's button stays where it was.
+- **Faster popular items (2026-11-14):** each "Vis flere varer" took ~3.5-4 s on the live site, even repeated: on
+  Vercel's serverless functions the `use cache` in-memory cache usually isn't kept between requests (per the Next.js
+  docs), so the whole ranking was recomputed each time - three full-table reads (families 9,500, matched_prices
+  17,500, products 13,000 rows) in 1,000-row pages one after another, ~4.4 s. `readAll()` now asks for the row count
+  first and fetches the remaining pages in parallel, and the tables load at the same time: ~1.5 s (stable ordering
+  with a tiebreak column so parallel pages don't overlap). The button also fetches the next page in the background,
+  so a press shows it in ~20 ms. Not done: `'use cache: remote'` (shared cache, but Vercel charges for it) or a
+  database view counting shops per family (needs a migration) - options if it's still too slow.

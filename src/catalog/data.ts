@@ -268,14 +268,29 @@ export async function categoryFamilies(category: string): Promise<FamilyResult[]
   return rankFamilies(families, pre, CATEGORY_SHORTLIST);
 }
 
-/** Paged read of a whole table or view (PostgREST returns at most 1000 rows at a time). */
-async function readAll<T>(table: string, columns: string, orderBy: string): Promise<T[]> {
-  const rows: T[] = [];
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await publicClient().from(table).select(columns).order(orderBy).range(from, from + 999);
-    if (error) throw error;
-    rows.push(...(data as T[]));
-    if (data.length < 1000) break;
+/**
+ * A whole table or view. PostgREST returns at most 1000 rows per request, so the first
+ * request also asks for the row count and the remaining pages are fetched in parallel -
+ * one after another took ~2.7 s for matched_prices' 17,500 rows (2026-11-14).
+ */
+async function readAll<T>(table: string, columns: string, orderBy: string[]): Promise<T[]> {
+  const PAGE = 1000;
+  // orderBy must make rows unique (add a tiebreak column), or pages can overlap or skip rows.
+  const page = (from: number, count = false) => {
+    let q = publicClient().from(table).select(columns, count ? { count: "exact" } : undefined);
+    for (const column of orderBy) q = q.order(column);
+    return q.range(from, from + PAGE - 1);
+  };
+  const first = await page(0, true);
+  if (first.error) throw first.error;
+  const total = first.count ?? first.data.length;
+  const rest = await Promise.all(
+    Array.from({ length: Math.max(0, Math.ceil(total / PAGE) - 1) }, (_, i) => page((i + 1) * PAGE)),
+  );
+  const rows = [...(first.data as T[])];
+  for (const r of rest) {
+    if (r.error) throw r.error;
+    rows.push(...(r.data as T[]));
   }
   return rows;
 }
@@ -285,8 +300,8 @@ async function familyShopCounts(): Promise<Map<number, number>> {
   "use cache";
   cacheLife("hours");
   const [prices, products] = await Promise.all([
-    readAll<{ product_id: number; shop_id: string }>("matched_prices", "product_id, shop_id", "product_id"),
-    readAll<{ id: number; family_id: number | null }>("products", "id, family_id", "id"),
+    readAll<{ product_id: number; shop_id: string }>("matched_prices", "product_id, shop_id", ["product_id", "shop_id", "url"]),
+    readAll<{ id: number; family_id: number | null }>("products", "id, family_id", ["id"]),
   ]);
   const familyOf = new Map(products.map((p) => [p.id, p.family_id]));
   const shops = new Map<number, Set<string>>();
@@ -325,14 +340,11 @@ export async function popularFamilies(page = 0): Promise<FamilyResult[]> {
 async function popularOrder(): Promise<FamilyRow[]> {
   "use cache";
   cacheLife("hours");
-  const families: FamilyRow[] = [];
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await publicClient().from("product_families").select("id, name, category").order("id").range(from, from + 999);
-    if (error) throw error;
-    families.push(...data);
-    if (data.length < 1000) break;
-  }
-  const shops = await familyShopCounts();
+  // Families and shop counts are independent, so both load at once.
+  const [families, shops] = await Promise.all([
+    readAll<FamilyRow>("product_families", "id, name, category", ["id"]),
+    familyShopCounts(),
+  ]);
   const count = (f: FamilyRow) => shops.get(f.id) ?? 0;
 
   const bestsellers: FamilyRow[] = [];
