@@ -928,3 +928,9 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   says whether more pages exist, since pages are shorter where items aren't sold right now). Search order = name and
   search words (`preScore`); availability only reorders within a page. "rødvin" now runs to page 60. Search pages
   still load in ~0.5-0.9 s (locally, first time). The old "Vis X flere varer" fold within a page is gone.
+- **Build failure fixed (2026-11-14):** the Vercel build of 6fb472a failed prerendering `/` with Postgres "canceling
+  statement due to statement timeout" (57014): `readAll()` sent ~18 page requests at once against the
+  `matched_prices` view (each re-evaluates the view) plus an exact row count. It now reads 4 pages at a time with no
+  count (~3.7 s for all three tables, fine since it only runs when a cached page is rebuilt), and the front page is
+  built without popular items if the fetch fails - the browser then loads them - so a slow database can't block a
+  deploy. Long-term option: a database view counting shops per family (needs a migration).

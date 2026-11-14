@@ -17,7 +17,8 @@ export function PopularGrid({ families, shops }: { families: FamilyResult[]; sho
           <PopularCard key={f.id} family={f} shopName={(id) => shopNames[id] ?? id} />
         ))}
       </ul>
-      <PopularMore shopNames={shopNames} />
+      {/* With no prerendered items (the build couldn't fetch them), the browser loads from page 0. */}
+      <PopularMore shopNames={shopNames} startPage={families.length ? 1 : 0} />
     </section>
   );
 }

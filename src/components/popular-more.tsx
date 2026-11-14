@@ -18,9 +18,9 @@ const fetchPage = async (page: number): Promise<FamilyResult[]> => {
  * page is fetched in the background as soon as the previous one shows - so a press is
  * usually instant.
  */
-export function PopularMore({ shopNames }: { shopNames: Record<string, string> }) {
+export function PopularMore({ shopNames, startPage = 1 }: { shopNames: Record<string, string>; startPage?: number }) {
   const [families, setFamilies] = useState<FamilyResult[]>([]);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(startPage);
   const [state, setState] = useState<"idle" | "loading" | "error" | "done">("idle");
   // The page being fetched ahead, by number. Re-used by the press, so nothing loads twice.
   const ahead = useRef<{ page: number; result: Promise<FamilyResult[]> } | null>(null);
@@ -36,10 +36,6 @@ export function PopularMore({ shopNames }: { shopNames: Record<string, string> }
     return ahead.current.result;
   };
 
-  // Fetch the first extra page right away; the visitor is likely to want it.
-  useEffect(() => {
-    prefetch(1);
-  }, []); // once, on first show
 
   const loadMore = async () => {
     if (busy.current) return;
@@ -65,6 +61,15 @@ export function PopularMore({ shopNames }: { shopNames: Record<string, string> }
       busy.current = false;
     }
   };
+
+  // Fetch the next page right away; the visitor is likely to want it. Starting at page 0
+  // means the front page came without items, so show them straight away.
+  useEffect(() => {
+    if (startPage === 0) loadMore();
+    else prefetch(startPage);
+    // Once, on first show.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <>

@@ -1,4 +1,5 @@
 import { getShops, popularFamilies } from "@/catalog/data";
+import type { FamilyResult, Shop } from "@/catalog/types";
 import { CategoryRow } from "@/components/category-row";
 import { PopularGrid } from "@/components/popular-grid";
 import { SearchBox } from "@/components/search-box";
@@ -10,7 +11,12 @@ import { SearchBox } from "@/components/search-box";
  * Every visitor gets the ready-made page, and search engines see the items.
  */
 export default async function Home() {
-  const [families, shops] = await Promise.all([popularFamilies(0), getShops()]);
+  // If the database is slow or down while the page is built, build it without the items
+  // rather than failing the whole deploy; the browser then loads them (PopularMore).
+  const [families, shops] = await Promise.all([popularFamilies(0), getShops()]).catch((e: unknown) => {
+    console.error("Front page: popular items not prerendered:", e);
+    return [[], []] as [FamilyResult[], Shop[]];
+  });
   return (
     <main>
       <section className="rounded-3xl bg-zinc-800 px-5 py-10 text-center text-white sm:px-10 sm:py-16">

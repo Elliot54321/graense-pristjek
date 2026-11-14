@@ -288,9 +288,12 @@ async function categoryOrder(category: string): Promise<(FamilyRow & { pre: numb
 }
 
 /**
- * A whole table or view. PostgREST returns at most 1000 rows per request, so the first
- * request also asks for the row count and the remaining pages are fetched in parallel -
- * one after another took ~2.7 s for matched_prices' 17,500 rows (2026-11-14).
+ * A whole table or view. PostgREST returns at most 1000 rows per request, so pages are
+ * fetched a few at a time (one after another took ~2.7 s for matched_prices' 17,500 rows).
+ * Not all at once: every page of a view re-evaluates the view, and 18 parallel requests
+ * made the database cancel one ("statement timeout") during a Vercel build, 2026-11-14.
+ * No row count is asked for either - counting a view is a full extra pass - pages are
+ * read until one comes back short.
  */
 async function readAll<T>(
   table: string,
@@ -300,24 +303,22 @@ async function readAll<T>(
   filter: (query: any) => any = (query) => query, // eslint-disable-line @typescript-eslint/no-explicit-any
 ): Promise<T[]> {
   const PAGE = 1000;
+  const AT_ONCE = 4;
   // orderBy must make rows unique (add a tiebreak column), or pages can overlap or skip rows.
-  const page = (from: number, count = false) => {
-    let q = filter(publicClient().from(table).select(columns, count ? { count: "exact" } : undefined));
+  const page = (index: number) => {
+    let q = filter(publicClient().from(table).select(columns));
     for (const column of orderBy) q = q.order(column);
-    return q.range(from, from + PAGE - 1) as PromiseLike<{ data: T[] | null; error: Error | null; count: number | null }>;
+    return q.range(index * PAGE, (index + 1) * PAGE - 1) as PromiseLike<{ data: T[] | null; error: Error | null }>;
   };
-  const first = await page(0, true);
-  if (first.error) throw first.error;
-  const total = first.count ?? first.data?.length ?? 0;
-  const rest = await Promise.all(
-    Array.from({ length: Math.max(0, Math.ceil(total / PAGE) - 1) }, (_, i) => page((i + 1) * PAGE)),
-  );
-  const rows = [...(first.data ?? [])];
-  for (const r of rest) {
-    if (r.error) throw r.error;
-    rows.push(...(r.data ?? []));
+  const rows: T[] = [];
+  for (let start = 0; ; start += AT_ONCE) {
+    const batch = await Promise.all(Array.from({ length: AT_ONCE }, (_, i) => page(start + i)));
+    for (const r of batch) {
+      if (r.error) throw r.error;
+      rows.push(...(r.data ?? []));
+    }
+    if (batch.some((r) => (r.data?.length ?? 0) < PAGE)) return rows;
   }
-  return rows;
 }
 
 /** Number of shops currently selling each family (any pack). */
@@ -325,7 +326,7 @@ async function familyShopCounts(): Promise<Map<number, number>> {
   "use cache";
   cacheLife("hours");
   const [prices, products] = await Promise.all([
-    readAll<{ product_id: number; shop_id: string }>("matched_prices", "product_id, shop_id", ["product_id", "shop_id", "url"]),
+    readAll<{ product_id: number; shop_id: string }>("matched_prices", "product_id, shop_id", ["product_id", "shop_id"]),
     readAll<{ id: number; family_id: number | null }>("products", "id, family_id", ["id"]),
   ]);
   const familyOf = new Map(products.map((p) => [p.id, p.family_id]));
