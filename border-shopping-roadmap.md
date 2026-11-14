@@ -885,3 +885,7 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   (`search_log`) once there's enough data. Considered and set aside: one "månedens tilbud" section per shop - it
   sorts by shop instead of comparing, and would mostly republish the newsletters; a shop-neutral "Ugens bedste
   tilbud" (biggest savings right now) is the better version if the front page needs more.
+- **"Vis flere varer" on the popular grid (2026-11-14, user request):** the grid now continues indefinitely, 12
+  items per press (`/api/popular?side=N`, cached an hour). Order: the bestsellers first, then every family sold in at
+  least two shops - common items first, then by number of shops, categories taking turns. Page 40 still had 12 items
+  on 2026-11-14. Phones now show all 12 of the first page too.
