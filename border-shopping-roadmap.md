@@ -918,3 +918,7 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   "Vis flere varer" pages come from the CDN-cached `/api/popular`, fetched ahead. A nightly job writing the ranking to
   a table was considered: same effect, but a new table, migration and pipeline step - only worth it if the ranking
   gets much heavier.
+- **Footer (2026-11-14, user request):** the footer was three short sentences on their own lines, so it filled only
+  half the width. It's now a light grey band with a line on top: the wordmark, one sentence about the site and the
+  price update info on the left, a "Sider" column (Sådan gør du, Om os, Kontakt, Din indkøbsliste) on the right;
+  stacked on phones.

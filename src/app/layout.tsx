@@ -50,24 +50,42 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           </div>
         </header>
         <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-5">{children}</div>
-        <footer className="mx-auto w-full max-w-6xl px-4 py-6 text-xs text-zinc-500">
-          Priserne er hentet fra butikkernes hjemmesider hver nat og kan afvige fra priserne i butikken.
-          <Suspense>
-            <Freshness />
-          </Suspense>
-          <p className="mt-2">
-            <Link href="/guide" className="underline underline-offset-2">
-              Sådan gør du
-            </Link>
-            {" · "}
-            <Link href="/om" className="underline underline-offset-2">
-              Om os
-            </Link>{" "}
-            – hvor priserne kommer fra, og hvordan vi håndterer dine data.{" · "}
-            <Link href="/kontakt" className="underline underline-offset-2">
-              Kontakt
-            </Link>
-          </p>
+        {/* Full-width band; inside, the price info and the page links share the width on wider screens. */}
+        <footer className="mt-10 border-t border-zinc-200 bg-zinc-50">
+          <div className="mx-auto grid w-full max-w-6xl gap-6 px-4 py-8 text-sm text-zinc-600 md:grid-cols-[2fr_1fr]">
+            <div>
+              <p className="text-base font-bold tracking-tight text-zinc-900">
+                Pris<span className="text-emerald-600">grænsen</span>
+              </p>
+              <p className="mt-2">
+                Sammenligner priserne hos Fleggaard, Calle, Poetzsch, Scandinavian Park og BorderShop, så du kan se, hvor
+                din indkøbsliste bliver billigst. Siden er uafhængig og ikke tilknyttet nogen af butikkerne.
+              </p>
+              <div className="mt-3 text-xs text-zinc-500">
+                Priserne hentes fra butikkernes hjemmesider og aviser hver nat og kan afvige fra priserne i butikken.
+                <Suspense>
+                  <Freshness />
+                </Suspense>
+              </div>
+            </div>
+            <nav aria-label="Sidefod">
+              <p className="font-semibold text-zinc-900">Sider</p>
+              <ul className="mt-2 flex flex-col">
+                {[
+                  { href: "/guide", label: "Sådan gør du" },
+                  { href: "/om", label: "Om os – priser og dine data" },
+                  { href: "/kontakt", label: "Kontakt" },
+                  { href: "/liste", label: "Din indkøbsliste" },
+                ].map((l) => (
+                  <li key={l.href}>
+                    <Link href={l.href} className="inline-flex min-h-9 items-center underline-offset-2 hover:underline">
+                      {l.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          </div>
         </footer>
         {/* Cookie-free page-view counts (Vercel Web Analytics); no consent banner needed. */}
         <Analytics />
