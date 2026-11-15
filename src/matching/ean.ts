@@ -30,6 +30,17 @@
  * Products with the same EAN but clearly different content (e.g. a bottle vs.
  * the same bottle in a gift box with glasses) get a lower confidence so they
  * show up for review instead of silently comparing different things.
+ *
+ * Size split (2026-11-14): the shopping list prices a listing at its *product's*
+ * content, so a copy whose own content is smaller than its product's (BorderShop
+ * "Hans Baer Riesling 0,25 l" on the 0,75 l product, a single gum pack on the
+ * 7-pack product) would be priced per liter/kg as if it were the bigger size - up
+ * to 10x too cheap. Such a copy goes to its own product in the same family instead
+ * (no EAN on that product, content from the shop), so the family still compares it,
+ * per liter/kg of what the shop actually sells. Copies of one barcode with the same
+ * size share that product; a later run finds it again among the barcode's products.
+ * Only this direction, and only when the name doesn't explain the gap (see
+ * `overstated`): shops misread contents too, and a copy that looks dearer is safe.
  */
 import { adminClient, fetchAll } from "../db/admin";
 
@@ -73,6 +84,53 @@ interface ShopProductRow {
   content_amount: number | null;
   content_unit: string | null;
 }
+
+interface Content {
+  amount: number | null;
+  unit: string | null;
+}
+
+/** Both contents known, same unit, within CONTENT_TOLERANCE: the same size. */
+function sameSize(a: Content | undefined, b: Content | undefined): boolean {
+  if (!a || !b || a.amount === null || b.amount === null || !a.unit || a.unit !== b.unit) return false;
+  return Math.abs(Number(a.amount) - Number(b.amount)) / Number(b.amount) <= CONTENT_TOLERANCE;
+}
+
+const near = (a: number, b: number) => Math.abs(a - b) / b <= CONTENT_TOLERANCE;
+const UNIT_FACTOR: Record<string, { unit: string; factor: number }> = {
+  kg: { unit: "kg", factor: 1 },
+  g: { unit: "kg", factor: 0.001 },
+  l: { unit: "l", factor: 1 },
+  cl: { unit: "l", factor: 0.01 },
+  ml: { unit: "l", factor: 0.001 },
+};
+
+/**
+ * The product claims clearly more content than this copy's own listing, and the
+ * listing's name doesn't explain the difference - so the shopping list, which uses
+ * the product's content, would price this copy too cheap per liter/kg. One-sided on
+ * purpose: a copy with *more* content than its product only looks dearer (safe), and
+ * shops' own contents are sometimes misread too. Explanations in the name:
+ *  - a pack count: "4x25g", "8er Pack", "24/0,33L", "6er" where count x copy ≈ product
+ *    (ScandiPark stores some multi-packs as one unit);
+ *  - the product's size printed in the name ("Polly Lakrids 400g" stored as 100 g).
+ */
+function overstated(name: string, own: Content, product: Content | undefined): boolean {
+  if (!product || own.amount === null || product.amount === null || !own.unit || own.unit !== product.unit) return false;
+  const [mine, theirs] = [Number(own.amount), Number(product.amount)];
+  if (mine >= theirs * (1 - CONTENT_TOLERANCE)) return false;
+  for (const m of name.matchAll(/(\d+)\s*(?:x|er\b|\/|-?pack|stk)/gi)) if (near(mine * Number(m[1]), theirs)) return false;
+  for (const m of name.matchAll(/(\d+(?:[.,]\d+)?)\s*(kg|g|l|cl|ml)\b/gi)) {
+    const u = UNIT_FACTOR[m[2].toLowerCase()];
+    if (u.unit === product.unit && near(Number(m[1].replace(",", ".")) * u.factor, theirs)) return false;
+  }
+  return true;
+}
+
+const contentOfRow = (r: ShopProductRow): Content => ({
+  amount: r.content_amount === null ? null : Number(r.content_amount),
+  unit: r.content_unit,
+});
 
 function contentsAgree(rows: ShopProductRow[]): boolean {
   const known = rows.filter((r) => r.content_amount !== null);
@@ -144,12 +202,12 @@ async function main() {
   const productIdByEan = new Map(existing.map((p) => [p.ean, p.id]));
 
   // Families and how many barcodes each covers (a whole-series family covers many).
-  const familyOf = new Map(
-    (
-      await fetchAll<{ id: number; family_id: number | null }>((from, to) =>
-        db.from("products").select("id, family_id").order("id").range(from, to),
-      )
-    ).map((p) => [p.id, p.family_id]),
+  const allProducts = await fetchAll<{ id: number; family_id: number | null; content_amount: number | null; content_unit: string | null }>(
+    (from, to) => db.from("products").select("id, family_id, content_amount, content_unit").order("id").range(from, to),
+  );
+  const familyOf = new Map(allProducts.map((p) => [p.id, p.family_id]));
+  const contentOf = new Map<number, Content>(
+    allProducts.map((p) => [p.id, { amount: p.content_amount === null ? null : Number(p.content_amount), unit: p.content_unit }]),
   );
   const familyBarcodes = new Map<number, Set<string>>();
   for (const sp of shopProducts) {
@@ -186,6 +244,8 @@ async function main() {
   const moved: { id: number; productId: number; method: string; confidence: number; note: string }[] = [];
   const movedLines: string[] = [];
   const conflicts: string[] = [];
+  const newSizes: { tempId: number; ean: string; row: ShopProductRow; content: Content; family: number | null; sizeOf: number }[] = [];
+  const sizeLines: string[] = [];
   for (const [ean, rows] of byEan) {
     const agree = contentsAgree(rows);
     if (!agree) {
@@ -230,16 +290,50 @@ async function main() {
     // Copies following an unreviewed LLM link inherit it: same method, same confidence.
     const followed = decided.size === 0 ? llmLink.get(target) : undefined;
 
+    // Size split (see header): a copy whose product claims more content than it has goes
+    // to a product of this barcode that has its size, else to a new one (negative id until saved).
+    const groupTarget = target;
+    const destination = (r: ShopProductRow): number => {
+      const size = contentOfRow(r);
+      // A copy already on a product of its own size stays there when the target has another
+      // size (e.g. the target is a size product made earlier, holding more copies).
+      const current = alreadyMatched.get(r.id)?.product_id;
+      if (current !== undefined && current !== groupTarget && sameSize(size, contentOf.get(current)) && !sameSize(size, contentOf.get(groupTarget))) {
+        return current;
+      }
+      if (!overstated(r.name, size, contentOf.get(groupTarget))) return groupTarget;
+      for (const other of rows) {
+        const pid = alreadyMatched.get(other.id)?.product_id;
+        if (pid !== undefined && pid !== groupTarget && sameSize(size, contentOf.get(pid))) return pid;
+      }
+      const planned = newSizes.find((n) => n.ean === ean && sameSize(size, n.content));
+      if (planned) return planned.tempId;
+      const tempId = -(newSizes.length + 1);
+      newSizes.push({ tempId, ean, row: r, content: size, family: familyOf.get(groupTarget) ?? null, sizeOf: groupTarget });
+      contentOf.set(tempId, size);
+      return tempId;
+    };
+
     for (const r of rows) {
       const old = alreadyMatched.get(r.id);
       const method = followed ? "llm" : "ean";
       const conf = followed ? Number(followed.confidence) : confidence;
+      if (old && human(old)) continue; // never move a human decision
+      const target = destination(r);
+      if (target !== groupTarget && old?.product_id !== target) {
+        const t = target < 0 ? "new product" : `#${target}`;
+        sizeLines.push(`${ean} ${r.shop_id} "${r.name}" (${r.content_amount ?? "?"} ${r.content_unit ?? ""}): ${old ? `#${old.product_id}` : "unmatched"} -> ${t}, not #${groupTarget} (${contentOf.get(groupTarget)?.amount} ${contentOf.get(groupTarget)?.unit})`);
+      }
       if (!old) {
         matches.push({ shop_product_id: r.id, product_id: target, method, confidence: conf });
         continue;
       }
-      if (human(old)) continue; // never move a human decision
       if (old.product_id !== target) {
+        if (target !== groupTarget) {
+          // Moved for its size only: the family stays the target's (set on the new product).
+          moved.push({ id: r.id, productId: target, method, confidence: conf, note: `Barcode ${ean}, own size (was #${old.product_id}, ${old.method})` });
+          continue;
+        }
         moved.push({
           id: r.id,
           productId: target,
@@ -265,6 +359,8 @@ async function main() {
   for (const line of movedLines) console.log(`  ${line}`);
   console.log(`Products given the more specific family of a moved copy: ${familyMoves.size}`);
   for (const { line } of familyMoves.values()) console.log(`  ${line}`);
+  console.log(`Copies given their own size (${newSizes.length} new products): ${sizeLines.length}`);
+  for (const line of sizeLines) console.log(`  ${line}`);
   if (conflicts.length) {
     console.log(`Barcodes left alone (reviewed two ways, or split evenly): ${conflicts.length}`);
     for (const line of conflicts) console.log(`  ${line}`);
@@ -273,6 +369,28 @@ async function main() {
     console.log(`Dry run - nothing saved. Would add ${matches.length} new matches and re-score ${rescored.length}.`);
     return;
   }
+
+  // New size products first, so moves and new matches can point at them.
+  const realId = new Map<number, number>();
+  for (const n of newSizes) {
+    const { data, error } = await db
+      .from("products")
+      .insert({
+        name: n.row.name,
+        brand: n.row.brand,
+        content_amount: n.content.amount,
+        content_unit: n.content.unit,
+        category: n.row.categories[0] ?? null,
+        family_id: n.family,
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+    realId.set(n.tempId, data.id);
+  }
+  const resolve = (id: number) => (id < 0 ? realId.get(id)! : id);
+  for (const m of moved) m.productId = resolve(m.productId);
+  for (const m of matches) m.product_id = resolve(m.product_id);
 
   for (const m of moved) {
     const { error } = await db

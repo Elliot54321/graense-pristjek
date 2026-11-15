@@ -947,3 +947,83 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
 ### Working setup: architect and area chats (2026-11-14)
 
 - **Working setup (2026-11-14):** the project now runs as one architect chat plus area chats (UI, Admin, Data & newsletters, Matching, Catalog & small features), each owning its own files in the shared folder - see "How we work" in CLAUDE.md. Chosen over separate worktrees/branches: one person, so no merging is simpler; the file-ownership rule prevents two chats overwriting each other.
+
+### Trust audit of the shopping list (2026-11-15, Matching chat)
+
+- **Why:** Phase 3 is done when the answer can be trusted on a real trip. This audit checks a realistic 28-item border basket
+  against the same data `/liste` uses (`matched_prices`, unreviewed LLM links < 0.8 held back) and then the whole catalog
+  for the same failure types. New read-only tool `src/matching/audit.ts` (`npx tsx --env-file-if-exists=.env.local
+  src/matching/audit.ts [--find <regex> | --outliers | --content | --dupes]`): basket per shop like `compare.ts`;
+  `--outliers` = families whose cheapest listing is < 50 % of the other shops' median per l/kg; `--content` = listings
+  whose own content differs from their product's; `--dupes` = same family name on sale in two families.
+- **Basket result after the fixes** (P Poetzsch, F Fleggaard, C Calle, S ScandiPark, B/R BorderShop Puttgarden/Rostock;
+  "estimated" = shown at the highest other price; F/C estimated = not in this newsletter unless noted):
+
+  | Item | Priced | Estimated | Problems found | Fixed? |
+  |---|---|---|---|---|
+  | Coca-Cola 24x0,33 | P C S B R | F | - (family mixes cans and bottles by design) | - |
+  | Coca-Cola Zero 24x0,33 | all 6 | - | - | - |
+  | Pepsi Max 24x0,33 | P S B R | F C | - | - |
+  | Faxe Kondi 24x0,33 | all 6 | - | - | - |
+  | Fanta Orange 24x0,33 | P C S B R | F | - | - |
+  | Red Bull 24x0,25 | P S B R | F C | - | - |
+  | Monster Energy 12x0,5 | all 6 | - | Calle's 2nd offer "Monster Energy Original" held back (0.75) | no - awaits /admin |
+  | Carlsberg Pilsner 24x0,33 | F C S B R | **P** | Poetzsch "Carlsberg Pilsner" held back (LLM 0.75; its case has another barcode) | no - awaits /admin |
+  | Tuborg Grøn / Classic, Royal Pilsner, Heineken | all 6 | - | Royal Pilsner duplicate (known example) already gone; Calle's 2nd Heineken offer held back | already fixed |
+  | Somersby Apple | P C S B R | F | - | - |
+  | Jägermeister 1 l | P F S B R | C | **S looked half price**: two empty plastic cups ("0,3L PET Genanvendelige kop") were linked into the family | yes - "not comparable" |
+  | Gammel Dansk, Smirnoff, Baileys, Captain Morgan 1 l | 4-5 shops | F (C) | - | - |
+  | Haribo Matador Mix 1 kg | all 6 | - | known example: already linked at P and S | already fixed |
+  | Toms Guldkarameller | P S B R | F C | - | - |
+  | Marabou Mælkechokolade | P F S B R | C | - | - |
+  | Kinder Bueno | P S B R | F C | F's offer "312-378 g." has no content, so it can't be priced | no - Data |
+  | Nutella 1 kg | all 6 (was P S) | - | **two "Nutella" families** (candy vs groceries) | yes - merged |
+  | Pringles Original | P C S B R | F | - | - |
+  | Casillero del Diablo Cab. Sauv. 0,75 l | P S B R | F C | S 36,49 vs B 49,95 - real price | - |
+  | Yellow Tail Shiraz 0,75 l | S B R | P F C | - (P doesn't sell it) | - |
+  | Nescafé Gold 200 g | P F C S (was P S) | B R | **F/C offer in its own family** "Nescafe Gold 200 g." | yes - moved to Nescafé Gold Original |
+  | Lavazza Crema e Gusto 1 kg | S | rest | - (only S sells it) | - |
+
+- **Systematic finding: listings priced at the wrong size.** `/liste` uses the *product's* content (`packsForBasket`),
+  search uses each listing's own price per l/kg. 191 visible listings had a different content from their product, mostly
+  "same barcode, different content" EAN links (confidence 0.6, shown on the site). Where the product claims more than
+  the shop sells, the list priced that shop up to 10x too cheap: BorderShop Hans Baer Riesling 0,25 l as 0,75 l,
+  Wrigley's single pack as ScandiPark's 7-pack, OK Micro Popcorn 90 g as 900 g, ScandiPark Brut D'Argent 0,75 l as
+  BorderShop's misread 75 l. **Fix (`ean.ts`, size split):** such a copy gets its own product in the same family with
+  the shop's content, so the family compares it per l/kg of what's actually sold. One-sided on purpose (copies with *more*
+  content only look dearer, and shops misread contents too) and skipped when the name explains the gap ("4x25g", "8er",
+  "24/0,33L", or the product's size printed in the name - e.g. ScandiPark stores "Fisherman's Friend 4x25g" as 25 g, and
+  a symmetric split would have made 20+ correct prices wrong; caught in the first dry run). Runs nightly with
+  `match:ean`; a later run finds the size product again. Saved: 44 copies -> 34 new size products. 150 mismatches left,
+  all in the safe direction or without a content (newsletter ranges).
+- **Duplicate families:** `--dupes` found 36 pairs; 33 merged (47 products; the family sold in most shops kept,
+  search words joined) - Nutella, Nutella B-Ready/Biscuits, J.P. Chenet x2, Monin syrups x6 (now groceries: they were
+  "spirits" at Poetzsch, which would count syrup towards the spirits import limit), Spangsberg overtræksknapper x3,
+  Corny Big x3, DK-Nuts x2, Capri-Sun, Anthon Berg Ren rå marcipan, Tyrkisk Peber (ScandiPark's 400 g bag then moved
+  on to the 400 g bags' family), Branca Menta (+ "Fernet Branca Bitter Branca Menta 1L" from its own family), Omo,
+  Panda, Paw Patrol, Quaker, Livol, Nordthy, Khao Shong, MasterMix. Most pairs differed only in category (shops file the
+  same item differently). Left apart: Ga-Jol x3 (liqueur vs pastilles - correct) and Twix (ScandiPark's "5x2er 250g" is
+  stored as 1,25 kg and would become a false cheapest). The six emptied Monin families were renamed "... (samlet i
+  fN)" (unique category+name), not deleted.
+- **Coverage (`match:coverage`) before -> after:** common items unchanged at 117/120 all linked (0 partly, 2 one shop,
+  1 none; found/linked P 116/114, F 41/41, C 42/42, S 100/100, B 110/110, R 110/110) - the headline items were already
+  linked; the problems sat in sizes and duplicates the report doesn't see. Comparable share per category moved up a
+  little: Poetzsch beer 93->94 %, spirits 74->75 %, groceries 34->35 %; ScandiPark wine 54->55 %, groceries 27->28 %;
+  Fleggaard candy 68->69 %; Calle household 35->38 %. `common-items.ts` rules tightened (Coca-Cola Zero Lime, Faxe Kondi
+  Free, Fanta Strawberry Kiwi, Tuborg Classic Øko, Baileys Tiramisu, Captain Morgan Dark, Kinder Bueno Eggs no longer
+  counted as the base item).
+- **Remaining issues, by area (for the architect):**
+  - *Data & newsletters:* (1) BorderShop "0 ,75 L" parsed as 75 l - Brut Dargent Chardonnay is still a false cheapest
+    (0,80 kr./l). (2) ScandiPark multipacks are parsed two ways: "4x25g" -> 25 g (one unit) but "7er Pack 98g" -> 686 g,
+    "8er Pack 184g", "14er Box 266g", "kinder Bueno White 8x2 312g", "Twix 5x2er 250g" -> N x the total, which makes S
+    falsely cheap in search (Wrigley's 58 kr./kg vs ~400). (3) Suspicious Poetzsch rows: "Mr. Popgun Micro popcorn" 0,9 kg
+    (now the cheapest popcorn), "Casillero del Diablo Shiraz" 14,00 kr., "Carletti P-tærter" 0,06 kg at 9,99. (4) BorderShop
+    "Cloetta Polly Lakrids 400g" stored as 100 g. (5) Newsletter size ranges ("312-378 g.", "62-75 g.", "18 - 24 x 0,33 l")
+    get no content, so the list can't price them (Kinder Bueno at Fleggaard shows "estimated" though it's in the issue).
+  - *Catalog:* search's "Billigst" uses each listing's own price per l/kg, the list uses the product's content - they can
+    still disagree for the 150 remaining mismatches. Pricing each offer at its own listing's content in `compare.ts` would
+    remove the whole class. Also: EAN links with confidence 0.6 are shown on the site (the hold-back covers LLM links only).
+  - *Matching / review (deferred):* Poetzsch Carlsberg Pilsner held back at 0.75 is the most visible gap (Poetzsch shows
+    "estimated" for the #1 beer); a one-click "Bekræft" in `/admin` when the review happens.
+  - *Housekeeping:* add `"match:audit"` to package.json and CLAUDE.md's command list if the audit should be rerun after
+    each newsletter import.
