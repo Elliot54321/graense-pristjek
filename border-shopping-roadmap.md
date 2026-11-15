@@ -940,9 +940,12 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   (`/api/families?...&fra=N`). "rødvin": 590 sold red wines, every page 12 except the last, no repeats.
 - **Photos on the list (2026-11-15, user request):** each row on "Din indkøbsliste" shows a small photo (48 px, 64 px on
   wider screens). The photo is saved with the item when it's added (`BasketItem.imageUrl`, optional, in
-  `src/catalog/types.ts` - edited by the UI chat with the user's OK): the pack's own photo, or for "Billigste på listen"
-  the cheapest pack's, else another pack of the family (newsletter packs have none). Items on older lists get an empty
-  grey tile until they're added again from search, which fills in the photo.
+  `src/catalog/types.ts`): the pack's own photo, or for "Billigste på listen"
+  the cheapest pack's, else another pack of the family (newsletter packs have none). Items saved without one (lists from
+  before the change) showed an empty tile - re-adding couldn't fix it, as the button is a stepper once an item is on the
+  list - so `/api/compare` now also returns `images` (item key -> photo; a family's most widely sold pack with a photo,
+  as on the front page) and the list uses it as fallback. Both Catalog-area edits were made by the UI chat with the
+  user's OK.
 
 ### Working setup: architect and area chats (2026-11-14)
 

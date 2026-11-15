@@ -12,11 +12,12 @@ import { ImportLimits } from "./import-limits";
 import { ShoppingOptions } from "./shopping-options";
 
 type Alcohol = Partial<Record<AlcoholType, number>>;
-type State = { status: "idle" | "loading" | "error" | "busy"; results: ShopResult[]; alcohol: Alcohol };
+/** images: a photo per item key from the server, for items saved without one. */
+type State = { status: "idle" | "loading" | "error" | "busy"; results: ShopResult[]; alcohol: Alcohol; images: Record<string, string> };
 
 export function BasketView() {
   const items = useBasket();
-  const [state, setState] = useState<State>({ status: "idle", results: [], alcohol: {} });
+  const [state, setState] = useState<State>({ status: "idle", results: [], alcohol: {}, images: {} });
   // Bumped by "Prøv igen" to re-run the pricing below.
   const [attempt, setAttempt] = useState(0);
 
@@ -36,8 +37,8 @@ export function BasketView() {
         // Too many re-pricings in a minute (rate limit): keep the last prices and say so.
         if (res.status === 429) return setState((s) => ({ ...s, status: "busy" }));
         if (!res.ok) throw new Error(String(res.status));
-        const { results, alcohol } = (await res.json()) as { results: ShopResult[]; alcohol: Alcohol };
-        setState({ status: "idle", results, alcohol });
+        const { results, alcohol, images } = (await res.json()) as Omit<State, "status">;
+        setState({ status: "idle", results, alcohol, images: images ?? {} });
       } catch (e) {
         if (!controller.signal.aborted) setState((s) => ({ ...s, status: "error" }));
         void e;
@@ -70,7 +71,7 @@ export function BasketView() {
     <>
       <ul className="mt-4 divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
         {items.map((item) => (
-          <BasketRow key={item.key} item={item} />
+          <BasketRow key={item.key} item={item} imageUrl={item.imageUrl ?? state.images[item.key]} />
         ))}
       </ul>
       <div className="mt-1 flex justify-between text-sm">
@@ -111,19 +112,19 @@ export function BasketView() {
   );
 }
 
-function BasketRow({ item }: { item: BasketItem }) {
+function BasketRow({ item, imageUrl }: { item: BasketItem; imageUrl?: string }) {
   return (
     <li className="flex items-center justify-between gap-3 px-3 py-2.5">
-      {/* The shop's photo of the pack it was added from (linked, not copied); older lists and
-          newsletter-only items get an empty tile so the names stay aligned. */}
+      {/* The shop's photo of the pack it was added from, else one the server picked (linked, not
+          copied); items no shop has a photo of get an empty tile so the names stay aligned. */}
       <div
         className={`flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md border border-zinc-200 sm:h-16 sm:w-16 ${
-          item.imageUrl ? "bg-white" : "bg-zinc-100"
+          imageUrl ? "bg-white" : "bg-zinc-100"
         }`}
       >
-        {item.imageUrl && (
+        {imageUrl && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={item.imageUrl} alt="" width={64} height={64} loading="lazy" decoding="async" className="h-full w-full object-contain p-1" />
+          <img src={imageUrl} alt="" width={64} height={64} loading="lazy" decoding="async" className="h-full w-full object-contain p-1" />
         )}
       </div>
       <div className="min-w-0 flex-1">

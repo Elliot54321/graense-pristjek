@@ -3,13 +3,15 @@
  *
  * The basket lives in the browser; this prices it in every shop. `alcohol` is the
  * basket's liters of spirits / fortified wine / wine / beer, for the import-limit
- * warning (the browser compares it with the number of adults).
+ * warning (the browser compares it with the number of adults). `images` maps each
+ * item's key to a product photo, for items saved without one (lists from before 2026-11-15).
  */
 import { z } from "zod";
 import { compareBasket } from "@/catalog/compare";
 import { familiesById, getShops, packsForBasket } from "@/catalog/data";
 import { alcoholLiters } from "@/catalog/import-limits";
 import { allow, clientIp } from "@/lib/rate-limit";
+import type { Pack } from "@/catalog/types";
 
 const MAX_ITEMS = 100;
 /** The basket re-prices on every change, so a busy shopper sends ~10-20 a minute. */
@@ -54,5 +56,21 @@ export async function POST(request: Request) {
   // Product items need their pack's family too, for the alcohol type.
   const packFamilies = packs.flatMap((p) => (p.familyId ? [p.familyId] : []));
   const families = await familiesById([...familyIds, ...packFamilies]);
-  return Response.json({ results: compareBasket(items, packs, shops), alcohol: alcoholLiters(items, packs, families) });
+  return Response.json({
+    results: compareBasket(items, packs, shops),
+    alcohol: alcoholLiters(items, packs, families),
+    images: itemImages(items, packs),
+  });
+}
+
+/** A photo per item: the product's own, or for a family its most widely sold pack's (as on the front page). */
+function itemImages(items: z.infer<typeof Item>[], packs: Pack[]): Record<string, string> {
+  const images: Record<string, string> = {};
+  for (const item of items) {
+    const candidates = packs
+      .filter((p) => p.imageUrl && (item.kind === "product" ? p.productId === item.productId : p.familyId === item.familyId))
+      .sort((a, b) => b.offers.length - a.offers.length);
+    if (candidates[0]) images[item.key] = candidates[0].imageUrl!;
+  }
+  return images;
 }
