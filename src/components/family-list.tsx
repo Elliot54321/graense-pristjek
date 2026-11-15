@@ -89,6 +89,8 @@ export function FamilyCard({ family, shops, page }: { family: FamilyResult; shop
               step: bestPack.contentAmount,
               unit: family.best.unit,
               packLabel: bestPack.packLabel ?? undefined,
+              // Newsletter packs have no photo: fall back to another pack of the family.
+              imageUrl: (bestPack.imageUrl ?? family.packs.find((p) => p.imageUrl)?.imageUrl) || undefined,
             }}
           />
         )}
@@ -182,7 +184,7 @@ function PackRow({ pack, shops, page }: { pack: Pack; shops: Map<string, Shop>; 
             label="Sæt på listen"
             variant="secondary"
             className="mt-2"
-            item={{ key: `p-${pack.productId}`, kind: "product", productId: pack.productId, label: pack.name, quantity: 1 }}
+            item={{ key: `p-${pack.productId}`, kind: "product", productId: pack.productId, label: pack.name, quantity: 1, imageUrl: pack.imageUrl ?? undefined }}
           />
         </div>
       </div>

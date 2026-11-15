@@ -71,8 +71,9 @@ export type BasketItem =
   /** step = how much one "+" adds: the pack size the family was added with. */
   /** packLabel: the pack one step is ("24 x 0,33 l"), shown instead of liters; missing in older baskets. */
   /** singlePrice: price the exact quantity at the till instead of assuming the multi-buy rate (see compare.ts). */
-  | { key: string; kind: "family"; familyId: number; label: string; amount: number; step: number; unit: Unit; packLabel?: string; singlePrice?: boolean }
-  | { key: string; kind: "product"; productId: number; label: string; quantity: number; singlePrice?: boolean };
+  /** imageUrl: photo of the pack it was added from, shown on the list; missing in older baskets. */
+  | { key: string; kind: "family"; familyId: number; label: string; amount: number; step: number; unit: Unit; packLabel?: string; singlePrice?: boolean; imageUrl?: string }
+  | { key: string; kind: "product"; productId: number; label: string; quantity: number; singlePrice?: boolean; imageUrl?: string };
 
 export interface LineResult {
   key: string;

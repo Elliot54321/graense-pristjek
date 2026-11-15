@@ -114,6 +114,18 @@ export function BasketView() {
 function BasketRow({ item }: { item: BasketItem }) {
   return (
     <li className="flex items-center justify-between gap-3 px-3 py-2.5">
+      {/* The shop's photo of the pack it was added from (linked, not copied); older lists and
+          newsletter-only items get an empty tile so the names stay aligned. */}
+      <div
+        className={`flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md border border-zinc-200 sm:h-16 sm:w-16 ${
+          item.imageUrl ? "bg-white" : "bg-zinc-100"
+        }`}
+      >
+        {item.imageUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={item.imageUrl} alt="" width={64} height={64} loading="lazy" decoding="async" className="h-full w-full object-contain p-1" />
+        )}
+      </div>
       <div className="min-w-0 flex-1">
         <p className="text-sm">{item.label}</p>
         {/* Families are bought by amount: we pick the cheapest pack size in each shop. */}

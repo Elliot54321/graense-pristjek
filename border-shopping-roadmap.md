@@ -938,6 +938,11 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   right now were dropped after a page was cut. Pages now keep taking candidates until 12 sold families are found and
   return a cursor (`next` = position in the ranked list) that "Vis flere resultater" sends back
   (`/api/families?...&fra=N`). "rødvin": 590 sold red wines, every page 12 except the last, no repeats.
+- **Photos on the list (2026-11-15, user request):** each row on "Din indkøbsliste" shows a small photo (48 px, 64 px on
+  wider screens). The photo is saved with the item when it's added (`BasketItem.imageUrl`, optional, in
+  `src/catalog/types.ts` - edited by the UI chat with the user's OK): the pack's own photo, or for "Billigste på listen"
+  the cheapest pack's, else another pack of the family (newsletter packs have none). Items on older lists get an empty
+  grey tile until they're added again from search, which fills in the photo.
 
 ### Working setup: architect and area chats (2026-11-14)
 

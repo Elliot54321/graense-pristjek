@@ -62,8 +62,10 @@ export function addToBasket(item: BasketItem) {
   write(
     items.map((i) => {
       if (i.key !== item.key) return i;
-      if (i.kind === "product" && item.kind === "product") return { ...i, quantity: i.quantity + item.quantity };
-      if (i.kind === "family" && item.kind === "family") return { ...i, amount: i.amount + item.amount };
+      // Items from older lists get their photo the next time they're added.
+      const imageUrl = i.imageUrl ?? item.imageUrl;
+      if (i.kind === "product" && item.kind === "product") return { ...i, imageUrl, quantity: i.quantity + item.quantity };
+      if (i.kind === "family" && item.kind === "family") return { ...i, imageUrl, amount: i.amount + item.amount };
       return i;
     }),
   );
