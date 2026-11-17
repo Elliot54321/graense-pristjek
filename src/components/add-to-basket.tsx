@@ -14,17 +14,20 @@ export function AddToBasket({
   label = "Sæt på listen",
   variant = "primary",
   className = "",
+  full = false,
 }: {
   item: BasketItem;
   label?: string;
   variant?: "primary" | "secondary";
   className?: string;
+  /** Fill the container's width (button and stepper), for narrow cards. */
+  full?: boolean;
 }) {
   const onList = useBasket().find((i) => i.key === item.key);
   if (onList) {
     return (
       <div className={className}>
-        <ItemStepper item={onList} />
+        <ItemStepper item={onList} full={full} />
         <p className="mt-0.5 text-xs text-emerald-700 dark:text-emerald-400">På listen ✓</p>
       </div>
     );
@@ -33,7 +36,7 @@ export function AddToBasket({
     <button
       type="button"
       onClick={() => addToBasket(item)}
-      className={`min-h-10 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+      className={`min-h-10 rounded-md px-3 ${full ? "w-full" : ""} py-2 text-sm font-medium transition-colors ${
         variant === "primary"
           ? "border border-zinc-700 bg-zinc-700 text-white hover:bg-zinc-600 dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
           : "border border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-transparent dark:text-zinc-100 dark:hover:bg-zinc-800"

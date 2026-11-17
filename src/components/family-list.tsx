@@ -1,6 +1,7 @@
 import { dealPerPiece, effectivePrice } from "@/catalog/compare";
 import type { FamilyResult, Offer, Pack, Shop } from "@/catalog/types";
 import { AddToBasket } from "@/components/add-to-basket";
+import { cheapestListItem } from "@/components/list-item";
 import { CouponBadge, COUPON_NOTE, MultiBuyBadge, OfferBadge } from "@/components/badges";
 import { ReportLink } from "@/components/report-link";
 import { ChevronDown } from "lucide-react";
@@ -58,6 +59,7 @@ export function FamilyCard({ family, shops, page }: { family: FamilyResult; shop
   // One pack per card - the cheapest per liter/kg, which "Billigste på listen" adds too -
   // so cards in the grid line up; the other variants (sizes, cans vs bottles) are one tap away.
   const shown = bestPack ?? family.packs[0];
+  const listItem = cheapestListItem(family);
   const others = family.packs.filter((p) => p !== shown);
   return (
     // Subgrid: the card's three parts (header, pack, variants) share rows with its neighbour, so the
@@ -76,24 +78,7 @@ export function FamilyCard({ family, shops, page }: { family: FamilyResult; shop
             </p>
           )}
         </div>
-        {family.best && bestPack?.contentAmount && (
-          <AddToBasket
-            label="Billigste på listen"
-            className="shrink-0"
-            item={{
-              key: `f-${family.id}`,
-              kind: "family",
-              familyId: family.id,
-              label: family.name,
-              amount: bestPack.contentAmount,
-              step: bestPack.contentAmount,
-              unit: family.best.unit,
-              packLabel: bestPack.packLabel ?? undefined,
-              // Newsletter packs have no photo: fall back to another pack of the family.
-              imageUrl: (bestPack.imageUrl ?? family.packs.find((p) => p.imageUrl)?.imageUrl) || undefined,
-            }}
-          />
-        )}
+        {listItem && <AddToBasket label="Billigste på listen" className="shrink-0" item={listItem} />}
       </div>
       <ul className="mt-3 border-t border-zinc-300 dark:border-zinc-800">
         <PackRow pack={shown} shops={shops} page={page} />

@@ -17,10 +17,11 @@ export function wholePacks(item: Extract<BasketItem, { kind: "family" }>): numbe
  * Products count pieces; families step by the pack size they were added with.
  * Going below one removes the item.
  */
-export function ItemStepper({ item }: { item: BasketItem }) {
+export function ItemStepper({ item, full = false }: { item: BasketItem; full?: boolean }) {
   if (item.kind === "product") {
     return (
       <Stepper
+        full={full}
         label={item.label}
         value={`${item.quantity} stk.`}
         onMinus={() => (item.quantity > 1 ? updateBasketItem(item.key, { quantity: item.quantity - 1 }) : removeFromBasket(item.key))}
@@ -31,6 +32,7 @@ export function ItemStepper({ item }: { item: BasketItem }) {
   const packs = wholePacks(item);
   return (
     <Stepper
+      full={full}
       label={item.label}
       value={packs !== null ? `${amount(packs)} × ${item.packLabel!.replace(" x ", "×")}` : `${amount(item.amount)} ${UNIT_LABEL[item.unit]}`}
       onMinus={() =>
@@ -41,14 +43,27 @@ export function ItemStepper({ item }: { item: BasketItem }) {
   );
 }
 
-function Stepper({ label, value, onMinus, onPlus }: { label: string; value: string; onMinus: () => void; onPlus: () => void }) {
+/** full: fills its container with a narrower middle, for the small front-page cards. */
+function Stepper({
+  label,
+  value,
+  onMinus,
+  onPlus,
+  full,
+}: {
+  label: string;
+  value: string;
+  onMinus: () => void;
+  onPlus: () => void;
+  full: boolean;
+}) {
   const btn = "h-10 w-10 shrink-0 rounded-md border border-zinc-300 text-lg leading-none dark:border-zinc-700";
   return (
-    <div className="flex shrink-0 items-center gap-2">
+    <div className={full ? "flex w-full items-center gap-1" : "flex shrink-0 items-center gap-2"}>
       <button type="button" onClick={onMinus} className={btn} aria-label={`Færre ${label}`}>
         −
       </button>
-      <span className="min-w-16 text-center text-sm tabular-nums" aria-live="polite">
+      <span className={`text-center tabular-nums ${full ? "min-w-0 flex-1 text-xs" : "min-w-16 text-sm"}`} aria-live="polite">
         {value}
       </span>
       <button type="button" onClick={onPlus} className={btn} aria-label={`Flere ${label}`}>

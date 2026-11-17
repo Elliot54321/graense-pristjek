@@ -946,6 +946,11 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   list - so `/api/compare` now also returns `images` (item key -> photo; a family's most widely sold pack with a photo,
   as on the front page) and the list uses it as fallback. Both Catalog-area edits were made by the UI chat with the
   user's OK.
+- **List button on popular items (2026-11-17, user request):** each "Populære varer" card has "Sæt på listen" under the
+  price, turning into the − / + stepper once added - the same pack as search's "Billigste på listen" (shared helper
+  `cheapestListItem()` in `components/list-item.ts`). The card's link (photo, name, price) still opens the search; the
+  button sits outside it. The stepper has a full-width variant for the narrow phone cards. Cards whose cheapest pack
+  has no liter/kg content get no button (2 of the first 12), like search.
 
 ### Working setup: architect and area chats (2026-11-14)
 
