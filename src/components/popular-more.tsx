@@ -86,7 +86,7 @@ export function PopularMore({ shopNames, startPage = 1 }: { shopNames: Record<st
           type="button"
           onClick={loadMore}
           disabled={state === "loading"}
-          className="mx-auto mt-4 flex min-h-11 w-full max-w-md items-center justify-center rounded-lg border border-zinc-300 text-sm font-medium hover:bg-zinc-100 disabled:opacity-60"
+          className="mx-auto mt-4 flex min-h-11 w-full max-w-md cursor-pointer items-center justify-center rounded-lg border border-zinc-300 text-sm font-medium transition-colors hover:border-emerald-600 hover:bg-emerald-100 hover:text-emerald-900 disabled:opacity-60"
         >
           {state === "loading" ? "Henter…" : "Vis flere varer"}
         </button>

@@ -954,6 +954,12 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
 - **More breathing room (2026-11-17, user request):** more space between the header and the first box on every page
   (24 px, 32 px on wider screens; was 20), between the search box and the category tiles (24/32 px, was 16), above
   "Populære varer" on wider screens (48 px) and above the result heading on /sog and /kategori (32 px, was 24).
+- **Clear hover (2026-11-17, user request):** hovering a button was hard to see (zinc-700 -> zinc-600, or white ->
+  zinc-100 on the grey cards). Now the dark buttons ("Billigste på listen", the popular cards' "Sæt på listen") turn
+  green (emerald-700); outlined buttons ("Sæt på listen" in search, "Se N andre varianter", − / +, "Vis flere ...") get a
+  green border and pale green fill (emerald-600 / emerald-100); all show the hand cursor (`cursor-pointer` per button -
+  a global `@layer base` rule in globals.css didn't reach the dev server's CSS, so it was dropped). The − / + buttons are
+  white now, so they read as buttons on the grey cards too.
 
 ### Working setup: architect and area chats (2026-11-14)
 

@@ -57,7 +57,8 @@ function Stepper({
   onPlus: () => void;
   full: boolean;
 }) {
-  const btn = "h-10 w-10 shrink-0 rounded-md border border-zinc-300 text-lg leading-none dark:border-zinc-700";
+  const btn =
+    "h-10 w-10 shrink-0 cursor-pointer rounded-md border border-zinc-300 bg-white text-lg leading-none transition-colors hover:border-emerald-600 hover:bg-emerald-100 hover:text-emerald-900 dark:border-zinc-700";
   return (
     <div className={full ? "flex w-full items-center gap-1" : "flex shrink-0 items-center gap-2"}>
       <button type="button" onClick={onMinus} className={btn} aria-label={`Færre ${label}`}>

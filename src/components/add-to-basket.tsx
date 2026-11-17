@@ -36,10 +36,10 @@ export function AddToBasket({
     <button
       type="button"
       onClick={() => addToBasket(item)}
-      className={`min-h-10 rounded-md px-3 ${full ? "w-full" : ""} py-2 text-sm font-medium transition-colors ${
+      className={`min-h-10 cursor-pointer rounded-md px-3 ${full ? "w-full" : ""} py-2 text-sm font-medium transition-colors ${
         variant === "primary"
-          ? "border border-zinc-700 bg-zinc-700 text-white hover:bg-zinc-600 dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
-          : "border border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-transparent dark:text-zinc-100 dark:hover:bg-zinc-800"
+          ? "border border-zinc-700 bg-zinc-700 text-white hover:border-emerald-700 hover:bg-emerald-700 dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+          : "border border-zinc-300 bg-white text-zinc-900 hover:border-emerald-600 hover:bg-emerald-100 hover:text-emerald-900 dark:border-zinc-700 dark:bg-transparent dark:text-zinc-100 dark:hover:bg-zinc-800"
       } ${className}`}
     >
       {label}

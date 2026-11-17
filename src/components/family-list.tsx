@@ -87,7 +87,7 @@ export function FamilyCard({ family, shops, page }: { family: FamilyResult; shop
         <details className="group/sizes mt-1 min-w-0 self-start">
           {/* A preview, not just a label: photos and pack sizes show there's more to see.
               min-w-0 on the card and here lets the one-line size summary shrink instead of widening the page. */}
-          <summary className="flex min-h-[3.875rem] cursor-pointer list-none items-center gap-3 rounded-lg border border-zinc-300 bg-white p-2 pr-3 hover:border-zinc-400 group-open/sizes:mb-1 [&::-webkit-details-marker]:hidden">
+          <summary className="flex min-h-[3.875rem] cursor-pointer list-none items-center gap-3 rounded-lg border border-zinc-300 bg-white p-2 pr-3 transition-colors hover:border-emerald-600 hover:bg-emerald-100 group-open/sizes:mb-1 [&::-webkit-details-marker]:hidden">
             <VariantThumbs packs={others} />
             <span className="min-w-0 flex-1">
               <span className="block text-sm font-semibold">
