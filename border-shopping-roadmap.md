@@ -1073,3 +1073,30 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   classes); subcategory pages under `src/app/kategori/` (e.g. `/kategori/vin/rodvin`, `categoryFamilies(id, 0, sub.id)`,
   "Vis flere" with `source={{ kategori, under }}`). Hide empty top categories and subcategories with `categoryCounts()`;
   switch from `CATEGORIES` to `TOP_CATEGORIES` then. The front page must stay static (no URL reads).
+
+### Shopping list priced at each offer's content (2026-11-17, Catalog chat)
+
+- **What changed:** each offer now carries its own content (`Offer.contentAmount/contentUnit`, set in `loadPacks()`),
+  and both search's price per l/kg and the list (`compare.ts`) use it - so they can no longer disagree. A family line
+  buys `ceil(amount / offer content)` pieces per offer; an exact-product line buys the same *amount* as the product
+  (more pieces where a shop's listing is smaller). When the shop sells another size, the line shows the shop's own name.
+- **Deviation from the brief (listing content first):** the offer's content is the **smaller** of the listing's and the
+  product's (product's when units differ; whichever is known when one is missing). Of the 150 remaining mismatches, 58
+  have a listing *bigger* than its product, and many of those are listing misreads - ScandiPark's "Wrigleys 7er Pack 98g"
+  stored as 686 g would have let the list buy 1 pack for 0,7 kg. With the smaller content a disagreement can only make a
+  shop look dearer, never falsely cheapest (same reasoning as the one-sided size split in `ean.ts`).
+- **Effect (measured on live data):** search's "Billigst" moves shop in 19 of 7,878 families. Fixed false cheapest
+  answers, mostly ScandiPark multipacks: Wrigley's 58 -> 390 kr./kg, Ga-Jol 20 -> 163, Malaco Kick 11 -> 143, Kinder Bueno
+  White 28 -> 192, Haribo Bananas 0,44 kr./stk. The cost: a few offers really bigger than their product now look dearer
+  and lose (ScandiPark Corny Big 24x40g x4 - their *product* says 40 g; Malaco Allsorts 1 kg vs 800 g; Chamallows 225 vs
+  175 g); fixing those contents (Data/Matching) brings them back. The list changes in 1 family vs before (Cloetta Polly:
+  BorderShop's 400 g stored as 100 g, Data issue 4). Basket check via `/api/compare`: Hans Baer Riesling, Wrigley's (98 g
+  and 7x98 g), OK Micro Popcorn and Brut D'Argent (BorderShop now 54,95 for 75 cl) are priced right; none wins wrongly.
+- **Remaining:** newsletter size ranges without a listing content fall back to the product's (Fleggaard "Kahlua 0,7-1 l"
+  is priced as the product's 1 l and is now cheapest at 109,99 kr./l - could be the 0,7 l). `src/matching/audit.ts`
+  still models the list with the product's content - the Matching chat should switch it to the same rule.
+- **EAN links at confidence 0.6 (measured, not applied):** 283 of 17,510 visible listings are unreviewed EAN links below
+  0.8 (ScandiPark 107, Poetzsch 74, BorderShop 51 + Rostock 51). 222 of them have the same content as their product
+  (e.g. identical Fisherman's Friend, Lillet, Jack Daniel's 5 cl names); 61 differ, and those are now priced at the smaller
+  content. Holding all of them back would remove 150 products and 77 families from the site. **Proposal: don't hold them
+  back** - the content rule covers the risk they carried; revisit if the audit finds wrong-product EAN links.

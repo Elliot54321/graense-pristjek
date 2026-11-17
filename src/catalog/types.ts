@@ -14,6 +14,13 @@ export interface Offer {
   productId: number;
   shopId: string;
   shopProductName: string;
+  /**
+   * What one piece of this offer contains, used for its price per l/kg in search and for the
+   * list: the smaller of the shop's own content and the product's (see offerContent() in
+   * data.ts); null if neither is known. Usually both agree.
+   */
+  contentAmount: number | null;
+  contentUnit: Unit | null;
   price: number;
   pricePerUnit: number | null;
   onOffer: boolean;

@@ -16,6 +16,11 @@
  *   item, and it keeps totals comparable: otherwise a shop missing an expensive
  *   item would look cheapest. Newsletter shops (Fleggaard, Calle) only show part of
  *   their range, so for them "missing" mostly means "not in this issue".
+ * - Every offer is priced at its own content (Offer.contentAmount: the smaller of the
+ *   listing's and the product's, see data.ts), the same one search's price per
+ *   liter/kg uses. One barcode can be shared by sizes, and pricing BorderShop's 0,25 l
+ *   Hans Baer as the product's 0,75 l made it look 3x too cheap (trust audit
+ *   2026-11-15). So a shop selling smaller packs needs more of them.
  */
 import type { BasketItem, LineResult, Offer, Pack, Shop, ShopResult } from "./types";
 
@@ -54,21 +59,31 @@ export function costFor(offer: Offer, quantity: number, singlePrice = false): { 
   return { cost, usedMultiBuy: cost < quantity * offer.price - 0.005 };
 }
 
-/** Cheapest offer for `quantity` packs in one shop (a shop can list the same product twice). */
-function offerAt(pack: Pack, shopId: string, quantity: number, singlePrice: boolean) {
-  return pack.offers
-    .filter((o) => o.shopId === shopId)
-    .sort((a, b) => costFor(a, quantity, singlePrice).cost - costFor(b, quantity, singlePrice).cost)[0];
+/** What one piece of this offer contains (set by data.ts; the product's if the offer has none). */
+export function offerContent(pack: Pack, offer: Offer): { amount: number; unit: Pack["contentUnit"] } | null {
+  if (offer.contentAmount && offer.contentUnit) return { amount: offer.contentAmount, unit: offer.contentUnit };
+  return pack.contentAmount && pack.contentUnit ? { amount: pack.contentAmount, unit: pack.contentUnit } : null;
+}
+
+/** Whole pieces of `offer` for `amount` of `unit` (null if its content is unknown or in another unit). */
+function piecesFor(pack: Pack, offer: Offer, amount: number, unit: Pack["contentUnit"]): number | null {
+  const content = offerContent(pack, offer);
+  if (!content || content.unit !== unit) return null;
+  // The small epsilon keeps 7,92 l / 7,92 l from becoming 2 packs.
+  return Math.max(1, Math.ceil(amount / content.amount - 1e-9));
 }
 
 function buyLine(item: BasketItem, pack: Pack, offer: Offer, quantity: number): LineResult {
   const singlePrice = !!item.singlePrice;
   const { cost, usedMultiBuy } = costFor(offer, quantity, singlePrice);
+  // When the shop sells another size than the product, show what it actually sells.
+  const own = offerContent(pack, offer);
+  const otherSize = !!(own && pack.contentAmount && Math.abs(own.amount - pack.contentAmount) / pack.contentAmount > 0.02);
   return {
     key: item.key,
     label: item.label,
     buy: {
-      productName: pack.name,
+      productName: otherSize ? offer.shopProductName : pack.name,
       quantity,
       price: offer.price,
       url: offer.url,
@@ -87,21 +102,33 @@ function buyLine(item: BasketItem, pack: Pack, offer: Offer, quantity: number): 
 
 function priceLine(item: BasketItem, packs: Pack[], shopId: string): LineResult {
   const none: LineResult = { key: item.key, label: item.label, buy: null, cost: null, estimate: null };
-  if (item.kind === "product") {
-    const pack = packs.find((p) => p.productId === item.productId);
-    const offer = pack && offerAt(pack, shopId, item.quantity, !!item.singlePrice);
-    return pack && offer ? buyLine(item, pack, offer, item.quantity) : none;
-  }
-
   let best: LineResult | null = null;
-  for (const pack of packs) {
-    if (pack.familyId !== item.familyId || pack.contentUnit !== item.unit || !pack.contentAmount) continue;
-    // Whole packs only; the small epsilon keeps 7,92 l / 7,92 l from becoming 2 packs.
-    const quantity = Math.max(1, Math.ceil(item.amount / pack.contentAmount - 1e-9));
-    const offer = offerAt(pack, shopId, quantity, !!item.singlePrice);
-    if (!offer) continue;
+  const consider = (pack: Pack, offer: Offer, quantity: number) => {
     const line = buyLine(item, pack, offer, quantity);
     if (!best || line.cost! < best.cost!) best = line;
+  };
+
+  if (item.kind === "product") {
+    const pack = packs.find((p) => p.productId === item.productId);
+    for (const offer of pack?.offers.filter((o) => o.shopId === shopId) ?? []) {
+      // The same amount as `quantity` of the product: more pieces where the shop's listing is
+      // smaller. Within 2 % (rounding in the shops' data) it's the same pack.
+      const own = offerContent(pack!, offer);
+      const same = !pack!.contentAmount || !own || own.unit !== pack!.contentUnit || Math.abs(own.amount - pack!.contentAmount) / pack!.contentAmount <= 0.02;
+      const quantity = same ? item.quantity : piecesFor(pack!, offer, item.quantity * pack!.contentAmount!, pack!.contentUnit) ?? item.quantity;
+      consider(pack!, offer, quantity);
+    }
+    return best ?? none;
+  }
+
+  // A family: the offer (any pack, at its own content) with the lowest total for the amount.
+  for (const pack of packs) {
+    if (pack.familyId !== item.familyId) continue;
+    for (const offer of pack.offers) {
+      if (offer.shopId !== shopId) continue;
+      const quantity = piecesFor(pack, offer, item.amount, item.unit);
+      if (quantity !== null) consider(pack, offer, quantity);
+    }
   }
   return best ?? none;
 }

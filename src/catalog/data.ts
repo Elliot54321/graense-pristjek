@@ -43,6 +43,8 @@ interface PriceRow {
   product_id: number;
   shop_id: string;
   name: string;
+  content_amount: number | null;
+  content_unit: Unit | null;
   price: number;
   price_per_unit: number | null;
   on_offer: boolean;
@@ -120,6 +122,28 @@ function cleanQuery(q: string): string {
   return q.toLowerCase().replace(/[,()*{}"'\\%:]/g, " ").replace(/\s+/g, " ").trim();
 }
 
+/**
+ * What one piece of a shop's offer contains, for its price per l/kg (search) and how many
+ * pieces the list buys. Usually the listing and its product agree. When they don't, one of
+ * them is wrong and we can't tell which: one barcode shared by sizes (BorderShop's 0,25 l Hans
+ * Baer linked to a 0,75 l product), or a misread listing (ScandiPark's "7er Pack 98g" stored
+ * as 686 g) or product ("24x40g" stored as 40 g). The smaller content is taken, so a
+ * disagreement can only make that shop look dearer, never falsely cheapest (trust audit
+ * 2026-11-15). Different units: the product's, so the family compares in one unit.
+ */
+function offerContent(
+  listing: { content_amount: number | null; content_unit: Unit | null },
+  product: ProductRow | undefined,
+): { amount: number; unit: Unit } | null {
+  const sized = (r: { content_amount: number | null; content_unit: Unit | null } | undefined) =>
+    r && Number(r.content_amount) > 0 && r.content_unit ? { amount: Number(r.content_amount), unit: r.content_unit } : null;
+  const own = sized(listing);
+  const theirs = sized(product);
+  if (!own || !theirs) return own ?? theirs;
+  if (own.unit !== theirs.unit) return theirs;
+  return own.amount < theirs.amount ? own : theirs;
+}
+
 async function loadPacks(productIds: number[], familyIds: number[]): Promise<Pack[]> {
   const db = publicClient();
   const filters: string[] = [];
@@ -137,7 +161,7 @@ async function loadPacks(productIds: number[], familyIds: number[]): Promise<Pac
   const { data: prices, error: priceError } = await db
     .from("matched_prices")
     .select(
-      "product_id, shop_id, name, price, price_per_unit, on_offer, regular_price, offer_ends_at, url, observed_at, multi_buy_quantity, multi_buy_price, saving_vs_dk_percent, coupon",
+      "product_id, shop_id, name, content_amount, content_unit, price, price_per_unit, on_offer, regular_price, offer_ends_at, url, observed_at, multi_buy_quantity, multi_buy_price, saving_vs_dk_percent, coupon",
     )
     .in("product_id", products.map((p) => p.id));
   if (priceError) throw priceError;
@@ -166,14 +190,18 @@ async function loadPacks(productIds: number[], familyIds: number[]): Promise<Pac
     return { count: Number(count), size: Number(size), unit: unit as Unit };
   };
 
+  const productById = new Map((products as ProductRow[]).map((p) => [p.id, p]));
   const offersByProduct = new Map<number, Offer[]>();
   for (const r of prices as PriceRow[]) {
+    const content = offerContent(r, productById.get(r.product_id));
     const offer: Offer = {
       productId: r.product_id,
       shopId: r.shop_id,
       shopProductName: r.name,
+      contentAmount: content?.amount ?? null,
+      contentUnit: content?.unit ?? null,
       price: Number(r.price),
-      pricePerUnit: r.price_per_unit === null ? null : Number(r.price_per_unit),
+      pricePerUnit: content ? Number(r.price) / content.amount : r.price_per_unit === null ? null : Number(r.price_per_unit),
       onOffer: r.on_offer,
       regularPrice: r.regular_price === null ? null : Number(r.regular_price),
       offerEndsAt: r.offer_ends_at,
