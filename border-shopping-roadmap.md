@@ -1038,3 +1038,32 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
     "estimated" for the #1 beer); a one-click "Bekræft" in `/admin` when the review happens.
   - *Housekeeping:* add `"match:audit"` to package.json and CLAUDE.md's command list if the audit should be rerun after
     each newsletter import.
+
+### Category taxonomy with subcategories (2026-11-17, Catalog chat)
+
+- **Decision (user, 2026-11-17):** 8 top categories with subcategories, based on Fleggaard's menu and cut to what has
+  ~20+ families on sale per subcategory. New top category **Chips & snacks** (`snacks`), split out of `candy`. Every
+  top category has a hidden "Øvrige" bucket: a family with no (or an unknown) subcategory still shows on its top page.
+- **Single source of truth:** `src/catalog/categories.ts` - `TOP_CATEGORIES` with stable English ids (top id =
+  `product_families.category`, subcategory id = `product_families.subcategory`; never rename an id), Danish slugs and
+  labels, a `hint` per subcategory for the matching prompt, and a suggested lucide icon + Tailwind colour per top
+  category. No server-only imports, so matching scripts and the browser can import it. `CATEGORIES` (what the site shows
+  today) is `TOP_CATEGORIES` without `snacks` until it has families. Labels changed to the approved ones ("Øl & cider",
+  "Slik & chokolade", ...), so the current tile row already shows them.
+- **Schema:** migration `20261117000000_family_subcategory.sql` adds `product_families.subcategory` (nullable text, no
+  check constraint - unknown = Øvrige), an index on (category, subcategory), and appends `subcategory` to
+  `family_best_prices`. **Not run yet** - the user runs it in the Supabase SQL Editor. Until then top-category pages
+  work exactly as before (they don't read the column) and `categoryCounts()` counts everything as "other".
+- **Reads:** `categoryFamilies(category, from, subcategory?)` in `data.ts`; `/api/families?kategori=<slug>&under=<sub-slug>&fra=N`
+  (unknown `under` = 400); `categoryCounts()` = families on sale per top category, per subcategory id, and "other"
+  (reuses the cached shop counts, so it's cheap).
+- **Handoff - Matching chat:** fill `product_families.subcategory` with the ids from `TOP_CATEGORIES` (import it; the
+  `hint`s are written for the prompt). Move chips/popcorn, nuts and biscuits/cakes families from `candy` to `snacks`
+  (`category` change; mind the `unique (category, name)` constraint) and add `snacks` to `GROUP_IDS` in `groups.ts` so
+  `match:new` and coverage know it. Also cover new families in the nightly `match:new`. Then tell the Catalog chat (or
+  architect) so `snacks` joins `CATEGORIES`.
+- **Handoff - UI chat:** a "Kategorier" dropdown in the header (`site-nav.tsx`) listing top categories and their
+  subcategories; bigger coloured front-page tiles (icon + colour from `TOP_CATEGORIES`, written out as literal Tailwind
+  classes); subcategory pages under `src/app/kategori/` (e.g. `/kategori/vin/rodvin`, `categoryFamilies(id, 0, sub.id)`,
+  "Vis flere" with `source={{ kategori, under }}`). Hide empty top categories and subcategories with `categoryCounts()`;
+  switch from `CATEGORIES` to `TOP_CATEGORIES` then. The front page must stay static (no URL reads).

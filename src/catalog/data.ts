@@ -13,6 +13,7 @@ import { COMMON_ITEMS } from "@/matching/common-items";
 import { commonTier, finalScore, preScore } from "./ranking";
 import { packLabel } from "@/lib/format";
 import { POPULAR_PAGE, RESULTS_PAGE } from "./pages";
+import { isSubcategoryOf } from "./categories";
 import type { FamilyResult, Offer, Pack, ResultPage, Shop, Unit } from "./types";
 
 /** Most families rankFamilies() returns (pages are smaller; see RESULTS_PAGE and POPULAR_PAGE). */
@@ -266,21 +267,26 @@ async function pageFrom(order: (FamilyRow & { pre: number })[], from: number): P
 }
 
 /**
- * A category page: all its families, page by page. Without a query, "what people buy" is
- * guessed from the common-items list and from how many shops sell the family (widely
- * sold = mainstream); within a page, availability breaks near-ties.
+ * A category page: all its families, page by page - of a top category (`category` is
+ * `product_families.category`), or of one of its subcategories (`subcategory` is a
+ * `product_families.subcategory` id from categories.ts). Without a query, "what people
+ * buy" is guessed from the common-items list and from how many shops sell the family
+ * (widely sold = mainstream); within a page, availability breaks near-ties.
  */
-export async function categoryFamilies(category: string, from = 0): Promise<ResultPage> {
+export async function categoryFamilies(category: string, from = 0, subcategory?: string): Promise<ResultPage> {
   "use cache";
   cacheLife("hours");
-  return pageFrom(await categoryOrder(category), from);
+  return pageFrom(await categoryOrder(category, subcategory), from);
 }
 
-async function categoryOrder(category: string): Promise<(FamilyRow & { pre: number })[]> {
+async function categoryOrder(category: string, subcategory?: string): Promise<(FamilyRow & { pre: number })[]> {
   "use cache";
   cacheLife("hours");
   const [families, shops] = await Promise.all([
-    readAll<FamilyRow>("product_families", "id, name, category", ["id"], (query) => query.eq("category", category)),
+    // A top category reads no subcategory column, so its pages work before the migration is run.
+    readAll<FamilyRow>("product_families", "id, name, category", ["id"], (query) =>
+      subcategory ? query.eq("category", category).eq("subcategory", subcategory) : query.eq("category", category),
+    ),
     familyShopCounts(),
   ]);
   return families
@@ -290,6 +296,44 @@ async function categoryOrder(category: string): Promise<(FamilyRow & { pre: numb
       pre: 40 * commonTier(f.name) + 12 * (shops.get(f.id) ?? 0) - 2 * Math.min(f.name.split(" ").length, 8),
     }))
     .sort((a, b) => b.pre - a.pre || a.name.length - b.name.length);
+}
+
+/** Families on sale right now per top category, split by subcategory. */
+export interface CategoryCount {
+  /** All families on sale in the top category (what its page lists). */
+  total: number;
+  /** Per subcategory id from categories.ts; ids with no families are left out. */
+  subcategories: Record<string, number>;
+  /** Families with no subcategory or an id categories.ts doesn't list ("Øvrige"). */
+  other: number;
+}
+
+/**
+ * How many families on sale each category and subcategory has (keyed by id), so the UI
+ * can hide empty ones. Cheap: shares familyShopCounts() with the category pages. Before
+ * the subcategory migration is run, everything counts as "other".
+ */
+export async function categoryCounts(): Promise<Record<string, CategoryCount>> {
+  "use cache";
+  cacheLife("hours");
+  type Row = { id: number; category: string; subcategory: string | null };
+  const [families, shops] = await Promise.all([
+    readAll<Row>("product_families", "id, category, subcategory", ["id"]).catch(async (error) => {
+      if (error?.code !== "42703") throw error; // 42703 = column doesn't exist yet
+      const rows = await readAll<Omit<Row, "subcategory">>("product_families", "id, category", ["id"]);
+      return rows.map((r) => ({ ...r, subcategory: null }));
+    }),
+    familyShopCounts(),
+  ]);
+  const counts: Record<string, CategoryCount> = {};
+  for (const f of families) {
+    if (!shops.get(f.id)) continue; // nobody sells it right now
+    const c = (counts[f.category] ??= { total: 0, subcategories: {}, other: 0 });
+    c.total++;
+    if (isSubcategoryOf(f.category, f.subcategory)) c.subcategories[f.subcategory!] = (c.subcategories[f.subcategory!] ?? 0) + 1;
+    else c.other++;
+  }
+  return counts;
 }
 
 /**
