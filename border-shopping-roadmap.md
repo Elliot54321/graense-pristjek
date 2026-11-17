@@ -962,6 +962,12 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   white now, so they read as buttons on the grey cards too.
 - **Bold shop names (2026-11-17, user request):** in the open "Priser i alle N butikker" list the shop names are
   semibold, so each row reads shop -> price at a glance.
+- **Visual guide (2026-11-17, user request):** each of the six "Sådan gør du" steps has a small picture of the part of
+  the site it's about, built from the site's own shapes and colours (no images): the search box with a per-liter
+  result, "Billigste på listen" and a − / + row, two shop totals with the green "Billigst", the multi-buy and coupon
+  badges with "Brug stk.-pris", the estimated-price line with its (i), and alcohol bars against the guide amounts
+  (`GUIDE_LITERS`) with the export declaration. The example prices use "Butik A/B", so they can't be read as real
+  prices. Picture on top on phones, to the right of the text on wider screens.
 
 ### Working setup: architect and area chats (2026-11-14)
 
