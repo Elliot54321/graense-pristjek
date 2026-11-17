@@ -983,6 +983,18 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   - **Subcategory pages:** `/kategori/<slug>/<sub>` (52, prerendered, in the sitemap), with breadcrumb and "Vis flere
     resultater" (`/api/families?kategori=&under=`). Top and sub pages share `kategori/[slug]/category-view.tsx` and show
     subcategory chips ("Alle", then each one; sideways scroll on phones). "Øvrige" families stay on the top page only.
+- **Popular items pick a variant (2026-11-18, user request):** a popular card put one specific pack straight on the
+  list, against the site's idea (see the family, then choose can/bottle/size). Each card is now an item family: big
+  photo on white with an offer/multi-buy/coupon badge, "N varianter", "fra X kr. pr. liter" + cheapest shop, then
+  **"Vælg variant"** (also a tap on the photo/name) and **"Billigste på listen"** (− / + once on the list). "Vælg variant"
+  opens the family's search result card (`FamilyCard`, new `openVariants` prop) in a native `<dialog>` - a sheet from the
+  bottom on phones, centred on desktop - so search and the front page share one picker. A variant added there shows as
+  "1 variant på listen ✓" on the card. Heading "Populære varer" + "Det køber de fleste ved grænsen - vælg selv
+  størrelse og emballage." Two layouts were mocked (A: tiles, B: rows); the user chose A. No new data needed: popular
+  families already carry all their packs. Not done: category chips filtering the popular items - the list mixes
+  categories (1-3 per category per page), so it needs a per-category popular read (`popularFamilies(page, category)`,
+  Catalog). Fixed in passing: duplicate React keys in "Priser i alle N butikker" when a newsletter shop lists the same
+  pack twice with the same link.
 
 ### Working setup: architect and area chats (2026-11-14)
 

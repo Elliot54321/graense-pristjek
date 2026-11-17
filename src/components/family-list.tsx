@@ -54,7 +54,18 @@ export function FamilyList({
 /** Short shop name for price rows ("BorderShop Puttgarden"); where the store is lives on /om and the basket. */
 const shopName = (shops: Map<string, Shop>, id: string) => shops.get(id)?.name ?? id;
 
-export function FamilyCard({ family, shops, page }: { family: FamilyResult; shops: Map<string, Shop>; page: string }) {
+/** openVariants: start with "Se N andre varianter" open (the front page's variant picker). */
+export function FamilyCard({
+  family,
+  shops,
+  page,
+  openVariants = false,
+}: {
+  family: FamilyResult;
+  shops: Map<string, Shop>;
+  page: string;
+  openVariants?: boolean;
+}) {
   const bestPack = family.best ? family.packs.find((p) => p.name === family.best!.productName) : undefined;
   // One pack per card - the cheapest per liter/kg, which "Billigste på listen" adds too -
   // so cards in the grid line up; the other variants (sizes, cans vs bottles) are one tap away.
@@ -84,7 +95,7 @@ export function FamilyCard({ family, shops, page }: { family: FamilyResult; shop
         <PackRow pack={shown} shops={shops} page={page} />
       </ul>
       {others.length > 0 ? (
-        <details className="group/sizes mt-1 min-w-0 self-start">
+        <details open={openVariants} className="group/sizes mt-1 min-w-0 self-start">
           {/* A preview, not just a label: photos and pack sizes show there's more to see.
               min-w-0 on the card and here lets the one-line size summary shrink instead of widening the page. */}
           <summary className="flex min-h-[3.875rem] cursor-pointer list-none items-center gap-3 rounded-lg border border-zinc-300 bg-white p-2 pr-3 transition-colors hover:border-emerald-600 hover:bg-emerald-100 group-open/sizes:mb-1 [&::-webkit-details-marker]:hidden">
@@ -182,8 +193,9 @@ function PackRow({ pack, shops, page }: { pack: Pack; shops: Map<string, Shop>; 
             Priser i alle {pack.offers.length} butikker
           </summary>
           <ul className="flex flex-col gap-1.5 pb-1">
-            {pack.offers.map((o) => (
-              <li key={`${o.shopId}-${o.url}`} className="text-sm">
+            {/* The index too: a newsletter shop can list the same pack twice with the same link. */}
+            {pack.offers.map((o, i) => (
+              <li key={`${o.shopId}-${o.url}-${i}`} className="text-sm">
                 <div className="flex items-baseline justify-between gap-3">
                   <a href={o.url} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate font-semibold underline-offset-2 hover:underline">
                     {shopName(shops, o.shopId)}

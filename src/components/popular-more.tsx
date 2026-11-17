@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { FamilyResult } from "@/catalog/types";
+import type { FamilyResult, Shop } from "@/catalog/types";
 import { PopularCard } from "./popular-card";
 
 const GRID = "mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4";
@@ -18,7 +18,7 @@ const fetchPage = async (page: number): Promise<FamilyResult[]> => {
  * page is fetched in the background as soon as the previous one shows - so a press is
  * usually instant.
  */
-export function PopularMore({ shopNames, startPage = 1 }: { shopNames: Record<string, string>; startPage?: number }) {
+export function PopularMore({ shops, startPage = 1 }: { shops: Shop[]; startPage?: number }) {
   const [families, setFamilies] = useState<FamilyResult[]>([]);
   const [page, setPage] = useState(startPage);
   const [state, setState] = useState<"idle" | "loading" | "error" | "done">("idle");
@@ -76,7 +76,7 @@ export function PopularMore({ shopNames, startPage = 1 }: { shopNames: Record<st
       {families.length > 0 && (
         <ul className={GRID}>
           {families.map((f) => (
-            <PopularCard key={f.id} family={f} shopName={(id) => shopNames[id] ?? id} />
+            <PopularCard key={f.id} family={f} shops={shops} />
           ))}
         </ul>
       )}
