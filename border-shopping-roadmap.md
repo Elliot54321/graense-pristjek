@@ -968,6 +968,21 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   badges with "Brug stk.-pris", the estimated-price line with its (i), and alcohol bars against the guide amounts
   (`GUIDE_LITERS`) with the export declaration. The example prices use "Butik A/B", so they can't be read as real
   prices. Picture on top on phones, to the right of the text on wider screens.
+- **Categories in the UI (2026-11-17, user request; data from the Catalog and Matching chats):** the site now uses all
+  8 top categories from `TOP_CATEGORIES`, so "Chips & snacks" shows. `components/visible-categories.ts` drops top
+  categories and subcategories with nothing on sale (`categoryCounts()`); if the count fails (slow database during a
+  build) it shows them all rather than failing the page. Icons and colours from `categories.ts` are mapped to literal
+  Tailwind classes in `components/category-style.ts`.
+  - **Front page:** big coloured tiles (round icon badge on a pale tile in the category's colour), 4 per row on phones
+    and all 8 in one row on wide screens; still prerendered. Search and category pages keep a compact row (coloured
+    icons, sideways scroll on phones; the open category is tinted).
+  - **"Kategorier" menu:** on desktop a button next to "Sådan gør du" opens a panel with every category and its
+    subcategories (hover or click; Escape returns focus to the button; click outside, mouse away or tabbing out
+    closes). On phones it's the first entry in the menu button's panel, expandable per category ("Alle øl & cider" +
+    subcategories, 40+ px rows); the panel scrolls inside itself. The layout reads the visible categories once.
+  - **Subcategory pages:** `/kategori/<slug>/<sub>` (52, prerendered, in the sitemap), with breadcrumb and "Vis flere
+    resultater" (`/api/families?kategori=&under=`). Top and sub pages share `kategori/[slug]/category-view.tsx` and show
+    subcategory chips ("Alle", then each one; sideways scroll on phones). "Øvrige" families stay on the top page only.
 
 ### Working setup: architect and area chats (2026-11-14)
 

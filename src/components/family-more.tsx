@@ -5,7 +5,7 @@ import type { FamilyResult, ResultPage, Shop } from "@/catalog/types";
 import { FamilyCard, RESULT_GRID } from "./family-list";
 
 /** Where the next pages come from: a search or a category. */
-export type ResultSource = { q: string } | { kategori: string };
+export type ResultSource = { q: string } | { kategori: string; under?: string };
 
 /**
  * "Vis flere resultater": shows the next page of search or category results each time
@@ -31,7 +31,9 @@ export function FamilyMore({ source, shops, page: reportPage, next: firstNext }:
 
   const prefetch = (from: number) => {
     if (ahead.current?.from !== from) {
-      const params = new URLSearchParams({ ...source, fra: String(from) });
+      // Only the fields that are set ("under" is missing on a top-category page).
+      const fields = Object.entries(source).filter((e): e is [string, string] => typeof e[1] === "string");
+      const params = new URLSearchParams([...fields, ["fra", String(from)]]);
       const result = fetch(`/api/families?${params}`).then(async (res) => {
         if (!res.ok) throw new Error(String(res.status));
         return (await res.json()) as ResultPage;

@@ -6,6 +6,7 @@ import { Suspense } from "react";
 import { BasketLink } from "@/components/basket-link";
 import { Freshness } from "@/components/freshness";
 import { MobileMenu, SiteNav } from "@/components/site-nav";
+import { visibleCategories } from "@/components/visible-categories";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
 import "./globals.css";
 
@@ -30,7 +31,9 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image" },
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  // For the "Kategorier" menus; cached for an hour like the category pages (categoryCounts).
+  const categories = await visibleCategories();
   return (
     <html lang="da" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col font-sans">
@@ -42,10 +45,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 Pris<span className="text-emerald-600">grænsen</span>
               </span>
             </Link>
-            <SiteNav />
+            <SiteNav categories={categories} />
             <div className="flex items-center gap-2 md:ml-auto">
               <BasketLink />
-              <MobileMenu />
+              <MobileMenu categories={categories} />
             </div>
           </div>
         </header>

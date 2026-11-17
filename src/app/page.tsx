@@ -29,7 +29,7 @@ export default async function Home() {
           <SearchBox query="" />
         </div>
       </section>
-      <CategoryRow />
+      <CategoryRow large />
       <PopularGrid families={families} shops={shops} />
     </main>
   );
