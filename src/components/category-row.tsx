@@ -19,7 +19,7 @@ const ICONS: Record<Category["slug"], LucideIcon> = {
 export function CategoryRow({ current }: { current?: string }) {
   return (
     <div className="relative">
-      <nav aria-label="Kategorier" className="-mx-4 mt-4 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:px-0">
+      <nav aria-label="Kategorier" className="-mx-4 mt-6 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:mt-8 sm:px-0">
         <ul className="flex min-w-max gap-1 sm:min-w-0 sm:justify-between">
           {CATEGORIES.map((c) => {
             const Icon = ICONS[c.slug];

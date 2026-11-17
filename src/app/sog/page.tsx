@@ -52,7 +52,7 @@ async function Search({ searchParams }: { searchParams: PageProps<"/sog">["searc
       <SearchBar query={query} />
       <CategoryRow />
       {query ? (
-        <Suspense fallback={<p className="mt-6 text-zinc-500">Søger…</p>}>
+        <Suspense fallback={<p className="mt-8 text-zinc-500">Søger…</p>}>
           <Results query={query} />
         </Suspense>
       ) : (
@@ -65,7 +65,7 @@ async function Search({ searchParams }: { searchParams: PageProps<"/sog">["searc
 /** Example searches as tappable chips. */
 function Examples({ title }: { title: string }) {
   return (
-    <div className="mt-6">
+    <div className="mt-8">
       <p className="text-sm text-zinc-600">{title}</p>
       <ul className="mt-2 flex flex-wrap gap-2">
         {EXAMPLES.map((e) => (
@@ -91,7 +91,7 @@ async function Results({ query }: { query: string }) {
   after(() => logSearch(query, families.length));
   if (!families.length) {
     return (
-      <div className="mt-6">
+      <div className="mt-8">
         <p className="font-medium">Ingen varer fundet for “{query}”.</p>
         <p className="mt-1 text-sm text-zinc-600">
           Prøv et kortere ord eller mærket alene, fx “tuborg” i stedet for “tuborg grøn dåse”.
@@ -102,7 +102,7 @@ async function Results({ query }: { query: string }) {
   }
   return (
     <>
-      <h1 className="mt-6 text-xl font-semibold tracking-tight">Resultater for “{query}”</h1>
+      <h1 className="mt-8 text-xl font-semibold tracking-tight">Resultater for “{query}”</h1>
       <FamilyList families={families} shops={shops} page={`/sog?q=${encodeURIComponent(query)}`} source={{ q: query }} next={next} />
     </>
   );

@@ -49,7 +49,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             </div>
           </div>
         </header>
-        <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-5">{children}</div>
+        <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 pt-6 pb-5 sm:pt-8">{children}</div>
         {/* Full-width band; inside, the price info and the page links share the width on wider screens. */}
         <footer className="mt-10 border-t border-zinc-200 bg-zinc-50">
           <div className="mx-auto grid w-full max-w-6xl gap-6 px-4 py-8 text-sm text-zinc-600 md:grid-cols-[2fr_1fr]">

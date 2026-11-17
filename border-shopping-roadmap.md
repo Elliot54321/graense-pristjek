@@ -951,6 +951,9 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   `cheapestListItem()` in `components/list-item.ts`). The card's link (photo, name, price) still opens the search; the
   button sits outside it. The stepper has a full-width variant for the narrow phone cards. Cards whose cheapest pack
   has no liter/kg content get no button (2 of the first 12), like search.
+- **More breathing room (2026-11-17, user request):** more space between the header and the first box on every page
+  (24 px, 32 px on wider screens; was 20), between the search box and the category tiles (24/32 px, was 16), above
+  "Populære varer" on wider screens (48 px) and above the result heading on /sog and /kategori (32 px, was 24).
 
 ### Working setup: architect and area chats (2026-11-14)
 

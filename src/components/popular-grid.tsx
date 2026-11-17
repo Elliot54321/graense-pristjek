@@ -10,7 +10,7 @@ import { PopularMore } from "./popular-more";
 export function PopularGrid({ families, shops }: { families: FamilyResult[]; shops: Shop[] }) {
   const shopNames = Object.fromEntries(shops.map((s) => [s.id, s.name]));
   return (
-    <section className="mt-8">
+    <section className="mt-8 sm:mt-12">
       <h2 className="text-xl font-semibold tracking-tight">Populære varer</h2>
       <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {families.map((f) => (

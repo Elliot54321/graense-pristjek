@@ -41,11 +41,11 @@ async function Category({ params }: { params: PageProps<"/kategori/[slug]">["par
   return (
     <>
       <CategoryRow current={category.slug} />
-      <h1 className="mt-6 text-2xl font-semibold tracking-tight">{category.title}</h1>
+      <h1 className="mt-8 text-2xl font-semibold tracking-tight">{category.title}</h1>
       <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
         De mest købte varer først. Søg for at finde en bestemt vare.
       </p>
-      <Suspense fallback={<p className="mt-6 text-zinc-500">Henter priser…</p>}>
+      <Suspense fallback={<p className="mt-8 text-zinc-500">Henter priser…</p>}>
         <Families id={category.id} slug={category.slug} />
       </Suspense>
     </>
