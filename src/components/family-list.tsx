@@ -185,7 +185,7 @@ function PackRow({ pack, shops, page }: { pack: Pack; shops: Map<string, Shop>; 
             {pack.offers.map((o) => (
               <li key={`${o.shopId}-${o.url}`} className="text-sm">
                 <div className="flex items-baseline justify-between gap-3">
-                  <a href={o.url} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate underline-offset-2 hover:underline">
+                  <a href={o.url} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate font-semibold underline-offset-2 hover:underline">
                     {shopName(shops, o.shopId)}
                   </a>
                   <strong

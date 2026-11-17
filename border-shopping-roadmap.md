@@ -960,6 +960,8 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   green border and pale green fill (emerald-600 / emerald-100); all show the hand cursor (`cursor-pointer` per button -
   a global `@layer base` rule in globals.css didn't reach the dev server's CSS, so it was dropped). The − / + buttons are
   white now, so they read as buttons on the grey cards too.
+- **Bold shop names (2026-11-17, user request):** in the open "Priser i alle N butikker" list the shop names are
+  semibold, so each row reads shop -> price at a glance.
 
 ### Working setup: architect and area chats (2026-11-14)
 
