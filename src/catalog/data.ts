@@ -514,6 +514,13 @@ async function priceFamilies(families: FamilyRow[], pre: Map<number, number>): P
     }
     const shops = new Set(own.flatMap((p) => p.offers.map((o) => o.shopId))).size;
     const result: FamilyResult = { id: f.id, name: f.name, category: f.category, best, packs: own };
+    // Nothing to compare per liter/kg: the list takes an exact pack instead (see FamilyResult.listPack).
+    if (!best && own.length) {
+      const pack = [...own].sort(
+        (a, b) => new Set(b.offers.map((o) => o.shopId)).size - new Set(a.offers.map((o) => o.shopId)).size || effectivePrice(a.offers[0]) - effectivePrice(b.offers[0]),
+      )[0];
+      result.listPack = { productId: pack.productId, name: pack.name, imageUrl: pack.imageUrl ?? own.find((p) => p.imageUrl)?.imageUrl ?? null };
+    }
     return { result, score: finalScore(pre.get(f.id)!, shops, own.length) };
   });
 }

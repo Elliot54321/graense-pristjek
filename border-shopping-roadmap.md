@@ -1254,3 +1254,25 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   - *Matching / review (deferred):* held-back LLM links on basket staples - Poetzsch Carlsberg Pilsner and Harboe
     Pilsner, ScandiPark Absolut 1 l and M&M's Peanuts, Fleggaard Absolut and M&M's Party Pack, Calle Kims Snack Chips,
     Gordon's, Monster and Heineken second offers; one "Bekræft" each when the `/admin` review happens.
+
+### Uncertain totals and per-piece families on the list (2026-11-18, Catalog chat)
+
+- **Uncertain totals:** a shop's or option's total is `uncertain` when estimates make up **more than 1/4** of its items
+  or of its money (`UNCERTAIN_SHARE` / `isUncertain()` in `compare.ts`). Chosen from the audit baskets: the household
+  basket's lowest total had 4 of 12 items estimated (33 %) and wasn't a trustworthy answer; the other baskets' winners had
+  0-2 of 15-28 (<= 13 %). Ranking is unchanged - the flag is about what the page claims.
+  - `ShopResult` (from `/api/compare`) gains `items` (items at least one shop has), `estimatedShare` (0-1, share of
+    `totalWithEstimates` that is estimates) and `uncertain`.
+  - `ShoppingOption` (`plan.ts`, built in the browser) gains `estimates` and `uncertain` (a split's estimates are the
+    items no store on that trip has).
+  - **For the UI chat:** when the top option is `uncertain`, don't show a confident "Billigst"; e.g. "Kan ikke
+    sammenlignes sikkert - X af Y varer mangler i butikken" with the counts. `LineResult` is unchanged.
+  - Real check (`/api/compare`, live data): a 12-item household basket - every shop uncertain (lowest total, Poetzsch,
+    has 9 of 12 estimated, 64 % of the money); a 10-item beer/soda basket - no shop uncertain (Poetzsch 1/10, 12 %).
+- **Families with no content:** search gave them no `best`, so the card had no "Billigste på listen" button (only the
+  per-pack "Sæt på listen", which already priced the exact product correctly). `FamilyResult.listPack` (`data.ts`, set
+  only when `best` is null) names the pack to add instead: the one sold in the most shops, then the cheapest. 60 of 204
+  household families on the category pages after page 1 have one (Lambi Classic, Stanniol, Gillette Mach3, ...).
+  **For the UI chat:** in `cheapestListItem()`, when `best` is null and `listPack` is set, return
+  `{ kind: "product", productId: listPack.productId, label: listPack.name, quantity: 1, imageUrl }` (button text e.g.
+  "Sæt på listen"). Checked: Lambi as a product item is priced at Calle (25 kr.) and estimated elsewhere, not failed.

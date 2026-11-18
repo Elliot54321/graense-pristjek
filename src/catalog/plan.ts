@@ -9,8 +9,10 @@
  * 2026-11-06).
  *
  * Items a store lacks keep the estimate from compare.ts (the highest price in any
- * other shop), so options stay comparable.
+ * other shop), so options stay comparable. An option whose basket is mostly estimates is
+ * marked `uncertain`: it keeps its place, but the page shouldn't call it cheapest.
  */
+import { isUncertain } from "./compare";
 import { AREAS, type Area, betweenStoresKm, ferryReturnDkk, storeName } from "./trips";
 import type { LineResult, ShopResult } from "./types";
 
@@ -38,6 +40,10 @@ export interface ShoppingOption {
   /** Estimated same-day ferry return, 0 on trips without a ferry. */
   ferryCost: number;
   total: number;
+  /** Items in the basket price that are estimates (no store in this option has them). */
+  estimates: number;
+  /** Too much of the basket is estimated to call this option cheapest (isUncertain in compare.ts). */
+  uncertain: boolean;
 }
 
 const round = (n: number) => Math.round(n * 100) / 100;
@@ -54,6 +60,7 @@ function combinations<T>(list: T[]): T[][] {
 
 /** Buy each item at the cheapest of these shops. */
 function split(area: Area, shops: ShopResult[], krPerKm: number, ferryCost: number): Omit<ShoppingOption, "key"> {
+  const items = shops[0].items;
   const stops = new Map<string, Stop>();
   const missing: ShoppingOption["missing"] = [];
   shops[0].lines.forEach((line, i) => {
@@ -71,8 +78,21 @@ function split(area: Area, shops: ShopResult[], krPerKm: number, ferryCost: numb
   const used = [...stops.values()].sort((a, b) => b.cost - a.cost);
   const betweenKm = betweenStoresKm(area, used.map((s) => s.shopId));
   const betweenCost = round(betweenKm * krPerKm);
-  const basket = round(used.reduce((sum, s) => sum + s.cost, 0) + missing.reduce((sum, m) => sum + (m.estimate ?? 0), 0));
-  return { area, stops: used, missing, basket, betweenKm, betweenCost, ferryCost, total: round(basket + betweenCost + ferryCost) };
+  const estimatedValue = missing.reduce((sum, m) => sum + (m.estimate ?? 0), 0);
+  const basket = round(used.reduce((sum, s) => sum + s.cost, 0) + estimatedValue);
+  const estimates = missing.filter((m) => m.estimate !== null).length;
+  return {
+    area,
+    stops: used,
+    missing,
+    basket,
+    betweenKm,
+    betweenCost,
+    ferryCost,
+    total: round(basket + betweenCost + ferryCost),
+    estimates,
+    uncertain: isUncertain(estimates, items, estimatedValue, basket),
+  };
 }
 
 export function shoppingOptions(results: ShopResult[], krPerKm: number): ShoppingOption[] {
@@ -93,6 +113,8 @@ export function shoppingOptions(results: ShopResult[], krPerKm: number): Shoppin
       betweenCost: 0,
       ferryCost,
       total: round(r.totalWithEstimates + ferryCost),
+      estimates: r.estimates,
+      uncertain: r.uncertain,
     }));
     options.push(...singles);
 

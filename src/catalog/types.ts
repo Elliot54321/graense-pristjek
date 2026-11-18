@@ -65,6 +65,12 @@ export interface FamilyResult {
     deal: { quantity: number; price: number } | null;
   } | null;
   packs: Pack[];
+  /**
+   * Only when `best` is null (no pack has a liter/kg content, e.g. household items sold per
+   * piece): the exact pack to put on the list instead of an amount of the family - the one sold
+   * in the most shops, then the cheapest. The list compares it as that product in every shop.
+   */
+  listPack?: { productId: number; name: string; imageUrl: string | null } | null;
 }
 
 /** A page of search or category results; `next` is where the following page starts (null: the end). */
@@ -117,4 +123,13 @@ export interface ShopResult {
   /** Missing items counted at their estimate, and the total including them - what shops are ranked by. */
   estimates: number;
   totalWithEstimates: number;
+  /** Items at least one shop has (the ones that count; items no shop has are left out everywhere). */
+  items: number;
+  /** Share of totalWithEstimates that is estimates, 0-1. */
+  estimatedShare: number;
+  /**
+   * Too much of this total is estimated to call it cheapest: more than UNCERTAIN_SHARE of the
+   * items, or of the money (compare.ts). Ranking is unchanged; it's about what the page claims.
+   */
+  uncertain: boolean;
 }

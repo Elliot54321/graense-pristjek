@@ -29,6 +29,20 @@ export const NEWSLETTER_SHOPS = new Set(["fleggaard", "calle"]);
 
 const round = (n: number) => Math.round(n * 100) / 100;
 
+/**
+ * A total is too estimated to call cheapest when more than this share of its items, or of its
+ * money, is estimates. Chosen from the audit baskets (2026-11-18): the household basket's
+ * "cheapest" shop had 4 of 12 items estimated (33 %) and was not a trustworthy answer, while the
+ * beer trip's winner had 2 of 15 (13 %) and the others 0-1.
+ */
+export const UNCERTAIN_SHARE = 0.25;
+
+/** True when estimates make up more than UNCERTAIN_SHARE of the items or of the total. */
+export function isUncertain(estimates: number, items: number, estimatedValue: number, total: number): boolean {
+  if (!items || !estimates) return false;
+  return estimates / items > UNCERTAIN_SHARE || (total > 0 && estimatedValue / total > UNCERTAIN_SHARE);
+}
+
 /** Price per piece of a multi-buy deal that beats the single price ("3 for 199,99" -> 66,66), else null. */
 export function dealPerPiece(offer: Offer): number | null {
   const deal = offer.multiBuy;
@@ -146,13 +160,19 @@ export function compareBasket(items: BasketItem[], packs: Pack[], shops: Shop[])
       const lines = linesPerShop[s].map((l, i) => (l.cost === null ? { ...l, estimate: highest[i] } : l));
       const total = round(lines.reduce((sum, l) => sum + (l.cost ?? 0), 0));
       const estimated = lines.filter((l) => l.estimate !== null);
+      const estimatedValue = estimated.reduce((sum, l) => sum + l.estimate!, 0);
+      const totalWithEstimates = round(total + estimatedValue);
+      const counted = highest.filter((h) => h !== null).length;
       return {
         shop,
         lines,
         total,
         missing: lines.filter((l) => l.cost === null).length,
         estimates: estimated.length,
-        totalWithEstimates: round(total + estimated.reduce((sum, l) => sum + l.estimate!, 0)),
+        totalWithEstimates,
+        items: counted,
+        estimatedShare: totalWithEstimates > 0 ? round(estimatedValue / totalWithEstimates) : 0,
+        uncertain: isUncertain(estimated.length, counted, estimatedValue, totalWithEstimates),
       };
     })
     .sort((a, b) => a.totalWithEstimates - b.totalWithEstimates || a.estimates - b.estimates);
