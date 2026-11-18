@@ -98,6 +98,10 @@ const NAME_RULES: [RegExp, string, string][] = [
   [/champagne|\bcava\b|prosecco|cr[ée]mant|mousserende|\bsekt\b|spumante|\basti\b/i, "wine", "sparkling"],
   [/portvin|\bport(o)?\b|sherry|madeira|gløgg|glühwein/i, "wine", "fortified"],
   [/\btonic\b|ginger ale|bitter lemon/i, "soda", "mixers"],
+  // Poetzsch files ice tea under "Danskvand og kildevand" and cereals under "Pasta, ris og
+  // nudler" (subcategory check 2026-11-18), so these keywords beat the path.
+  [/ice ?tea|iste\b/i, "soda", "soft_drinks"],
+  [/kellogg|corn ?flakes|frosties|froot loops|krispies|müsli|musli|granola|cruesli|havregryn|cheerios|chocapic|smacks|special k/i, "groceries", "breakfast"],
 ];
 
 export interface FamilyInfo {
@@ -125,7 +129,7 @@ export function ruleSubcategory(f: FamilyInfo): { sub: string; why: string } | n
   const pickIf = (sub: string | undefined) => (sub && allowed.has(sub) ? { sub, why: votes.get(sub)! } : null);
   const alcoholFree = [...votes.keys()].find((k) => k.startsWith("alcohol_free"));
   if (alcoholFree) return pickIf(alcoholFree);
-  const special = [...votes.keys()].filter((k) => ["cider", "fortified", "sparkling", "mixers"].includes(k));
+  const special = [...votes.keys()].filter((k) => ["cider", "fortified", "sparkling", "mixers", "soft_drinks", "breakfast"].includes(k));
   if (special.length === 1) return pickIf(special[0]);
   if (special.length > 1) return null;
   if (votes.size !== 1) return null;

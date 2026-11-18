@@ -1174,3 +1174,83 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   (Catalog 2026-11-17). Basket result unchanged.
 - **Next (other chats):** Catalog adds `snacks` to `CATEGORIES`; UI builds the menu, tiles and subcategory pages. Worth
   a later look: ports and sherries filed under spirits (could move to wine/fortified).
+
+### Trust audits: four trip baskets, repeatable (2026-11-18, Matching chat)
+
+- **Repeatable:** baskets live in `src/matching/audit-baskets.ts`; run `npm run match:audit -- <basket>|all` (`blandet`,
+  `ol`, `spiritus`, `familie`, `husholdning`, `faerge`). Each item is a common-items rule plus a quantity; the audit prices
+  it per shop like `compare.ts` (offer content = smaller of listing and product, deal rate for every piece, cheapest
+  whole packs), adds up each shop with missing items at the highest other price, and flags: missed/held-back/split links,
+  cheap outliers, cans+bottles in one family, coupon, deal rate below the deal quantity, Pfand, newsletter size ranges,
+  gift boxes, listing size != product size, per-piece or mixed units. `--subcategories` reads the first page of every
+  live subcategory page. Rerun after every newsletter import. (CLAUDE.md's command list could mention `match:audit`.)
+- **Ølturen** (15 crate items, 3-10 each): all 15 priced in 4+ shops. Deal rates only apply where the crate count reaches
+  the deal (Royal 3 for 199,99 etc.); no coupon prices in this basket. Ranking P 4.321 (2 estimated) < S 4.347 < B/R 4.448
+  < C < F.
+
+  | Item | Priced | Estimated | Problems | Fixed? |
+  |---|---|---|---|---|
+  | Carlsberg Pilsner x5 | F C S B R | P | Poetzsch held back (LLM 0.75) | no - awaits review |
+  | Harboe Pilsner x4 | C S B R | P F | Poetzsch held back (LLM 0.75) | no - awaits review |
+  | Tuborg Grøn, Royal Pilsner, Tuborg Classic, Monster | all 6 | - | Calle 2nd Monster offer held back | - |
+  | Heineken, Coca-Cola, Pepsi Max, Faxe Kondi x3-4 | 4-6 shops | F (C) | cans and bottles in one family: 4 crates of "Coca-Cola 24x0,33" buys 5 x 6x1,25 l PET at S (4,67 kr./l) | by design - UI note |
+  | Carlsberg Nordic 0,0 %, Somersby, Fanta, Red Bull, Egekilde | 4-5 shops | F (C) | - | - |
+
+  **Pfand:** no price row has a Pfand stored, also ScandiPark's single "Monster Energy 0,5L DPG" cans (DPG = German
+  deposit) - Data. **Ferry check:** the same basket at BorderShop Puttgarden vs Rostock: identical (4.447,75 kr.) - one
+  catalogue, so a ferry user only chooses by crossing.
+- **Spiritus og vin** (16 items: 15 l spirits, 10,5 l wine, 6 l sparkling, 1,5 l port): the import-limit check counts
+  15 l spirits > 10 l -> the list should warn. Ranking B/R 3.423 < S 3.643 < P (2 est.) < C (12 est.) < F (14 est.).
+
+  | Item | Priced | Estimated | Problems | Fixed? |
+  |---|---|---|---|---|
+  | Absolut Vodka 1 l | P S B R | F C | Fleggaard "Absolut Vodka 1 l. 38-40%" and ScandiPark "Absolut Vodka 1l" held back (0.75): S is priced via its 1,75 l at 162 kr./l | no - awaits review |
+  | Kahlúa 1 l | P F S B R | C | Fleggaard "Kahlua 0,7-1 l. 16-30%" (human-reviewed) is priced as 1 l at 109,99 and wins - may be the 0,7 l | no - Data (size ranges) |
+  | Moët Brut Impérial x2 | P S B R | F C | BorderShop's cheapest is a 2x0,75 l twin pack in gaveæske | acceptable - same wine |
+  | Gordon's Gin | P C S B R | F | Calle's 2nd offer held back | - |
+  | Jägermeister, Gammel Dansk, Smirnoff, Baileys, Captain Morgan, Bacardi, Jack Daniel's, Aalborg | 4-5 shops | F/C not in issue | - | - |
+  | Casillero, Yellow Tail, Freixenet, Sandeman Tawny | 3-4 shops | F C (P) | wine bought as 3 l BiB where cheaper per liter (by design) | - |
+
+  Ports filed as spirits (Niepoort, Graham's Six Grapes at Poetzsch) are still counted as fortified wine by the import
+  check (`alcoholType` reads "port" in the name, also in a spirits family); they only miss the "Hedvin" subcategory page.
+- **Familieturen** (15 items): ranking S 1.502 (1 est.) < P 1.582 < F (11 est.) < B < R < C. Snacks (Pringles, Kims,
+  DK-Nuts, Karen Volf) now sit in `snacks`.
+
+  | Item | Priced | Estimated | Problems | Fixed? |
+  |---|---|---|---|---|
+  | Lossepladsen | P S B R | F C | split: "BonBon Lossepladsen" (125 g) vs "Toms Lossepladsen" (1,5 kg) | yes - merged |
+  | Merci | P F S B R | C | "Merci enkeltsorter" was a catch-all of 11 products (Petits 1 kg next to 100 g bars) | yes - split, see below |
+  | Marabou Mælkechokolade x4 | P F S B R | C | Fleggaard "6 for 100" assumed for 4 (rule 2026-11-12) | by design |
+  | M&M's Peanut, Kims Snack Chips | 4 shops | F C | Fleggaard/Calle/ScandiPark offers held back (0.75) | no - awaits review |
+  | Kinder Bueno | P S B R | F C | Fleggaard "312-378 g." has no content | no - Data |
+  | Karen Volf Franske Vafler | S | rest | only ScandiPark; its 480 g listing sits on a 427 g product | priced at 427 g (safe) |
+  | Matador, Click Mix, Guldkarameller, Toblerone, Celebrations, Pringles, DK-Nuts, Nescafé Gold | 2-6 shops | - | - | - |
+- **Husholdning og dagligvarer** (12 items): **per-unit comparison is mostly not meaningful here.** Shops sell different
+  variants (Omo Pro Formula White vs Colour vs "100 vaske"), sizes come in different units for the same family (Finish
+  Power tabs: BorderShop 1,7 kg, Fleggaard/Calle "90 stk." with no content; Dolce Gusto: ScandiPark grams vs
+  Fleggaard/Calle "30 stk."), and Lambi has no content at all ("6-12 rl.") so no shop can be priced. The basket's
+  "cheapest" (S 955) carries 4 estimates, P 6, F 6 - not a trustworthy answer. Nutella (all 6 shops) is the only clean line.
+- **Subcategory check** (first 12 on each of 49 live pages): 11 misplaced, fixed - Aqua d'Or Ice Tea x3 (Poetzsch files
+  them under danskvand) -> sodavand, Stroh Jagertee rom -> likør, Jägermeister Winter Edition likør -> bitter, Toms
+  Pariser Linser -> chokolade, 5 Kellogg's cereals kolonial -> morgenmad (Poetzsch files them under "Pasta, ris og
+  nudler"). Rules now let ice-tea and cereal keywords beat those paths for new families. Also found and fixed: Carletti
+  Kæmpeplade Hvid/Lys/Mørk existed twice (groceries and candy) - merged into candy; Ritter Sport laktosefri bars
+  groceries -> candy/chokolade. The live pages are CDN-cached for an hour, so the fixes show after that.
+- **Fixes saved (user OK):** 39 family writes, no match changed - the 11 subcategories above; merges BonBon Lossepladsen ->
+  Toms Lossepladsen, Finish Power All in 1 90 stk. (F/C) -> Finish Power All in One tabs, 3 Carletti families; "Merci
+  enkeltsorter" -> "Merci Petits" (P, F, S) and 10 new single-product Merci families. Rules in `common-items.ts`
+  tightened (Absolut Tabasco/Kaws/Raspberry, Jack Daniel's Sinatra/Single Malt, Lossepladsen Sur).
+- **Coverage before -> after:** common items 117/120 both times. Only change: Poetzsch candy comparable 72 -> 71 % (its
+  single-shop Merci bars were "comparable" only through the catch-all). Everything else unchanged.
+- **Remaining issues by area:**
+  - *Data & newsletters:* (1) no Pfand stored anywhere, incl. ScandiPark "DPG" single cans; (2) newsletter size ranges
+    without content ("Kahlua 0,7-1 l" wins at 1 l; Kinder Bueno "312-378 g", Lambi "6-12 rl." unpriced); (3) household
+    contents: store pieces/washes/rolls/capsules ("90 stk.", "71 vaske", "18 kapsler") so families can compare per piece.
+  - *Catalog:* when most of a basket is estimated (household: 4-7 of 12), the list shouldn't crown a confident
+    "Billigst" - e.g. no badge, or "kan ikke sammenlignes" when estimates exceed some share; a family without any
+    content can't be priced per amount - adding it should add the exact product instead.
+  - *UI:* show the pack actually picked when it differs from what the user added (4 crates of cans -> PET bottles,
+    0,75 l x 6 -> 3 l bag-in-box, champagne twin pack in gaveæske).
+  - *Matching / review (deferred):* held-back LLM links on basket staples - Poetzsch Carlsberg Pilsner and Harboe
+    Pilsner, ScandiPark Absolut 1 l and M&M's Peanuts, Fleggaard Absolut and M&M's Party Pack, Calle Kims Snack Chips,
+    Gordon's, Monster and Heineken second offers; one "Bekræft" each when the `/admin` review happens.

@@ -1,9 +1,10 @@
 /**
- * Trust audit: what would the shopping list (/liste) compare for a realistic
- * border-trip basket, and where could the answer be wrong?
+ * Trust audit: what would the shopping list (/liste) compare for realistic
+ * border-trip baskets, and where could the answer be wrong?
  *
- *   npm run match:audit                 the basket below
- *   npm run match:audit -- --find <re>  list on-sale shop products whose name matches
+ *   npm run match:audit -- <basket>|all   baskets from audit-baskets.ts (ol, spiritus, familie, ...)
+ *   npm run match:audit -- --find <re>    list on-sale shop products whose name matches
+ *   npm run match:audit -- --outliers | --content | --dupes   whole-catalog checks
  *
  * For each item it picks the family most shops are linked to (like match:coverage),
  * then prices that family per shop the way compare.ts does (each offer at the smaller of
@@ -19,11 +20,21 @@
  *    the other shops - a possible wrong content, pack or multi-buy reading
  *  - container: cans and bottles mixed in one family (the list would pick either)
  *  - coupon: the chosen offer is a coupon price (shown with a badge - just listed)
+ *  - deal below its quantity: the list assumes the multi-buy rate for every piece
+ *    (decision 2026-11-12), also when fewer are bought - listed so it's visible
+ *  - Pfand: a deposit stored with the price (not added to it by the list)
+ *  - size range / gift box: a newsletter offer for several sizes, or a gift box
+ *  - size differs: the chosen listing's own size differs from its product's
+ *  - unit unclear: the family is priced per piece, or mixes units
+ * Per basket it adds up each shop like compare.ts (a missing item at the highest
+ * price elsewhere, "estimated"), and with `importLimits` the liters per import type.
  *
  * Read-only: it never writes to the database.
  */
+import { alcoholType, GUIDE_LITERS, type AlcoholType } from "../catalog/import-limits";
 import { adminClient, fetchAll } from "../db/admin";
-import { COMMON_ITEMS, type CommonItem } from "./common-items";
+import { AUDIT_BASKETS, type AuditBasket, type AuditItem } from "./audit-baskets";
+import type { CommonItem } from "./common-items";
 import { isListed } from "./groups";
 
 const SHOPS = ["poetzsch", "fleggaard", "calle", "scandipark", "bordershop", "bordershop-rostock"] as const;
@@ -39,40 +50,9 @@ const NEWSLETTER = new Set(["fleggaard", "calle"]);
 const ALCOHOL_FREE = /\b0[,.]0 ?%|\b0[,.]0\b|alkoholfri|alcohol ?free|\b0[,.]5 ?%/i;
 const BOTTLES = /flask|\bfl\b|\bpet\b|bottle/i;
 const CANS = /dåse|\bds\b|\bcan\b|dose/i;
-
-/** The basket: labels from common-items.ts, plus wines and groceries defined here. */
-const BASKET_LABELS = [
-  "Coca-Cola 24x0,33",
-  "Coca-Cola Zero 24x0,33",
-  "Pepsi Max 24x0,33",
-  "Faxe Kondi 24x0,33",
-  "Fanta Orange 24x0,33",
-  "Red Bull 24x0,25",
-  "Monster Energy 12x0,5",
-  "Carlsberg Pilsner 24x0,33",
-  "Tuborg Grøn 24x0,33",
-  "Tuborg Classic 24x0,33",
-  "Royal Pilsner 24x0,33",
-  "Heineken 24x0,33",
-  "Somersby Apple",
-  "Jägermeister 1 l",
-  "Gammel Dansk 1 l",
-  "Smirnoff Vodka 1 l",
-  "Baileys Original 1 l",
-  "Captain Morgan Spiced 1 l",
-  "Haribo Matador Mix 1 kg",
-  "Toms Guldkarameller",
-  "Marabou Mælkechokolade",
-  "Kinder Bueno",
-  "Nutella 1 kg",
-  "Pringles Original",
-];
-const EXTRA: CommonItem[] = [
-  { label: "Casillero del Diablo Cabernet Sauvignon 0,75 l", include: /casillero del diablo.*cabernet/i, content: { amount: 0.75, unit: "l" }, bottles: true },
-  { label: "Yellow Tail Shiraz 0,75 l", include: /yellow tail.*shiraz/i, content: { amount: 0.75, unit: "l" }, bottles: true },
-  { label: "Nescafé Gold 200 g", include: /nescaf[eé] gold/i, exclude: /cappuccino|latte|crema|decaf|stick|mild/i, content: { amount: 0.2, unit: "kg" } },
-  { label: "Lavazza Crema e Gusto 1 kg", include: /lavazza.*crema e gusto/i, exclude: /bønner|bohne|beans|forte|dolce/i, content: { amount: 1, unit: "kg" } },
-];
+/** "0,7-1 l.", "312-378 g." - a newsletter price for several sizes (same as safety.ts). */
+const SIZE_RANGE = /\d+(?:[.,]\d+)?\s*-\s*\d+(?:[.,]\d+)?\s*(?:l|cl|ml|kg|g)\b/i;
+const GIFT_BOX = /gaveæske|gave-?pakning|gift ?box|geschenk|\bmed (\d+ )?glas|inkl\.? (\d+ )?glas/i;
 
 interface Row {
   id: number;
@@ -105,6 +85,7 @@ interface PriceRow {
   multi_buy_quantity: number | null;
   multi_buy_price: number | null;
   coupon: boolean;
+  pfand: number | null;
 }
 
 const one = <T>(x: T | T[] | null): T | null => (Array.isArray(x) ? (x[0] ?? null) : x);
@@ -170,12 +151,12 @@ async function load() {
   const prices = await fetchAll<PriceRow>((from, to) =>
     db
       .from("current_prices")
-      .select("shop_product_id, price, price_per_unit, multi_buy_quantity, multi_buy_price, coupon")
+      .select("shop_product_id, price, price_per_unit, multi_buy_quantity, multi_buy_price, coupon, pfand")
       .order("shop_product_id")
       .range(from, to),
   );
-  const families = await fetchAll<{ id: number; name: string }>((from, to) =>
-    db.from("product_families").select("id, name").order("id").range(from, to),
+  const families = await fetchAll<{ id: number; name: string; category: string }>((from, to) =>
+    db.from("product_families").select("id, name, category").order("id").range(from, to),
   );
   const priceBy = new Map(prices.map((p) => [p.shop_product_id, p]));
   const listings: Listing[] = rows.map((row) => {
@@ -193,50 +174,90 @@ async function load() {
     const perUnit = effective !== null && content?.amount ? effective / content.amount : null;
     return { row, match, product, price, visible, effective, content, perUnit };
   });
-  return { listings, familyName: new Map(families.map((f) => [`f${f.id}`, f.name])) };
+  return {
+    listings,
+    familyName: new Map(families.map((f) => [`f${f.id}`, f.name])),
+    familyCategory: new Map(families.map((f) => [`f${f.id}`, f.category])),
+  };
 }
 
-function audit(item: CommonItem, listings: Listing[], familyName: Map<string, string>) {
+interface ItemResult {
+  out: string[];
+  problems: string[];
+  priced: string[];
+  estimated: string[];
+  /** Cost per shop (null = not sold there). */
+  cost: Map<string, number | null>;
+  family: string | null;
+  /** Liters bought (for import limits), from the cheapest shop's line. */
+  liters: number;
+}
+
+function audit(item: AuditItem, listings: Listing[], familyName: Map<string, string>, shops: readonly string[]): ItemResult {
   const out: string[] = [];
   const problems: string[] = [];
-  const hits = listings.filter((l) => fits(item, l.row.name) && sizeFits(item, l.row.content_amount, l.row.content_unit));
+  const cost = new Map<string, number | null>(shops.map((s) => [s, null]));
+  const hits = listings.filter(
+    (l) => shops.includes(l.row.shop_id) && fits(item, l.row.name) && sizeFits(item, l.row.content_amount, l.row.content_unit),
+  );
   // Family most shops are linked to (visible links only) = what the list compares.
   const shopsPerKey = new Map<string, Set<string>>();
   for (const l of hits) if (l.visible) shopsPerKey.set(key(l), (shopsPerKey.get(key(l)) ?? new Set()).add(l.row.shop_id));
   const mainKey = [...shopsPerKey].sort((a, b) => b[1].size - a[1].size)[0]?.[0];
   if (!mainKey) {
     out.push(`  no visible match at all (${hits.length} hits)`);
-    return { out, problems: ["no visible match"], priced: [] as string[], estimated: [] as string[] };
+    return { out, problems: ["no visible match"], priced: [], estimated: [], cost, family: null, liters: 0 };
   }
   out.push(`  family: ${familyName.get(mainKey) ?? mainKey} (${mainKey})`);
 
   // What the list buys per shop: whole packs of the family for the item's amount.
-  const amount = item.content?.amount ?? median(hits.flatMap((l) => (l.row.content_amount ? [Number(l.row.content_amount)] : [])));
+  const quantity = item.quantity ?? 1;
+  const baseAmount = item.content?.amount ?? median(hits.flatMap((l) => (l.row.content_amount ? [Number(l.row.content_amount)] : [])));
+  const amount = baseAmount * quantity;
   const unit = item.content?.unit ?? hits.find((l) => l.row.content_unit)?.row.content_unit;
-  const inFamily = listings.filter((l) => l.visible && key(l) === mainKey);
+  const inFamily = listings.filter((l) => l.visible && key(l) === mainKey && shops.includes(l.row.shop_id));
   const priced: string[] = [];
   const estimated: string[] = [];
   const perUnitByShop = new Map<string, number>();
-  for (const shop of SHOPS) {
+  let liters = 0;
+  let cheapest = Infinity;
+  for (const shop of shops) {
     let best: { l: Listing; qty: number; cost: number } | null = null;
     for (const l of inFamily.filter((x) => x.row.shop_id === shop)) {
       const c = l.content?.amount;
       if (!c || l.content?.unit !== unit || l.effective === null) continue;
       const qty = Math.max(1, Math.ceil(amount / c - 1e-9));
-      const cost = qty * l.effective;
-      if (!best || cost < best.cost) best = { l, qty, cost };
+      const lineCost = qty * l.effective;
+      if (!best || lineCost < best.cost) best = { l, qty, cost: lineCost };
     }
     const sells = hits.filter((l) => l.row.shop_id === shop);
     if (best) {
       priced.push(SHORT[shop]);
+      cost.set(shop, Math.round(best.cost * 100) / 100);
+      if (best.cost < cheapest && unit === "l") {
+        cheapest = best.cost;
+        liters = best.qty * best.l.content!.amount;
+      }
       if (best.l.perUnit !== null) perUnitByShop.set(shop, best.l.perUnit);
       const p = best.l.price!;
       const deal = p.multi_buy_quantity ? ` (deal ${p.multi_buy_quantity} for ${kr(Number(p.multi_buy_price))})` : "";
       const coupon = p.coupon ? " KUPON" : "";
+      const pfand = p.pfand ? ` +pfand ${kr(Number(p.pfand))}` : "";
       out.push(
-        `  ${SHORT[shop]} ${best.qty} x "${best.l.row.name}" [${best.l.content?.amount} ${unit}] ${kr(Number(p.price))}${deal}${coupon} = ${kr(best.cost)}  (${kr(best.l.perUnit ?? NaN)}/${unit}, ${best.l.match!.method} ${best.l.match!.confidence}${best.l.match!.reviewed ? " reviewed" : ""})`,
+        `  ${SHORT[shop]} ${best.qty} x "${best.l.row.name}" [${best.l.content?.amount} ${unit}] ${kr(Number(p.price))}${deal}${coupon}${pfand} = ${kr(best.cost)}  (${kr(best.l.perUnit ?? NaN)}/${unit}, ${best.l.match!.method} ${best.l.match!.confidence}${best.l.match!.reviewed ? " reviewed" : ""})`,
       );
       if (p.coupon) problems.push(`${SHORT[shop]} coupon price (badge shown)`);
+      if (p.multi_buy_quantity && best.qty < p.multi_buy_quantity && best.l.effective! < Number(p.price) - 0.005) {
+        problems.push(`${SHORT[shop]} deal rate for ${best.qty} of a ${p.multi_buy_quantity}-deal`);
+      }
+      if (p.pfand) problems.push(`${SHORT[shop]} Pfand ${kr(Number(p.pfand))} stored`);
+      if (SIZE_RANGE.test(best.l.row.name)) problems.push(`${SHORT[shop]} size range "${best.l.row.name}"`);
+      if (GIFT_BOX.test(best.l.row.name)) problems.push(`${SHORT[shop]} gift box "${best.l.row.name}"`);
+      const own = best.l.row.content_amount === null ? null : Number(best.l.row.content_amount);
+      const prod = best.l.product?.content_amount == null ? null : Number(best.l.product.content_amount);
+      if (own !== null && prod !== null && Math.abs(own - prod) / prod > 0.05) {
+        problems.push(`${SHORT[shop]} size differs (listing ${own} vs product ${prod} ${unit})`);
+      }
     } else {
       estimated.push(SHORT[shop]);
       out.push(`  ${SHORT[shop]} -- estimated${NEWSLETTER.has(shop) && !sells.length ? " (not in newsletter)" : ""}`);
@@ -270,8 +291,14 @@ function audit(item: CommonItem, listings: Listing[], familyName: Map<string, st
   if (containers.has("bottle") && containers.has("can")) {
     const bottles = inFamily.filter((l) => BOTTLES.test(l.row.name)).map((l) => `${SHORT[l.row.shop_id]} "${l.row.name}"`);
     out.push(`  ! bottles in the family: ${bottles.slice(0, 6).join(", ")}`);
+    problems.push("cans and bottles in one family");
   }
-  return { out, problems, priced, estimated };
+  // Per-piece families, or families mixing units: a per-unit "cheapest" means little.
+  // Listings without any content are just unpriceable, not another unit.
+  const units = new Set(inFamily.flatMap((l) => (l.content?.unit ? [l.content.unit] : [])));
+  if (unit !== "l" && unit !== "kg") problems.push(`unit unclear (${unit ?? "none"})`);
+  else if (units.size > 1) problems.push(`units mixed in family (${[...units].join(", ")})`);
+  return { out, problems: [...new Set(problems)], priced, estimated, cost, family: mainKey, liters };
 }
 
 /**
@@ -348,8 +375,31 @@ function duplicateFamilies(listings: Listing[], familyName: Map<string, string>)
     console.log(`  ${n}: ${ks.map((k) => `${k} "${familyName.get(k)}" [${[...shopsByFamily.get(k)!].join("")}]`).join("  |  ")}`);
 }
 
+/**
+ * Subcategory sanity check: the first page a visitor sees on each live subcategory page
+ * (the family names in its result cards), to spot misplaced families by eye.
+ * One request per page, a second apart; `--base` points it at another deployment.
+ */
+async function subcategoryPages(base: string) {
+  const { TOP_CATEGORIES } = await import("../catalog/categories");
+  for (const top of TOP_CATEGORIES) {
+    for (const sub of top.subcategories) {
+      const url = `${base}/kategori/${top.slug}/${sub.slug}`;
+      const res = await fetch(url, { headers: { "User-Agent": "Prisgraensen-audit" } });
+      const html = await res.text();
+      const names = [...html.matchAll(/<h2 class="text-lg[^"]*">([^<]+)<\/h2>/g)].map((m) => m[1].replace(/&amp;/g, "&").replace(/&#x27;/g, "'"));
+      console.log(`${top.id}/${sub.id} (${res.status}): ${names.join(" · ") || "(none)"}`);
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+  }
+}
+
 async function main() {
-  const { listings, familyName } = await load();
+  if (process.argv.includes("--subcategories")) {
+    const at = process.argv.indexOf("--base");
+    return subcategoryPages(at > 0 ? process.argv[at + 1] : "https://www.prisgraensen.dk");
+  }
+  const { listings, familyName, familyCategory } = await load();
   const findAt = process.argv.indexOf("--find");
   if (findAt > 0) {
     const re = new RegExp(process.argv[findAt + 1], "i");
@@ -364,12 +414,58 @@ async function main() {
   if (process.argv.includes("--content")) return contentMismatch(listings, familyName);
   if (process.argv.includes("--dupes")) return duplicateFamilies(listings, familyName);
 
-  const items = [...BASKET_LABELS.map((label) => COMMON_ITEMS.find((i) => i.label === label)!), ...EXTRA];
+  const wanted = process.argv.slice(2).find((a) => !a.startsWith("--")) ?? "all";
+  const baskets = wanted === "all" ? AUDIT_BASKETS : AUDIT_BASKETS.filter((b) => b.id === wanted);
+  if (!baskets.length) {
+    console.error(`Unknown basket "${wanted}". Baskets: ${AUDIT_BASKETS.map((b) => b.id).join(", ")}, all`);
+    process.exit(1);
+  }
+  for (const basket of baskets) runBasket(basket, listings, familyName, familyCategory);
+}
+
+/** One basket: per-item lines, per-shop totals like compare.ts, the summary table. */
+function runBasket(basket: AuditBasket, listings: Listing[], familyName: Map<string, string>, familyCategory: Map<string, string>) {
+  const shops = basket.shops ?? SHOPS;
+  console.log(`\n${"=".repeat(80)}\n${basket.label} [${basket.id}]\nFocus: ${basket.focus}\n${"=".repeat(80)}`);
   const summary: string[] = [];
-  for (const item of items) {
-    const { out, problems, priced, estimated } = audit(item, listings, familyName);
-    console.log(`\n${item.label}\n${out.join("\n")}`);
-    summary.push(`| ${item.label} | ${priced.join(" ") || "-"} | ${estimated.join(" ") || "-"} | ${problems.join("; ") || "-"} |`);
+  const results: ItemResult[] = [];
+  for (const item of basket.items) {
+    const r = audit(item, listings, familyName, shops);
+    results.push(r);
+    console.log(`\n${item.label} x ${item.quantity ?? 1}\n${r.out.join("\n")}`);
+    summary.push(`| ${item.label} x ${item.quantity ?? 1} | ${r.priced.join(" ") || "-"} | ${r.estimated.join(" ") || "-"} | ${r.problems.join("; ") || "-"} |`);
+  }
+  // Shop totals: a missing item counts at the highest price elsewhere (as compare.ts does).
+  const totals = shops.map((shop) => {
+    let total = 0;
+    let estimates = 0;
+    for (const r of results) {
+      const own = r.cost.get(shop);
+      const known = [...r.cost.values()].filter((c): c is number => c !== null);
+      if (own != null) total += own;
+      else if (known.length) {
+        total += Math.max(...known);
+        estimates++;
+      }
+    }
+    return { shop, total, estimates };
+  });
+  totals.sort((a, b) => a.total - b.total || a.estimates - b.estimates);
+  console.log(`\nTotals (missing items at the highest other price):`);
+  for (const t of totals) console.log(`  ${SHORT[t.shop]} ${kr(t.total).padStart(10)} kr.${t.estimates ? `  (${t.estimates} estimated)` : ""}`);
+
+  if (basket.importLimits) {
+    const liters: Partial<Record<AlcoholType, number>> = {};
+    basket.items.forEach((item, i) => {
+      const fam = results[i].family;
+      const type = fam ? alcoholType(familyCategory.get(fam) ?? "", `${familyName.get(fam) ?? ""} ${item.label}`) : null;
+      if (type) liters[type] = Math.round(((liters[type] ?? 0) + results[i].liters) * 100) / 100;
+    });
+    console.log(`\nImport limits for 1 adult (guide amounts):`);
+    for (const [type, l] of Object.entries(liters)) {
+      const limit = GUIDE_LITERS[type as AlcoholType];
+      console.log(`  ${type.padEnd(10)} ${String(l).padStart(6)} l of ${limit} l${l > limit ? "  <- over: the list should warn" : ""}`);
+    }
   }
   console.log(`\n| Item | Priced | Estimated | Problems |\n|---|---|---|---|\n${summary.join("\n")}`);
 }
