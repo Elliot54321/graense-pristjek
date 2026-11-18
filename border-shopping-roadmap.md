@@ -1404,3 +1404,18 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   Dolce Gusto, Livol), and search's family "best" (`priceFamilies` in `data.ts`, also the `family_best_prices` view)
   takes the lowest price per unit across units - "3,89 kr./stk." would beat "176 kr./kg". **For the Catalog chat:** compare
   within one unit (e.g. the family's most common unit) first; then pieces can be switched on.
+
+### `/admin` hides listings that aren't on sale (2026-11-18, Admin chat)
+
+- **Problem (user):** blank Fleggaard tiles in `/admin` - October main-newsletter offers (expired 2026-11-03, imported
+  before source tracking, so no photo and no page) were still shown as other listings on cards.
+- **Decision:** the links stay in the database (they're reused when the offer returns, and the site already ignores
+  expired rows); only the admin view changes. `loadReview()` (`src/app/admin/data.ts`) now drops a suggestion or AI-link
+  card whose own listing isn't on sale (`isListed`; nothing to decide), and leaves unlisted listings off suggestions'
+  targets, links' "others" and winners' rivals. The totals ("de 50 vigtigste af N") count only listed items. When
+  hiding leaves a side empty, it says "Kun i en tidligere avis." (all hidden were Fleggaard/Calle) or "Kun varer, der
+  ikke er til salg lige nu."
+- **Measured on live data:** Forslag 35 -> 3 (the 32 dropped: 20 retired ScandiPark listings, 12 expired Fleggaard
+  offers), AI-links 469 -> 414, "Ikke til salg lige nu" tags 96 -> 0, listing tiles without photo or page 66 -> 0
+  (32 Fleggaard, 34 ScandiPark); "Kun i en tidligere avis" shown on 10 cards. Winners unchanged (0 right now; they come
+  from `matched_prices`, which is listed-only already). The "not on sale" penalty in `priority.ts` is now only a safeguard.

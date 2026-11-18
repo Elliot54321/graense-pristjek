@@ -56,7 +56,9 @@ export interface Suggestion {
   self: Listing;
   currentProduct: ProductInfo;
   target: ProductInfo | null; // null if the suggested product no longer exists
-  targetListings: Listing[];
+  targetListings: Listing[]; // listed only
+  /** Linked listings left off the card because they aren't on sale (e.g. an expired newsletter). */
+  hidden: HiddenListings;
   reason: string;
   priority: Priority;
 }
@@ -65,7 +67,8 @@ export interface LlmLink {
   self: Listing;
   product: ProductInfo;
   confidence: number;
-  others: Listing[]; // other shop products linked to the same product
+  others: Listing[]; // other listed shop products linked to the same product
+  hidden: HiddenListings;
   priority: Priority;
 }
 
@@ -73,10 +76,29 @@ export interface WinnerCard {
   self: Listing;
   product: ProductInfo;
   confidence: number;
-  rivals: Listing[]; // the linked product in other shops, or the family's cheapest per shop
+  rivals: Listing[]; // the linked product in other shops, or the family's cheapest per shop (listed only)
   sameProduct: boolean;
   saving: number; // 0.25 = 25 % cheaper per liter/kg than the next shop
   priority: Priority;
+}
+
+/** How many linked listings were hidden, and whether all of them were newsletter offers. */
+export interface HiddenListings {
+  count: number;
+  newsletterOnly: boolean;
+}
+
+/**
+ * The card shows only listings on sale now. Expired ones stay linked in the database
+ * (the same offer returns next month and reuses its match), but there's nothing to
+ * judge on them - October's offers imported before source tracking even show a blank tile.
+ */
+function splitListed(listings: Listing[]): { shown: Listing[]; hidden: HiddenListings } {
+  const gone = listings.filter((l) => !l.listed);
+  return {
+    shown: listings.filter((l) => l.listed),
+    hidden: { count: gone.length, newsletterOnly: gone.every((l) => NEWSLETTER_SHOPS.has(l.shopId)) },
+  };
 }
 
 interface MatchRow {
@@ -271,16 +293,18 @@ export async function loadReview(): Promise<{
   const suggestions = suggestionRows.flatMap((r): Suggestion[] => {
     const p = parsed.get(r.shop_product_id);
     const self = byShopProduct.get(r.shop_product_id);
-    if (!p || !self) return [];
+    // An offer that's no longer on sale has nothing to decide: it's left out (and not counted).
+    if (!p || !self || !self.listed) return [];
     const currentProduct = products.get(r.product_id) ?? unknownProduct(r.product_id);
     const target = products.get(p.targetId) ?? null;
-    const targetListings = byProduct.get(p.targetId) ?? [];
+    const { shown: targetListings, hidden } = splitListed(byProduct.get(p.targetId) ?? []);
     return [
       {
         self,
         currentProduct,
         target,
         targetListings,
+        hidden,
         reason: p.reason,
         priority: rank(self, [currentProduct, ...(target ? [target] : [])], targetListings),
       },
@@ -289,12 +313,14 @@ export async function loadReview(): Promise<{
 
   const llmLinks = llmRows.flatMap((r): LlmLink[] => {
     const self = byShopProduct.get(r.shop_product_id);
-    if (!self) return [];
+    if (!self || !self.listed) return [];
     // Newsletter links shown on the site are checked through "winners" instead: only those decide answers.
     if (NEWSLETTER_SHOPS.has(self.shopId) && Number(r.confidence) >= SHOWN_CONFIDENCE) return [];
     const product = products.get(r.product_id) ?? unknownProduct(r.product_id);
-    const others = (byProduct.get(r.product_id) ?? []).filter((l) => l.shopProductId !== r.shop_product_id);
-    return [{ self, product, confidence: Number(r.confidence), others, priority: rank(self, [product], others) }];
+    const { shown: others, hidden } = splitListed(
+      (byProduct.get(r.product_id) ?? []).filter((l) => l.shopProductId !== r.shop_product_id),
+    );
+    return [{ self, product, confidence: Number(r.confidence), others, hidden, priority: rank(self, [product], others) }];
   });
 
   const byPriority = (a: { priority: Priority }, b: { priority: Priority }) => b.priority.score - a.priority.score;
@@ -304,7 +330,7 @@ export async function loadReview(): Promise<{
   // Winners: rank with their own listing, then load the rival shops' listings for the shown ones.
   const ranked = winnerRows.flatMap((w) => {
     const self = byShopProduct.get(w.shopProductId);
-    if (!self) return [];
+    if (!self || !self.listed) return []; // winners come from matched_prices, so this is only a safeguard
     const product = products.get(w.productId) ?? unknownProduct(w.productId);
     return [{ w, self, product, priority: rank(self, [product], []) }];
   });
@@ -314,7 +340,7 @@ export async function loadReview(): Promise<{
     self,
     product,
     confidence: w.confidence,
-    rivals: w.rivalIds.flatMap((id) => rivalListings.get(id) ?? []),
+    rivals: w.rivalIds.flatMap((id) => rivalListings.get(id) ?? []).filter((l) => l.listed),
     sameProduct: w.sameProduct,
     saving: w.saving,
     priority,
