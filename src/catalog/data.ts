@@ -259,6 +259,11 @@ export async function searchFamilies(rawQuery: string, from = 0): Promise<Result
 const FEW_RESULTS = 3;
 /** Exact matches beyond this are assumed to include enough on sale (pricing them all would be slow). */
 const CHECK_SOLD_UP_TO = 20;
+/**
+ * Typo matches this much less similar than the best one are dropped: "gamel dansk" finds Gammel
+ * Dansk (0.79-0.92) but not "Dänische Rote Grütze" (0.58) or "Rexim Dansk Peber" (0.50).
+ */
+const FUZZY_SPREAD = 0.2;
 
 /**
  * Every family matching the query, best first by name and search words; then typo matches.
@@ -285,8 +290,14 @@ async function searchOrder(
   if (firstPage.families.length >= FEW_RESULTS || q.key.length < 3) return { order: exact, fuzzy: [], firstPage };
 
   const seen = new Set(exact.map((f) => f.id));
-  // Similarity 0..1 -> -500..-300: below every word match, more similar first.
-  const fuzzy = (await fuzzyFamilies(q.key)).filter((f) => !seen.has(f.id)).map((f) => ({ ...f, pre: -500 + 200 * f.similarity }));
+  const hits = (await fuzzyFamilies(q.key)).filter((f) => !seen.has(f.id));
+  const best = Math.max(0, ...hits.map((f) => f.similarity));
+  // Similarity 0..1 -> -3000..-1000: below every word match, and steep enough that 0.05 more
+  // similarity (100) outweighs being sold in more shops (8 per shop, see finalScore), so
+  // "redbull" lists Red Bull (0.55) before Redbreast (0.50).
+  const fuzzy = hits
+    .filter((f) => f.similarity >= best - FUZZY_SPREAD)
+    .map((f) => ({ ...f, pre: -3000 + 2000 * f.similarity }));
   if (!fuzzy.length) return { order: exact, fuzzy: [], firstPage };
   return { order: [...exact, ...fuzzy.map(({ id, name, category, pre }) => ({ id, name, category, pre }))], fuzzy: fuzzy.map((f) => f.id) };
 }

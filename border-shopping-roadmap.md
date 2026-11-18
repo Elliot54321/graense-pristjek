@@ -1316,12 +1316,20 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   also match the start of a name word ("carlsber", "tobleron", "smirnof"). A 3+ word query may miss one word, ranked after
   every full match. `preScore` still rewards the whole name and the name's start. Matching runs on all 9,561 families,
   read once and cached with their folded words (`searchIndex()`), instead of a database filter per query.
-- **Step 2, typo matches (`supabase/migrations/20261118000000_search_fuzzy.sql`, not run yet):** `pg_trgm`, a
+- **Step 2, typo matches (`supabase/migrations/20261118000000_search_fuzzy.sql`, run 2026-11-18):** `pg_trgm`, a
   generated `product_families.search_text` (folded name + search words, `search_norm()`) with a GIN trigram index, and the
   read-only RPC `search_families_fuzzy(q)` (word similarity >= 0.5, top 20; execute granted to anon/authenticated).
   Used only when the word matching finds fewer than 3 families on sale; typo matches rank below every word match. Until
-  the migration is run the RPC is missing and search simply has none (checked: no errors). **Untested against the
-  database** - after running it, check "marabu", "heiniken", "gamel dansk", "redbull", "cocacola", "john stagertee rom".
+  the migration is run the RPC is missing and search simply has none (checked: no errors).
+- **Step 2 tested (2026-11-18, after the migration):** the RPC takes 50-80 ms. All six left-over searches now find their
+  item: "marabu" -> Marabou (12 on sale), "heiniken" -> Heineken (0.67), "gamel dansk" -> Gammel Dansk (0.79-0.92),
+  "redbull" -> Red Bull (0.55), "cocacola" -> Coca-Cola, "john stagertee rom" -> Stroh Jagertee (0.53); also "tuborgg",
+  "jegermeister". "xyzzyq" still finds nothing, and searches that already matched are unchanged. Two fixes after the first
+  test: within a page, cards are re-ranked by shops (+8 each), which let Redbreast whisky (0.50, 5 shops) beat Red Bull
+  (0.55), so similarity now maps to -3000..-1000 (0.05 = 100 points); and hits more than 0.2 below the best are dropped
+  ("gamel dansk" no longer lists "Dänische Rote Grütze" at 0.58 or "Rexim Dansk Peber" at 0.50). Threshold 0.5 kept:
+  "john stagertee rom" -> Jagertee is only 0.53. Searches take 0.3-0.5 s once warm (1.2 s on a fresh server).
+  Seen in passing, for Matching: "cola" lists "Lip Smacker Coca Cola" (lip balm) among the colas.
 - **For the UI chat:** `ResultPage.suggestion` (`string | null`, search page 1 only) is the first result's family name
   when it's a typo match - no family on sale matched the query as typed - for "Mente du: Heineken?".
 - **Before -> after** (83 queries: the 43 logged searches, 35 deliberate variants, 5 reference searches; page 1 ranked
