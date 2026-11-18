@@ -6,7 +6,8 @@
  *   npm run match:audit -- --find <re>  list on-sale shop products whose name matches
  *
  * For each item it picks the family most shops are linked to (like match:coverage),
- * then prices that family per shop the way compare.ts does (cheapest whole packs for
+ * then prices that family per shop the way compare.ts does (each offer at the smaller of
+ * its listing's and its product's content, cheapest whole packs for
  * the item's amount, multi-buy rate assumed), using only offers matched_prices shows
  * (seen in 3 days / newsletter valid, and unreviewed LLM links held back below 0.8).
  * It then flags:
@@ -117,8 +118,23 @@ interface Listing {
   visible: boolean;
   /** Price per piece a bulk shopper pays (deal rate when it beats the single price). */
   effective: number | null;
-  /** Effective price per l/kg of the product's content. */
+  /** The content the list prices this offer at (see offerContent). */
+  content: { amount: number; unit: string } | null;
+  /** Effective price per l/kg of that content. */
   perUnit: number | null;
+}
+
+/**
+ * Same rule as the list (src/catalog/data.ts, 2026-11-17): the smaller of the listing's
+ * and the product's content; the product's when the units differ; whichever is known
+ * when one is missing. A disagreement can then only make a shop look dearer.
+ */
+function offerContent(row: Row, product: ProductEmbed | null): { amount: number; unit: string } | null {
+  const own = row.content_amount !== null && row.content_unit ? { amount: Number(row.content_amount), unit: row.content_unit } : null;
+  const prod = product?.content_amount != null && product.content_unit ? { amount: Number(product.content_amount), unit: product.content_unit } : null;
+  if (!own || !prod) return own ?? prod;
+  if (own.unit !== prod.unit) return prod;
+  return own.amount < prod.amount ? own : prod;
 }
 
 function fits(item: CommonItem, name: string): boolean {
@@ -173,9 +189,9 @@ async function load() {
       const deal = price.multi_buy_quantity && price.multi_buy_price !== null ? Number(price.multi_buy_price) / price.multi_buy_quantity : null;
       effective = deal !== null && deal < single - 0.005 ? deal : single;
     }
-    const content = product?.content_amount ?? row.content_amount;
-    const perUnit = effective !== null && content ? effective / Number(content) : null;
-    return { row, match, product, price, visible, effective, perUnit };
+    const content = offerContent(row, product);
+    const perUnit = effective !== null && content?.amount ? effective / content.amount : null;
+    return { row, match, product, price, visible, effective, content, perUnit };
   });
   return { listings, familyName: new Map(families.map((f) => [`f${f.id}`, f.name])) };
 }
@@ -204,9 +220,9 @@ function audit(item: CommonItem, listings: Listing[], familyName: Map<string, st
   for (const shop of SHOPS) {
     let best: { l: Listing; qty: number; cost: number } | null = null;
     for (const l of inFamily.filter((x) => x.row.shop_id === shop)) {
-      const c = l.product?.content_amount;
-      if (!c || l.product?.content_unit !== unit || l.effective === null) continue;
-      const qty = Math.max(1, Math.ceil(amount / Number(c) - 1e-9));
+      const c = l.content?.amount;
+      if (!c || l.content?.unit !== unit || l.effective === null) continue;
+      const qty = Math.max(1, Math.ceil(amount / c - 1e-9));
       const cost = qty * l.effective;
       if (!best || cost < best.cost) best = { l, qty, cost };
     }
@@ -218,7 +234,7 @@ function audit(item: CommonItem, listings: Listing[], familyName: Map<string, st
       const deal = p.multi_buy_quantity ? ` (deal ${p.multi_buy_quantity} for ${kr(Number(p.multi_buy_price))})` : "";
       const coupon = p.coupon ? " KUPON" : "";
       out.push(
-        `  ${SHORT[shop]} ${best.qty} x "${best.l.row.name}" [${best.l.product?.content_amount} ${unit}] ${kr(Number(p.price))}${deal}${coupon} = ${kr(best.cost)}  (${kr(best.l.perUnit ?? NaN)}/${unit}, ${best.l.match!.method} ${best.l.match!.confidence}${best.l.match!.reviewed ? " reviewed" : ""})`,
+        `  ${SHORT[shop]} ${best.qty} x "${best.l.row.name}" [${best.l.content?.amount} ${unit}] ${kr(Number(p.price))}${deal}${coupon} = ${kr(best.cost)}  (${kr(best.l.perUnit ?? NaN)}/${unit}, ${best.l.match!.method} ${best.l.match!.confidence}${best.l.match!.reviewed ? " reviewed" : ""})`,
       );
       if (p.coupon) problems.push(`${SHORT[shop]} coupon price (badge shown)`);
     } else {
@@ -267,7 +283,7 @@ function outliers(listings: Listing[], familyName: Map<string, string>) {
   const byFamily = new Map<string, Listing[]>();
   for (const l of listings) {
     if (!l.visible || !l.product?.family_id || l.perUnit === null) continue;
-    const k = `${key(l)}|${l.product.content_unit}`;
+    const k = `${key(l)}|${l.content?.unit}`;
     byFamily.set(k, [...(byFamily.get(k) ?? []), l]);
   }
   const found: string[] = [];
@@ -279,7 +295,7 @@ function outliers(listings: Listing[], familyName: Map<string, string>) {
     if (cheapest.perUnit! >= 0.5 * m) continue;
     const fk = k.split("|")[0];
     found.push(
-      `${Math.round((100 * cheapest.perUnit!) / m)}%  ${familyName.get(fk) ?? fk} (${fk}): ${SHORT[cheapest.row.shop_id]} #${cheapest.row.id} "${cheapest.row.name}" ${cheapest.product?.content_amount} ${cheapest.product?.content_unit} ${kr(cheapest.effective!)} = ${kr(cheapest.perUnit!)} vs median ${kr(m)} (${cheapest.match!.method} ${cheapest.match!.confidence}${cheapest.match!.reviewed ? " reviewed" : ""})`,
+      `${Math.round((100 * cheapest.perUnit!) / m)}%  ${familyName.get(fk) ?? fk} (${fk}): ${SHORT[cheapest.row.shop_id]} #${cheapest.row.id} "${cheapest.row.name}" ${cheapest.content?.amount} ${cheapest.content?.unit} ${kr(cheapest.effective!)} = ${kr(cheapest.perUnit!)} vs median ${kr(m)} (${cheapest.match!.method} ${cheapest.match!.confidence}${cheapest.match!.reviewed ? " reviewed" : ""})`,
     );
   }
   console.log(`${found.length} families whose cheapest listing is under half the others' median:\n${found.sort().join("\n")}`);

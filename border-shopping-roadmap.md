@@ -1135,3 +1135,42 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   (e.g. identical Fisherman's Friend, Lillet, Jack Daniel's 5 cl names); 61 differ, and those are now priced at the smaller
   content. Holding all of them back would remove 150 products and 77 families from the site. **Proposal: don't hold them
   back** - the content rule covers the risk they carried; revisit if the audit finds wrong-product EAN links.
+
+### Subcategories filled and snacks split out of candy (2026-11-17, Matching chat)
+
+- **Tool:** `src/matching/subcategories.ts` (`npx tsx --env-file-if-exists=.env.local src/matching/subcategories.ts plan |
+  compare | submit | collect <batch> | apply [--save]`). Cheap rules first - Poetzsch and ScandiPark category paths
+  ("Vin/Rødvin", "suesswaren/lakritz", ...) and clear keywords (alkoholfri, cider, champagne/cava/prosecco,
+  port/sherry/gløgg, tonic/ginger ale); a family's listings must agree, keywords beat paths (an alcohol-free red sits in
+  "Vin/Rødvin"). Rules settled 2,633 of 9,551 families; the rest went to the model as one Batch API job.
+- **Model choice:** 100 on-sale families, hand-checked (`compare`). Haiku: 1 clear mistake (Falcon Export as lager) and 5
+  more left empty that Sonnet got right (Mackmyra whisky, Leffe Blonde, Pingvin Stang, ...); Sonnet: none wrong. Both
+  beat the rules where they disagreed (Kellogg's Frosties -> breakfast, Råstoff -> vodka). User chose **Sonnet 5.5**:
+  6,868 families for **$1.46** (estimate was $1.00 - token estimate too low). The model may answer "other" or "not
+  sure"; those stay empty (= "Øvrige", safe). Plain crispbread (Wasa Knækbrød) is kept out of "Kiks & kager" by a rule.
+- **Snacks:** 459 families moved to `snacks` (301 from candy, 158 from groceries - Pringles, Kims, DK-Nuts, Leibniz,
+  Karen Volf, TUC, Wasa crispbread *snacks*). Empty families left over from earlier merges kept their category, so the
+  `unique (category, name)` constraint never bit; `saveSubcategories` joins a clash into the existing snacks family if
+  one ever comes up. `snacks` added to `GROUP_IDS` (`groups.ts`); shops still file these under candy/groceries, so
+  `poolOf()` lets candy, groceries and snacks share candidates in `match:new`, and `match:coverage` counts a product as
+  snacks when its family is. `common-items.ts` matches by name, so it's unaffected; `src/catalog/import-limits.ts`
+  only reads beer/wine/spirits - no change needed.
+- **Saved:** 7,547 families have a subcategory; 2,004 empty (1,727 of 8,243 on sale: gift sets, pet food, vitamins,
+  ready-to-drink cans, ports that shops file as spirits, shandies). On sale per subcategory:
+  beer - lager 53, specialty 54, classic 24, cider 24, alcohol-free 16, Øvrige 35;
+  soda - soft drinks 58, sugar-free 43, juice 38, energy 36, water 24, mixers 18, Øvrige 63;
+  wine - red 560, white 399, sparkling 169, rosé 123, fortified 51, alcohol-free 44, Øvrige 77;
+  spirits - whisky 484, rum 233, liqueur 175, gin 141, shots 111, vodka 83, brandy 81, aquavit 40, bitter 36, tequila 23, Øvrige 389;
+  candy - chocolate 538, gummies 300, caramels 196, liquorice 171, pastilles 82, Øvrige 338;
+  snacks - biscuits 165, chips 145, nuts 97;
+  groceries - pantry 894, coffee/tea 226, meat 117, breakfast 111, Øvrige 527;
+  household - personal care 175, laundry 52, cleaning 42, wraps 42, paper 22, Øvrige 298.
+  **No subcategory is under ~15 on sale**; the smallest are alcohol-free beer 16, mixers 18, paper 22, tequila 23.
+- **Nightly:** `match:new` gives the families it creates a subcategory (and `snacks` where it fits) via
+  `subcategoriesFor` - rules, then Sonnet direct, cached per family; an API failure just leaves them empty.
+- **Coverage after the move:** common items unchanged (117/120). New row "Chips, nuts, biscuits" comparable: Poetzsch
+  49 %, Fleggaard 64 %, Calle 81 %, ScandiPark 30 %, BorderShop 100 %; candy now 72 / 70 / 75 / 56 / 100 %.
+- **Audit:** `audit.ts` now prices each offer at the smaller of the listing's and the product's content, like the list
+  (Catalog 2026-11-17). Basket result unchanged.
+- **Next (other chats):** Catalog adds `snacks` to `CATEGORIES`; UI builds the menu, tiles and subcategory pages. Worth
+  a later look: ports and sherries filed under spirits (could move to wine/fortified).

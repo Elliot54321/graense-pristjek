@@ -1,6 +1,18 @@
 /** Comparison categories shared by matching and the coverage report. */
 
-export const GROUP_IDS = ["soda", "beer", "candy", "spirits", "wine", "groceries", "household"] as const;
+export const GROUP_IDS = ["soda", "beer", "candy", "snacks", "spirits", "wine", "groceries", "household"] as const;
+
+/**
+ * Shops file chips, nuts and biscuits under candy or groceries, while the site has a
+ * `snacks` top category for them (2026-11-17). Matching a product of one of these groups
+ * looks for candidate families in all three.
+ */
+export const SHARED_POOLS: Record<string, readonly string[]> = {
+  candy: ["candy", "snacks"],
+  groceries: ["groceries", "snacks"],
+  snacks: ["snacks", "candy", "groceries"],
+};
+export const poolOf = (group: string): readonly string[] => SHARED_POOLS[group] ?? [group];
 
 /** The fields of a shop product the rules below need. */
 export interface GroupRow {

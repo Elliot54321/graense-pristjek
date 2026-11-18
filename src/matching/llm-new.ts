@@ -28,9 +28,10 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import { adminClient, fetchAll } from "../db/admin";
 import { carryOverReviewed, linkNewsletterTwins } from "./carry-over";
-import { GROUP_IDS, GROUPS, isListed } from "./groups";
+import { GROUP_IDS, GROUPS, isListed, poolOf } from "./groups";
 import { costUsd } from "./llm";
 import { isCatchAllFamilyName, linkDoubts } from "./safety";
+import { loadFamilies, saveSubcategories, subcategoriesFor } from "./subcategories";
 
 const MODEL = "claude-sonnet-5-5";
 const CLASSIFY_MODEL = "claude-haiku-5-5";
@@ -116,8 +117,8 @@ const Classified = z.object({
 });
 
 const CLASSIFY_INSTRUCTIONS = `Sort each product from a Danish border shop into one comparison category, by its name:
-soda (incl. water, juice, iced tea, energy drinks), beer (incl. cider), candy (incl. chocolate,
-chips, nuts, cookies), spirits (incl. liqueurs, shots, alcopops), wine (incl. sparkling wine,
+soda (incl. water, juice, iced tea, energy drinks), beer (incl. cider), candy (incl. chocolate),
+snacks (chips, popcorn, nuts, biscuits, cookies, cakes), spirits (incl. liqueurs, shots, alcopops), wine (incl. sparkling wine,
 port and sherry), groceries (other food, coffee, tea), household (cleaning, toiletries, pet
 food), other (anything else: toys, gifts, glasses, electronics, gift boxes of mixed goods).`;
 
@@ -263,7 +264,8 @@ async function main() {
   const chunks: { group: string; items: ShopRow[]; candidateIds: number[] }[] = [];
   for (const group of GROUP_IDS) {
     const items = toAsk.filter((r) => groupOf(r) === group).sort((a, b) => a.name.localeCompare(b.name));
-    const pool = candidates.filter((c) => c.group === group);
+    // Chips/nuts/biscuits: shops say candy or groceries, the site says snacks - search all.
+    const pool = candidates.filter((c) => c.group !== undefined && poolOf(group).includes(c.group));
     for (let i = 0; i < items.length; i += CHUNK_SIZE) {
       const part = items.slice(i, i + CHUNK_SIZE);
       const chosen = new Set<number>();
@@ -458,6 +460,21 @@ async function main() {
     if (error) throw error;
   }
   console.log(`Saved: ${famRows.length} new families, ${created} new products, ${matchRows.length} matches.`);
+
+  // 3. Subcategories for the new families (and `snacks` where it fits), now that their
+  // products are saved: rules first, then the model (cached; a failure leaves them empty).
+  const newIds = [...familyIds.values()];
+  if (newIds.length) {
+    const fams = (await loadFamilies(newIds)).filter((f) => f.subcategory === null);
+    const { result, cost: subCost } = await subcategoriesFor(client, fams);
+    const changes = new Map<number, { from: string; category: string; subcategory: string | null; name: string }>();
+    for (const f of fams) {
+      const r = result.get(f.id);
+      if (r && (r.subcategory !== null || r.category !== f.category)) changes.set(f.id, { from: f.category, name: f.name, ...r });
+    }
+    await saveSubcategories(changes, false);
+    console.log(`Subcategories: ${changes.size} of ${fams.length} new families ($${subCost.toFixed(4)}).`);
+  }
 }
 
 main().catch((e) => {

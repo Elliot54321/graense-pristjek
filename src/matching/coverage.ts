@@ -13,7 +13,7 @@
  */
 import { adminClient, fetchAll } from "../db/admin";
 import { COMMON_ITEMS, type CommonItem } from "./common-items";
-import { GROUPS, isListed } from "./groups";
+import { GROUPS, isListed, poolOf } from "./groups";
 
 const SIZE_TOLERANCE = 0.02;
 const ALCOHOL_FREE = /\b0[,.]0 ?%|\b0[,.]0\b|alkoholfri|alcohol ?free|\b0[,.]5 ?%/i;
@@ -31,7 +31,8 @@ const SHOPS: { id: string; label: string; short: string }[] = [
 const CATEGORY_LABELS: Record<string, string> = {
   soda: "Soda, water, energy",
   beer: "Beer and cider",
-  candy: "Candy, chocolate, snacks",
+  candy: "Candy, chocolate",
+  snacks: "Chips, nuts, biscuits",
   spirits: "Spirits",
   wine: "Wine",
   groceries: "Groceries",
@@ -52,7 +53,11 @@ interface Row {
 }
 interface MatchEmbed {
   product_id: number;
-  products: { family_id: number | null } | { family_id: number | null }[] | null;
+  products: ProductEmbed | ProductEmbed[] | null;
+}
+interface ProductEmbed {
+  family_id: number | null;
+  product_families: { category: string } | { category: string }[] | null;
 }
 
 /** What makes two shop products comparable: the same family, else the same exact product. */
@@ -75,6 +80,19 @@ function fits(item: CommonItem, r: Row): boolean {
   );
 }
 
+/**
+ * Comparison group of a shop product: the shop's own category, except that a product
+ * whose family moved to `snacks` (shops file chips/nuts/biscuits under candy or
+ * groceries) counts as snacks.
+ */
+function groupOf(r: Row): string | undefined {
+  const group = GROUPS[r.shop_id]?.(r);
+  const m = Array.isArray(r.product_matches) ? r.product_matches[0] : r.product_matches;
+  const p = m ? (Array.isArray(m.products) ? m.products[0] : m.products) : null;
+  const fam = p ? (Array.isArray(p.product_families) ? p.product_families[0] : p.product_families) : null;
+  return group && fam?.category && fam.category !== group && poolOf(group).includes(fam.category) ? fam.category : group;
+}
+
 const pct = (n: number, of: number) => (of ? `${Math.round((100 * n) / of)}%` : "-").padStart(4);
 
 function categoryReport(rows: Row[]) {
@@ -88,7 +106,7 @@ function categoryReport(rows: Row[]) {
   console.log(`  ${"".padEnd(25)}${SHOPS.map((s) => s.label.padStart(23)).join("")}`);
   for (const [group, label] of Object.entries(CATEGORY_LABELS)) {
     const cells = SHOPS.map((shop) => {
-      const inGroup = rows.filter((r) => r.shop_id === shop.id && GROUPS[shop.id]?.(r) === group);
+      const inGroup = rows.filter((r) => r.shop_id === shop.id && groupOf(r) === group);
       const comparable = inGroup.filter((r) => (shopsByKey.get(groupKey(r) ?? "")?.size ?? 0) > 1).length;
       return `${String(inGroup.length).padStart(5)} / ${pct(comparable, inGroup.length)} comparable`.padStart(23);
     });
@@ -157,7 +175,7 @@ async function main() {
     db
       .from("shop_products")
       .select(
-        "id, shop_id, name, categories, content_amount, content_unit, last_seen_at, listed_until, product_matches(product_id, products(family_id))",
+        "id, shop_id, name, categories, content_amount, content_unit, last_seen_at, listed_until, product_matches(product_id, products(family_id, product_families(category)))",
       )
       .order("id")
       .range(from, to),
