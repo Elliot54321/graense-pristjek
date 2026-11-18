@@ -1421,3 +1421,8 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   can't be judged without the page image) are dropped too - any suggestion or AI link whose other side has listings
   but none on sale. Forslag 3 -> 0, AI-links 414 -> 353. Links stay in the database; the cards return when the offer
   is in a current newsletter (with its page image).
+- **Decisions without a page reload (same day, user):** each button used to `refresh()` the whole page, which reran
+  `loadReview()` (slow) and then removed the card and added a new 50th one, so the page jumped while the next card was
+  being read. Now the decision actions only save; the card (`DecisionCard` in `forms.tsx`) stays in place at the same
+  height, dimmed, with a "✓ Linket"/"Bekræftet"/... row where the buttons were, so nothing on the page moves. "Hent
+  flere" under each list reloads the queue (decided cards leave). Errors show on the card. No undo yet.

@@ -4,6 +4,8 @@
  * checks the admin cookie first, because server actions can be called with a
  * plain POST, not just from our page. Every decision marks the match reviewed,
  * so later matching runs never change it again.
+ * Decisions don't refresh the page: the card shows "saved" in place (DecisionCard in
+ * forms.tsx) so nothing moves; "Hent flere" reloads the queue.
  */
 import { cookies } from "next/headers";
 import { refresh } from "next/cache";
@@ -68,7 +70,6 @@ export async function linkSuggestion(formData: FormData) {
   const suggestion = parseSuggestion(match.note ?? "");
   if (!suggestion) throw new Error("Ingen forslag på dette match.");
   await saveMatch(shopProductId, { product_id: suggestion.targetId, method: "manual", confidence: 1, note: null });
-  refresh();
 }
 
 /** Suggestion -> "Not the same": keep the current product, remember the rejection. */
@@ -78,7 +79,6 @@ export async function rejectSuggestion(formData: FormData) {
   const match = await loadMatch(shopProductId);
   if (!parseSuggestion(match.note ?? "")) throw new Error("Ingen forslag på dette match.");
   await saveMatch(shopProductId, { note: `Rejected in review: ${match.note}` });
-  refresh();
 }
 
 /** LLM link -> "Confirm". */
@@ -88,7 +88,6 @@ export async function confirmLink(formData: FormData) {
   const match = await loadMatch(shopProductId);
   if (match.method !== "llm") throw new Error("Ikke et LLM-match.");
   await saveMatch(shopProductId, {});
-  refresh();
 }
 
 /**
@@ -135,7 +134,6 @@ export async function unlink(formData: FormData) {
     if (createError) throw createError;
     await saveMatch(shopProductId, { product_id: created.id, method: "manual", confidence: 1, note: null });
   }
-  refresh();
 }
 
 /**
@@ -167,7 +165,6 @@ export async function separate(formData: FormData) {
     confidence: 1,
     note: `Separated in review from product #${match.product_id}`,
   });
-  refresh();
 }
 
 /** Error report -> "Klaret": hide it from the list. */
@@ -176,5 +173,4 @@ export async function markReportHandled(formData: FormData) {
   const id = idFrom(formData, "reportId");
   const { error } = await adminClient().from("feedback").update({ handled: true }).eq("id", id);
   if (error) throw error;
-  refresh();
 }

@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { confirmLink, linkSuggestion, logout, markReportHandled, rejectSuggestion, separate, unlink } from "./actions";
 import { adminConfigured, isAdmin } from "./auth";
 import { loadReview, SHOWN_CONFIDENCE, type Listing, type LlmLink, type ProductInfo, type Suggestion, type WinnerCard } from "./data";
-import { ActionButton, LoginForm } from "./forms";
+import { DecisionCard, LoginForm, ReloadButton } from "./forms";
 import { loadInsights, type SearchCount } from "./insights";
 
 export const metadata: Metadata = {
@@ -60,7 +60,12 @@ async function Review() {
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Fra &quot;Fejl i prisen?&quot; på siden. Nyeste først.</p>
         <ul className="mt-4 flex flex-col gap-3">
           {insights.reports.map((r) => (
-            <li key={r.id} className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+            <DecisionCard
+              key={r.id}
+              idName="reportId"
+              id={r.id}
+              decisions={[{ action: markReportHandled, label: "Klaret", variant: "no", done: "Klaret" }]}
+            >
               <p className="text-xs text-zinc-500">
                 {new Date(r.createdAt).toLocaleString("da-DK", { timeZone: "Europe/Copenhagen" })}
                 {r.page && ` · fra ${r.page}`}
@@ -73,13 +78,7 @@ async function Review() {
                 </p>
               )}
               <p className="mt-1 whitespace-pre-wrap text-sm">{r.message}</p>
-              <form className="mt-3 flex">
-                <input type="hidden" name="reportId" value={r.id} />
-                <ActionButton action={markReportHandled} variant="no">
-                  Klaret
-                </ActionButton>
-              </form>
-            </li>
+            </DecisionCard>
           ))}
         </ul>
         {!insights.reports.length && <p className="mt-4 text-zinc-500">Ingen åbne fejlrapporter.</p>}
@@ -108,6 +107,7 @@ async function Review() {
           ))}
         </ul>
         {!winners.length && <p className="mt-4 text-zinc-500">Ingen avistilbud at gennemgå.</p>}
+        {winners.length > 0 && <ReloadButton />}
       </section>
 
       <section className="mt-10">
@@ -123,6 +123,7 @@ async function Review() {
           ))}
         </ul>
         {!suggestions.length && <p className="mt-4 text-zinc-500">Ingen forslag at gennemgå.</p>}
+        {suggestions.length > 0 && <ReloadButton />}
       </section>
 
       <section className="mt-10">
@@ -138,6 +139,7 @@ async function Review() {
           ))}
         </ul>
         {!llmLinks.length && <p className="mt-4 text-zinc-500">Ingen AI-links at gennemgå.</p>}
+        {llmLinks.length > 0 && <ReloadButton />}
       </section>
     </>
   );
@@ -161,7 +163,14 @@ function WinnerItem({ w }: { w: WinnerCard }) {
   const pct = Math.round(w.saving * 100);
   const exactLink = w.confidence < 1;
   return (
-    <li className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
+    <DecisionCard
+      id={w.self.shopProductId}
+      decisions={[
+        { action: confirmLink, label: "Bekræft", variant: "yes", done: "Bekræftet" },
+        ...(exactLink ? [{ action: unlink, label: "Fjern link", variant: "no" as const, done: "Link fjernet" }] : []),
+        { action: separate, label: "Ikke sammenlignelig", variant: "no", done: "Ikke sammenlignelig" },
+      ]}
+    >
       <p className="flex flex-wrap gap-2 text-sm text-zinc-600 dark:text-zinc-400">
         <span className={pct > 40 ? "rounded bg-red-100 px-2 py-0.5 text-red-900" : "rounded bg-emerald-100 px-2 py-0.5 text-emerald-900"}>
           {pct > 0 ? `${pct} % billigere pr. ${UNIT[w.self.contentUnit ?? ""] ?? "enhed"} end næste butik` : "Samme pris som næste butik"}
@@ -182,19 +191,19 @@ function WinnerItem({ w }: { w: WinnerCard }) {
         <Side title="Avistilbud" product={w.product} listings={[w.self]} />
         <Side title={w.sameProduct ? "Samme vare i andre butikker" : "Billigst i familien i andre butikker"} product={null} listings={w.rivals} />
       </div>
-      <form className="mt-4 flex gap-3">
-        <input type="hidden" name="shopProductId" value={w.self.shopProductId} />
-        <ActionButton action={confirmLink} variant="yes">Bekræft</ActionButton>
-        {exactLink && <ActionButton action={unlink} variant="no">Fjern link</ActionButton>}
-        <ActionButton action={separate} variant="no">Ikke sammenlignelig</ActionButton>
-      </form>
-    </li>
+    </DecisionCard>
   );
 }
 
 function SuggestionCard({ s }: { s: Suggestion }) {
   return (
-    <li className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
+    <DecisionCard
+      id={s.self.shopProductId}
+      decisions={[
+        ...(s.target ? [{ action: linkSuggestion, label: "Link", variant: "yes" as const, done: "Linket" }] : []),
+        { action: rejectSuggestion, label: "Ikke den samme", variant: "no", done: "Ikke den samme" },
+      ]}
+    >
       <p className="flex flex-wrap gap-2 text-sm">
         <span className="rounded bg-amber-100 px-2 py-0.5 text-amber-900">{s.reason || "tvivl"}</span>
         <SameBarcode listings={s.targetListings} />
@@ -210,20 +219,19 @@ function SuggestionCard({ s }: { s: Suggestion }) {
           empty={s.target ? "Ingen varer på produktet." : "Det foreslåede produkt findes ikke længere."}
         />
       </div>
-      <form className="mt-4 flex gap-3">
-        <input type="hidden" name="shopProductId" value={s.self.shopProductId} />
-        {s.target && (
-          <ActionButton action={linkSuggestion} variant="yes">Link</ActionButton>
-        )}
-        <ActionButton action={rejectSuggestion} variant="no">Ikke den samme</ActionButton>
-      </form>
-    </li>
+    </DecisionCard>
   );
 }
 
 function LinkCard({ l }: { l: LlmLink }) {
   return (
-    <li className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
+    <DecisionCard
+      id={l.self.shopProductId}
+      decisions={[
+        { action: confirmLink, label: "Bekræft", variant: "yes", done: "Bekræftet" },
+        { action: unlink, label: "Fjern link", variant: "no", done: "Link fjernet" },
+      ]}
+    >
       <p className="flex flex-wrap gap-2 text-sm text-zinc-600 dark:text-zinc-400">
         <span>Sikkerhed {Math.round(l.confidence * 100)} %</span>
         {l.confidence < SHOWN_CONFIDENCE && (
@@ -237,12 +245,7 @@ function LinkCard({ l }: { l: LlmLink }) {
         <Side title="Denne vare" product={null} listings={[l.self]} />
         <Side title="Linket til" product={l.product} listings={l.others} empty="Ingen andre varer på produktet." />
       </div>
-      <form className="mt-4 flex gap-3">
-        <input type="hidden" name="shopProductId" value={l.self.shopProductId} />
-        <ActionButton action={confirmLink} variant="yes">Bekræft</ActionButton>
-        <ActionButton action={unlink} variant="no">Fjern link</ActionButton>
-      </form>
-    </li>
+    </DecisionCard>
   );
 }
 
