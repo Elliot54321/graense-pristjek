@@ -9,6 +9,7 @@ import { replaceBasketItem, updateBasketItem, useBasket } from "@/components/bas
 import { InfoTip } from "@/components/info-tip";
 import { shopSearchUrl } from "@/catalog/shop-search";
 import { ReportLink } from "@/components/report-link";
+import { ZoomablePhoto } from "@/components/zoomable-photo";
 import { duration, kr, krRound } from "@/lib/format";
 
 type Home = { point: [number, number]; place: string; region: NonNullable<ReturnType<typeof regionOf>> };
@@ -431,14 +432,8 @@ function OtherPackNote({ item, buy }: { item: BasketItem; buy: NonNullable<LineR
   }
   if (!other) return null;
   return (
-    <span className="mt-1 flex items-center gap-2 rounded-md border border-sky-200 bg-sky-50 p-1.5 text-xs text-sky-900">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded bg-white">
-        {buy.imageUrl && (
-          // The shop's own photo, linked like elsewhere on the site.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={buy.imageUrl} alt="" width={36} height={36} loading="lazy" decoding="async" className="h-full w-full object-contain" />
-        )}
-      </span>
+    <div className="mt-1 flex items-center gap-2 rounded-md border border-sky-200 bg-sky-50 p-1.5 text-xs text-sky-900">
+      <ZoomablePhoto url={buy.imageUrl} name={buy.productName} pack={buy.packLabel} className="h-9 w-9 rounded border-0" zoomIcon={false} />
       <span className="min-w-0">
         <span className="font-medium">Anden pakning:</span> prisen er for {buy.quantity} ×{" "}
         {buy.packLabel ?? buy.productName}
@@ -454,7 +449,7 @@ function OtherPackNote({ item, buy }: { item: BasketItem; buy: NonNullable<LineR
           </button>
         )}
       </span>
-    </span>
+    </div>
   );
 }
 

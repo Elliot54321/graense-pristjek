@@ -37,7 +37,7 @@ export function PopularCard({ family: f, shops }: { family: FamilyResult; shops:
       <button type="button" onClick={open} className="flex flex-1 cursor-pointer flex-col text-left">
         <div className="relative flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-white">
           {image && (
-            // Linked from the shop's site like the search photos; see ProductPhoto in family-list.tsx.
+            // Linked from the shop's site like the search photos (see zoomable-photo.tsx); here a tap opens the item instead.
             // eslint-disable-next-line @next/next/no-img-element
             <img src={image} alt="" loading="lazy" decoding="async" className="h-full w-full object-contain p-3" />
           )}

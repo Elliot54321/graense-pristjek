@@ -4,6 +4,7 @@ import { AddToBasket } from "@/components/add-to-basket";
 import { cheapestListItem } from "@/components/list-item";
 import { CouponBadge, COUPON_NOTE, MultiBuyBadge, OfferBadge } from "@/components/badges";
 import { ReportLink } from "@/components/report-link";
+import { ZoomablePhoto } from "@/components/zoomable-photo";
 import { ChevronDown } from "lucide-react";
 import { kr, PER_UNIT_LABEL } from "@/lib/format";
 import { FamilyMore, type ResultSource } from "./family-more";
@@ -147,7 +148,7 @@ function PackRow({ pack, shops, page }: { pack: Pack; shops: Map<string, Shop>; 
     <li className="py-3">
       {/* Photo left, text and button right; the button sits under the price so the photo can be large. */}
       <div className="flex gap-3">
-        <ProductPhoto url={pack.imageUrl} />
+        <ZoomablePhoto url={pack.imageUrl} name={pack.name} pack={pack.packLabel} className="h-24 w-24 sm:h-28 sm:w-28" />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium">
             {pack.name}
@@ -269,22 +270,3 @@ function variantSummary(packs: Pack[]): string {
   return labels.slice(0, 3).join(", ") + (labels.length > 3 ? " og flere" : "");
 }
 
-/**
- * The shop's own product photo, linked straight from its site (only the address is
- * stored). A plain <img>: routing shop photos through Next's image optimizer would
- * copy them onto our servers. Newsletter-only products get an empty tile.
- */
-function ProductPhoto({ url }: { url: string | null }) {
-  return (
-    <div
-      className={`flex h-24 w-24 shrink-0 sm:h-28 sm:w-28 items-center justify-center overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-700 ${
-        url ? "bg-white" : "bg-zinc-200 dark:bg-zinc-800"
-      }`}
-    >
-      {url && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={url} alt="" width={112} height={112} loading="lazy" decoding="async" className="h-full w-full object-contain p-1" />
-      )}
-    </div>
-  );
-}

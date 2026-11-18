@@ -6,6 +6,7 @@ import type { AlcoholType } from "@/catalog/import-limits";
 import type { BasketItem, ShopResult } from "@/catalog/types";
 import { clearBasket, useBasket } from "@/components/basket";
 import { ItemStepper } from "@/components/item-stepper";
+import { ZoomablePhoto } from "@/components/zoomable-photo";
 import { amount, UNIT_LABEL } from "@/lib/format";
 import { COUPON_NOTE } from "@/components/badges";
 import { ImportLimits } from "./import-limits";
@@ -116,17 +117,8 @@ function BasketRow({ item, imageUrl }: { item: BasketItem; imageUrl?: string }) 
   return (
     <li className="flex items-center justify-between gap-3 px-3 py-2.5">
       {/* The shop's photo of the pack it was added from, else one the server picked (linked, not
-          copied); items no shop has a photo of get an empty tile so the names stay aligned. */}
-      <div
-        className={`flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md border border-zinc-200 sm:h-16 sm:w-16 ${
-          imageUrl ? "bg-white" : "bg-zinc-100"
-        }`}
-      >
-        {imageUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={imageUrl} alt="" width={64} height={64} loading="lazy" decoding="async" className="h-full w-full object-contain p-1" />
-        )}
-      </div>
+          copied); a tap shows it large. Items no shop has a photo of get an empty tile. */}
+      <ZoomablePhoto url={imageUrl} name={item.label} pack={item.kind === "family" ? item.packLabel : undefined} className="h-12 w-12 sm:h-16 sm:w-16" zoomIcon={false} />
       <div className="min-w-0 flex-1">
         <p className="text-sm">{item.label}</p>
         {/* Families are bought by amount: we pick the cheapest pack size in each shop. */}

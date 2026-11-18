@@ -1007,6 +1007,14 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   into the exact product it was added from (whole packs of the same amount, same list key so search still shows it as
   on the list), so every shop is priced for that pack and shops without it get an estimate. One-way: to go back,
   remove it and add "Billigste på listen" again. Only for items that know their pack (added from 2026-11-18).
+- **Enlarge photos (2026-11-18, user request):** a tap on a product photo opens it large on a dark backdrop, with the
+  product name and pack under it - on search, category and subcategory pages, in "Andre varianter", in the front page's
+  variant sheet, and on the list (item photos and the "Anden pakning" photo). The popular cards' own photos still open
+  the item. Shared `components/zoomable-photo.tsx`: a native modal `<dialog>` (Escape, focus kept inside and returned to
+  the photo), closes on ×, Escape or a tap outside, locks page scrolling while open. A small magnifier in the corner on
+  the bigger tiles shows it can be tapped. The big photo is the same shop address, scaled up into a square that fills
+  the screen (many shop photos are only 225-300 px). No photo, or one that fails to load: a grey tile that can't be
+  tapped; a failure in the big view says "Billedet kunne ikke hentes". No new library.
 
 ### Working setup: architect and area chats (2026-11-14)
 
