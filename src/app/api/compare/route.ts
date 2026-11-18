@@ -28,6 +28,7 @@ const Item = z.discriminatedUnion("kind", [
     unit: z.enum(["l", "kg", "piece"]),
     packLabel: z.string().max(40).optional(),
     singlePrice: z.boolean().optional(),
+    productId: z.number().int().positive().optional(),
   }),
   z.object({
     key: z.string().max(100),

@@ -22,6 +22,7 @@
  *   Hans Baer as the product's 0,75 l made it look 3x too cheap (trust audit
  *   2026-11-15). So a shop selling smaller packs needs more of them.
  */
+import { packLabel } from "@/lib/format";
 import type { BasketItem, LineResult, Offer, Pack, Shop, ShopResult } from "./types";
 
 /** Shops whose prices come from a newsletter, so a missing item is likely just not in the issue. */
@@ -97,7 +98,12 @@ function buyLine(item: BasketItem, pack: Pack, offer: Offer, quantity: number): 
     key: item.key,
     label: item.label,
     buy: {
+      productId: pack.productId,
       productName: otherSize ? offer.shopProductName : pack.name,
+      packLabel: otherSize ? packLabel(null, null, own!.unit, own!.amount) : pack.packLabel,
+      contentAmount: own?.amount ?? null,
+      contentUnit: own?.unit ?? null,
+      imageUrl: pack.imageUrl,
       quantity,
       price: offer.price,
       url: offer.url,

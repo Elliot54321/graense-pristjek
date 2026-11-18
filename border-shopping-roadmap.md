@@ -1276,3 +1276,9 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   **For the UI chat:** in `cheapestListItem()`, when `best` is null and `listPack` is set, return
   `{ kind: "product", productId: listPack.productId, label: listPack.name, quantity: 1, imageUrl }` (button text e.g.
   "Sæt på listen"). Checked: Lambi as a product item is priced at Calle (25 kr.) and estimated elsewhere, not failed.
+- **Which pack a list line bought (2026-11-18, for the UI chat's request):** `LineResult.buy` gains `productId` (the pack
+  bought), `packLabel` (what the shop sells - the offer's own size when it differs from the pack's, else the pack's
+  "24 x 0,33 l"), `contentAmount`/`contentUnit` (one piece of the offer, `offerContent()`) and `imageUrl` (the pack's). Family
+  `BasketItem`s take an optional `productId` (the pack they were added from; `/api/compare` accepts it, old lists lack
+  it). The UI compares `buy.productId` with the item's `productId` to say when another pack was picked. Checked: Coca-Cola
+  Zero added as "6 x 1,25 l" is bought as "24 x 0,33 l" cans at BorderShop and ScandiPark, and the line now says so.

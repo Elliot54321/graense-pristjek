@@ -85,7 +85,8 @@ export type BasketItem =
   /** packLabel: the pack one step is ("24 x 0,33 l"), shown instead of liters; missing in older baskets. */
   /** singlePrice: price the exact quantity at the till instead of assuming the multi-buy rate (see compare.ts). */
   /** imageUrl: photo of the pack it was added from, shown on the list; missing in older baskets. */
-  | { key: string; kind: "family"; familyId: number; label: string; amount: number; step: number; unit: Unit; packLabel?: string; singlePrice?: boolean; imageUrl?: string }
+  /** productId (family items): the pack it was added from; missing in older baskets. */
+  | { key: string; kind: "family"; familyId: number; label: string; amount: number; step: number; unit: Unit; packLabel?: string; singlePrice?: boolean; imageUrl?: string; productId?: number }
   | { key: string; kind: "product"; productId: number; label: string; quantity: number; singlePrice?: boolean; imageUrl?: string };
 
 export interface LineResult {
@@ -93,7 +94,16 @@ export interface LineResult {
   label: string;
   /** What to buy at this shop, or null if the shop doesn't have it. */
   buy: {
+    /** The product (pack) bought; compare with the item's productId to see if another pack was picked. */
+    productId: number;
     productName: string;
+    /** What the shop sells: "24 x 0,33 l", or the offer's own size when it differs from the pack's. */
+    packLabel: string | null;
+    /** One piece of the offer (its own content, see offerContent() in compare.ts); null if unknown. */
+    contentAmount: number | null;
+    contentUnit: Unit | null;
+    /** The pack's photo (null for newsletter-only products). */
+    imageUrl: string | null;
     quantity: number;
     price: number;
     url: string;
