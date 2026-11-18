@@ -1346,3 +1346,24 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   - **Speed** (local production server against live Supabase, `/api/families`): 0.24-0.59 s per search once warm; the first
     search on a fresh server 1.0-1.2 s (reads the family list, ~0.7 s). Live site today: 0.36-0.81 s. Matching itself
     takes ~1 ms per query (old filter logic: ~14 ms).
+
+### Pack sizes under one barcode: Kinder Bueno White, Malaco Allsorts, Corny (2026-11-18, Matching chat)
+
+- **User report:** ScandiPark's Kinder Bueno looked much heavier than the same product elsewhere, and its Malaco Allsorts
+  "1kg Box" sits next to 800 g bags. Two different causes:
+  - *Shop misreads (Data):* ScandiPark's scraper multiplies a printed total by the pack count - "kinder Bueno White 8x2
+    312g" stored as 2,496 kg, "Wrigleys … 7er Pack 98g" 686 g, "Malaco Kick 14er Box 266g" 3,724 kg, "Ga-Jol … 8er Pack
+    184g", "Mentos … 3er Pack 114g", "Niederegger … 10er 200g" (`packFromName` in `src/scrapers/scandipark.ts`: when the
+    name has "Ner"/"NxM" *and* a weight that is the total, the weight must not be multiplied). The site already prices
+    these at the product's size (smaller-content rule, 2026-11-17: Kinder Bueno White at ScandiPark = 224,33 kr./kg), so no
+    false cheapest - but the stored weight is wrong until the scraper is fixed.
+  - *Bigger pack on the small pack's barcode (Matching, fixed):* ScandiPark sells "Malaco Allsorts 1kg Box" with the 800 g
+    bags' barcode, so it was priced as 800 g (looked 25 % dearer). `ean.ts` now also gives a copy that is **bigger** than
+    its product its own size product when its name confirms the size ("1kg", "24x40g") **and its price does** (at least
+    75 % of the size ratio vs the barcode's other copies - stops "Pedigree … 62000 g" at a 1,62 kg price). Malaco 1 kg
+    box now 49,99 kr./kg vs 56-60 for the bags.
+  - *Product size from a retired listing (Matching, fixed):* the Corny Big 24-bar boxes' product said 40 g, taken from
+    ScandiPark's old German-shop listing (retired 2026-10-01). `ean.ts` now takes a product's content from listings on
+    sale first and never size-splits listings that aren't on sale. 33 product sizes corrected (Corny boxes 40 g -> 960 g,
+    Niederegger 10-sachet boxes, Skippers Pipes 60x17g, ...), 12 bigger ScandiPark packs got their own size, 17 copies
+    rejoined their now-correct product; a second dry run changes nothing.

@@ -43,6 +43,7 @@
  * `overstated`): shops misread contents too, and a copy that looks dearer is safe.
  */
 import { adminClient, fetchAll } from "../db/admin";
+import { isListed } from "./groups";
 
 const BATCH_SIZE = 500;
 /** Contents differing more than this (as a fraction) lower the confidence. */
@@ -83,6 +84,8 @@ interface ShopProductRow {
   categories: string[];
   content_amount: number | null;
   content_unit: string | null;
+  last_seen_at: string | null;
+  listed_until: string | null;
 }
 
 interface Content {
@@ -127,6 +130,41 @@ function overstated(name: string, own: Content, product: Content | undefined): b
   return true;
 }
 
+/** Sizes printed in a name ("1kg", "312g", "0,75L"), in the base unit (kg or l). */
+function sizesInName(name: string): Content[] {
+  return [...name.matchAll(/(\d+(?:[.,]\d+)?)\s*(kg|g|l|cl|ml)\b/gi)].map((m) => {
+    const u = UNIT_FACTOR[m[2].toLowerCase()];
+    return { amount: Number(m[1].replace(",", ".")) * u.factor, unit: u.unit };
+  });
+}
+
+/**
+ * The copy is clearly bigger than its product AND its own name confirms that size, so it is
+ * a bigger pack sold under the small pack's barcode (2026-11-18: ScandiPark "Malaco Allsorts
+ * 1kg Box" on the 800 g bags' barcode, "Corny Big Cinnamon Roll 24x40g" on the single bar's).
+ * Confirmed means: "N x M" in the name adds up to the copy's content, or a printed size equals
+ * it and no printed size equals the product's. Otherwise the shop's content is the doubtful
+ * one ("kinder Bueno White 8x2 312g" stored as 2,496 kg) and the copy stays, priced at the
+ * product's smaller content.
+ *
+ * The shops take their content *from* the name, so the name alone proves little; the price is
+ * the independent check. `priceRatio` = this copy's price / the median price of the barcode's
+ * other copies of the product's size; it must be at least 75 % of the size ratio (Malaco 1 kg
+ * at 49,99 vs 800 g at ~45: 1,11 vs 1,25 - ok; Pedigree "62000 g" at a 1,62 kg price - not).
+ */
+function confirmedBigger(name: string, own: Content, product: Content | undefined, priceRatio: number | null): boolean {
+  if (!product || own.amount === null || product.amount === null || !own.unit || own.unit !== product.unit) return false;
+  const [mine, theirs] = [Number(own.amount), Number(product.amount)];
+  if (mine <= theirs * (1 + CONTENT_TOLERANCE)) return false;
+  if (priceRatio === null || priceRatio < 0.75 * (mine / theirs)) return false;
+  for (const m of name.matchAll(/(\d+)\s*[x×]\s*(\d+(?:[.,]\d+)?)\s*(kg|g|l|cl|ml)\b/gi)) {
+    const u = UNIT_FACTOR[m[3].toLowerCase()];
+    if (u.unit === own.unit && near(Number(m[1]) * Number(m[2].replace(",", ".")) * u.factor, mine)) return true;
+  }
+  const printed = sizesInName(name).filter((s) => s.unit === own.unit);
+  return printed.some((s) => near(s.amount!, mine)) && !printed.some((s) => near(s.amount!, theirs));
+}
+
 const contentOfRow = (r: ShopProductRow): Content => ({
   amount: r.content_amount === null ? null : Number(r.content_amount),
   unit: r.content_unit,
@@ -150,10 +188,18 @@ async function main() {
   const shopProducts = await fetchAll<ShopProductRow>((from, to) =>
     db
       .from("shop_products")
-      .select("id, shop_id, name, brand, ean, categories, content_amount, content_unit")
+      .select("id, shop_id, name, brand, ean, categories, content_amount, content_unit, last_seen_at, listed_until")
       .not("ean", "is", null)
       .order("id")
       .range(from, to),
+  );
+  // Current shelf prices, for the price check on bigger copies (confirmedBigger).
+  const priceOf = new Map(
+    (
+      await fetchAll<{ shop_product_id: number; price: number }>((from, to) =>
+        db.from("current_prices").select("shop_product_id, price").order("shop_product_id").range(from, to),
+      )
+    ).map((p) => [p.shop_product_id, Number(p.price)]),
   );
   const alreadyMatched = new Map(
     (
@@ -172,8 +218,12 @@ async function main() {
 
   // One product per EAN, described from the preferred shop when it has the item.
   const productRows = [...byEan.entries()].map(([ean, rows]) => {
-    const best = rows.find((r) => r.shop_id === PREFERRED_SHOP) ?? rows[0];
-    const withContent = rows.find((r) => r.content_amount !== null);
+    // Listings on sale first: a retired listing may carry an old misreading (ScandiPark's
+    // German shop stored "Corny Big Cinnamon Roll 24x40g" as 40 g), and the product's content
+    // is what the shopping list prices every copy at.
+    const ordered = [...rows].sort((a, b) => Number(isListed(b)) - Number(isListed(a)));
+    const best = ordered.find((r) => r.shop_id === PREFERRED_SHOP && isListed(r)) ?? ordered.find((r) => r.shop_id === PREFERRED_SHOP) ?? ordered[0];
+    const withContent = ordered.find((r) => r.content_amount !== null);
     return {
       ean,
       name: best.name,
@@ -221,14 +271,17 @@ async function main() {
   // we fix a parser). Names are left alone in case someone corrected one by hand.
   const wanted = new Map(productRows.map((p) => [p.ean, p]));
   let updated = 0;
+  const contentChanges: string[] = [];
   for (const p of existing) {
     const w = wanted.get(p.ean);
     if (!w) continue;
-    const changed =
-      p.brand !== w.brand ||
-      Number(p.content_amount) !== Number(w.content_amount) ||
-      p.content_unit !== w.content_unit ||
-      p.category !== w.category;
+    const contentChanged = Number(p.content_amount) !== Number(w.content_amount) || p.content_unit !== w.content_unit;
+    const changed = p.brand !== w.brand || contentChanged || p.category !== w.category;
+    if (contentChanged) {
+      contentChanges.push(`#${p.id} ${w.name}: ${p.content_amount ?? "?"} ${p.content_unit ?? ""} -> ${w.content_amount ?? "?"} ${w.content_unit ?? ""}`);
+      // The size split below compares copies with the product's new content.
+      contentOf.set(p.id, { amount: w.content_amount === null ? null : Number(w.content_amount), unit: w.content_unit });
+    }
     if (!changed || dryRun) continue;
     const { error } = await db
       .from("products")
@@ -295,13 +348,23 @@ async function main() {
     const groupTarget = target;
     const destination = (r: ShopProductRow): number => {
       const size = contentOfRow(r);
+      const current = alreadyMatched.get(r.id)?.product_id;
+      // A listing no longer on sale never shows, so it gets no size product of its own.
+      if (!isListed(r)) return groupTarget;
       // A copy already on a product of its own size stays there when the target has another
       // size (e.g. the target is a size product made earlier, holding more copies).
-      const current = alreadyMatched.get(r.id)?.product_id;
       if (current !== undefined && current !== groupTarget && sameSize(size, contentOf.get(current)) && !sameSize(size, contentOf.get(groupTarget))) {
         return current;
       }
-      if (!overstated(r.name, size, contentOf.get(groupTarget))) return groupTarget;
+      const targetSize = contentOf.get(groupTarget);
+      // Price of this copy vs the barcode's other copies that have the product's size.
+      const peers = rows
+        .filter((o) => o.id !== r.id && sameSize(contentOfRow(o), targetSize) && priceOf.has(o.id))
+        .map((o) => priceOf.get(o.id)!)
+        .sort((a, b) => a - b);
+      const peerPrice = peers.length ? peers[Math.floor(peers.length / 2)] : null;
+      const priceRatio = peerPrice && priceOf.has(r.id) ? priceOf.get(r.id)! / peerPrice : null;
+      if (!overstated(r.name, size, targetSize) && !confirmedBigger(r.name, size, targetSize, priceRatio)) return groupTarget;
       for (const other of rows) {
         const pid = alreadyMatched.get(other.id)?.product_id;
         if (pid !== undefined && pid !== groupTarget && sameSize(size, contentOf.get(pid))) return pid;
@@ -355,6 +418,8 @@ async function main() {
     }
   }
 
+  console.log(`Product contents changed (from listings on sale): ${contentChanges.length}`);
+  for (const line of contentChanges) console.log(`  ${line}`);
   console.log(`Moved to their barcode's product: ${moved.length}`);
   for (const line of movedLines) console.log(`  ${line}`);
   console.log(`Products given the more specific family of a moved copy: ${familyMoves.size}`);
