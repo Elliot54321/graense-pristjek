@@ -1302,3 +1302,39 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   `BasketItem`s take an optional `productId` (the pack they were added from; `/api/compare` accepts it, old lists lack
   it). The UI compares `buy.productId` with the item's `productId` to say when another pack was picked. Checked: Coca-Cola
   Zero added as "6 x 1,25 l" is bought as "24 x 0,33 l" cans at BorderShop and ScandiPark, and the line now says so.
+
+### Forgiving search (2026-11-18, Catalog chat)
+
+- **Why:** the user found search too strict. Zero-result searches in `search_log`: "wrigley extra spearmint" (name has
+  "Wrigley's"), "stroh stagertee rom" (typo), "aqua d'or tea" / "aqua dor tea" (missing "Ice"), "toms pariser linser
+  karameller" (extra word). The old search only matched the whole query as the start of the name or a word in it, or
+  every word as an exact search word.
+- **Step 1, word matching in code (`src/catalog/search.ts`, live once deployed):** every query word on its own, in any
+  order; punctuation ignored ("wrigleys" = "Wrigley's", "aqua dor" = "Aqua d'Or"); accents and Danish spellings folded
+  (ä/æ/ae -> a, ø/ö/oe -> o, å/aa -> a, ü/ue -> u, é -> e: "jagermeister", "rodvin", "roedvin", "tuborg gron", "ålborg"
+  all find their item); simple endings (-erne/-ene/-er/-en/-et/-e/-s, "karameller" -> "karamel"). Words of 3+ letters
+  also match the start of a name word ("carlsber", "tobleron", "smirnof"). A 3+ word query may miss one word, ranked after
+  every full match. `preScore` still rewards the whole name and the name's start. Matching runs on all 9,561 families,
+  read once and cached with their folded words (`searchIndex()`), instead of a database filter per query.
+- **Step 2, typo matches (`supabase/migrations/20261118000000_search_fuzzy.sql`, not run yet):** `pg_trgm`, a
+  generated `product_families.search_text` (folded name + search words, `search_norm()`) with a GIN trigram index, and the
+  read-only RPC `search_families_fuzzy(q)` (word similarity >= 0.5, top 20; execute granted to anon/authenticated).
+  Used only when the word matching finds fewer than 3 families on sale; typo matches rank below every word match. Until
+  the migration is run the RPC is missing and search simply has none (checked: no errors). **Untested against the
+  database** - after running it, check "marabu", "heiniken", "gamel dansk", "redbull", "cocacola", "john stagertee rom".
+- **For the UI chat:** `ResultPage.suggestion` (`string | null`, search page 1 only) is the first result's family name
+  when it's a typo match - no family on sale matched the query as typed - for "Mente du: Heineken?".
+- **Before -> after** (83 queries: the 43 logged searches, 35 deliberate variants, 5 reference searches; page 1 ranked
+  like the site; script in the shared notes folder `catalog-search/`):
+  - "cola", "øl", "rødvin", "vodka", "chips": top 3 unchanged (Coca-Cola / Coca-Cola Zero / Pepsi Max; Tuborg Grøn /
+    Royal Pilsner / Tuborg Classic; ...), a few more families each.
+  - Searches with no result: 20 -> 7. Now found: "wrigley extra spearmint", "wrigley extra", "stroh stagertee rom" (Stroh
+    Jagertee, as a 2-of-3 match), "aqua dor tea", "aqua d'or tea", "toms pariser linser karameller", "jaegermeister",
+    "tuborg gron", "tuborg groen", "kondi faxe", "rodvin", "roedvin", "ålborg". Left for step 2: "cocacola", "marabu",
+    "gamel dansk", "redbull", "heiniken", "john stagertee rom" (and "xyzzyq").
+  - More results where the old search was too narrow: "coca cola zero" 3 -> 18 on sale, "karameller" 23 -> 114 (the 3rd
+    result is now "Baileys Chokolade Salt Karamel Trøffel" instead of Maoam), "jagermeister" 1 -> 8, "hans baer riesling"
+    2 -> 8 (other Hans Baer wines after the two Rieslings). "zero cola" now has "Jim Beam Bourbon & Cola Zero" 2nd.
+  - **Speed** (local production server against live Supabase, `/api/families`): 0.24-0.59 s per search once warm; the first
+    search on a fresh server 1.0-1.2 s (reads the family list, ~0.7 s). Live site today: 0.36-0.81 s. Matching itself
+    takes ~1 ms per query (old filter logic: ~14 ms).

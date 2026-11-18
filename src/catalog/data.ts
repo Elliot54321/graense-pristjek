@@ -11,6 +11,7 @@ import { dealPerPiece, effectivePrice, NEWSLETTER_SHOPS } from "./compare";
 import type { FamilyInfo } from "./import-limits";
 import { COMMON_ITEMS } from "@/matching/common-items";
 import { commonTier, finalScore, preScore } from "./ranking";
+import { indexFamily, matchScore, PARTIAL_MATCH, prepareQuery, type IndexedFamily, type SearchFamily } from "./search";
 import { packLabel } from "@/lib/format";
 import { POPULAR_PAGE, RESULTS_PAGE } from "./pages";
 import { isSubcategoryOf } from "./categories";
@@ -115,11 +116,6 @@ export async function getFreshness(): Promise<Freshness[]> {
       return { shop, lastSeen, stale, listedUntil: null };
     }),
   );
-}
-
-/** Characters with a meaning in PostgREST filters are removed from user input. */
-function cleanQuery(q: string): string {
-  return q.toLowerCase().replace(/[,()*{}"'\\%:]/g, " ").replace(/\s+/g, " ").trim();
 }
 
 /**
@@ -240,36 +236,81 @@ async function loadPacks(productIds: number[], familyIds: number[]): Promise<Pac
 
 
 /**
- * Search: families whose name has a word starting with the query (spaces and hyphens
- * match each other), or whose search words contain every query word - all of them,
- * page by page ("rødvin" matched 727 families on 2026-11-14; it used to stop at 30).
- * The order comes from name and search words (ranking.ts); within a page, prices are
- * loaded and availability (shops, packs) breaks near-ties. Families nobody sells right
- * now are left out, so a page can have fewer than RESULTS_PAGE.
+ * Search: families matching every query word in any order, forgiving punctuation, accents, Danish
+ * spellings and endings ("wrigleys" finds "Wrigley's", "jagermeister" "Jägermeister"; search.ts),
+ * page by page. The order comes from name and search words (ranking.ts); within a page, prices
+ * are loaded and availability (shops, packs) breaks near-ties. Families nobody sells right now are
+ * left out, so a page can have fewer than RESULTS_PAGE.
+ *
+ * When fewer than FEW_RESULTS families on sale match, typo matches from the database
+ * (`search_families_fuzzy`, pg_trgm) follow, ranked below every exact match. If the first result
+ * is such a typo match, `suggestion` names it ("Mente du: Stroh Jagertee?").
  */
 export async function searchFamilies(rawQuery: string, from = 0): Promise<ResultPage> {
   "use cache";
   cacheLife("hours");
-  return pageFrom(await searchOrder(cleanQuery(rawQuery)), from);
+  const { order, fuzzy, firstPage } = await searchOrder(rawQuery);
+  const page = from === 0 && firstPage ? firstPage : await pageFrom(order, from);
+  const first = page.families[0];
+  return { ...page, suggestion: from === 0 && first && fuzzy.includes(first.id) ? first.name : null };
 }
 
-/** Every family matching the query, best first by name and search words. */
-async function searchOrder(q: string): Promise<(FamilyRow & { pre: number })[]> {
+/** Below this many families on sale, typo matches are added. */
+const FEW_RESULTS = 3;
+/** Exact matches beyond this are assumed to include enough on sale (pricing them all would be slow). */
+const CHECK_SOLD_UP_TO = 20;
+
+/**
+ * Every family matching the query, best first by name and search words; then typo matches.
+ * `firstPage`: page 1 when it was already priced to decide on typo matches (and none were added).
+ */
+async function searchOrder(
+  rawQuery: string,
+): Promise<{ order: (FamilyRow & { pre: number })[]; fuzzy: number[]; firstPage?: ResultPage }> {
   "use cache";
   cacheLife("hours");
-  if (q.length < 2) return [];
-  const words = q.split(/[ -]/).filter(Boolean);
-  // "_" matches any single character, so "coca cola" also finds "Coca-Cola".
-  const pattern = q.replace(/[ -]/g, "_");
-  const families = await readAll<FamilyRow & { search_words: string[] | null }>(
-    "product_families",
-    "id, name, category, search_words",
-    ["id"],
-    (query) => query.or(`name.ilike.${pattern}*,name.ilike.* ${pattern}*,name.ilike.*-${pattern}*,search_words.cs.{${words.join(",")}}`),
-  );
-  return families
-    .map((f) => ({ id: f.id, name: f.name, category: f.category, pre: preScore(f.name, f.search_words ?? [], q) }))
+  const q = prepareQuery(rawQuery.slice(0, 100));
+  if (q.key.length < 2) return { order: [], fuzzy: [] };
+  const exact = (await searchIndex())
+    .flatMap((f) => {
+      const text = matchScore(f, q);
+      if (text === null) return [];
+      // A match missing one word (text 5) comes after every full match.
+      return [{ id: f.id, name: f.name, category: f.category, pre: preScore(f, q, text) - (text === PARTIAL_MATCH ? 200 : 0) }];
+    })
     .sort((a, b) => b.pre - a.pre || a.name.length - b.name.length);
+  if (exact.length > CHECK_SOLD_UP_TO) return { order: exact, fuzzy: [] };
+  const firstPage = await pageFrom(exact, 0);
+  // Very short queries are too loose for typo matching ("ab" is similar to too much).
+  if (firstPage.families.length >= FEW_RESULTS || q.key.length < 3) return { order: exact, fuzzy: [], firstPage };
+
+  const seen = new Set(exact.map((f) => f.id));
+  // Similarity 0..1 -> -500..-300: below every word match, more similar first.
+  const fuzzy = (await fuzzyFamilies(q.key)).filter((f) => !seen.has(f.id)).map((f) => ({ ...f, pre: -500 + 200 * f.similarity }));
+  if (!fuzzy.length) return { order: exact, fuzzy: [], firstPage };
+  return { order: [...exact, ...fuzzy.map(({ id, name, category, pre }) => ({ id, name, category, pre }))], fuzzy: fuzzy.map((f) => f.id) };
+}
+
+/** All families with their name and search words prepared for matching (search.ts). */
+async function searchIndex(): Promise<IndexedFamily[]> {
+  "use cache";
+  cacheLife("hours");
+  const families = await readAll<SearchFamily>("product_families", "id, name, category, search_words", ["id"]);
+  return families.map(indexFamily);
+}
+
+/**
+ * Typo matches from the database (pg_trgm word similarity on name + search words; migration
+ * 20261118000000). Until that migration is run the function doesn't exist, and search simply has
+ * no typo matches.
+ */
+async function fuzzyFamilies(key: string): Promise<(FamilyRow & { similarity: number })[]> {
+  const { data, error } = await publicClient().rpc("search_families_fuzzy", { q: key });
+  if (error) {
+    if (error.code !== "PGRST202" && error.code !== "42883") console.error("search_families_fuzzy failed:", error.message);
+    return [];
+  }
+  return (data as (FamilyRow & { similarity: number })[]).map((f) => ({ ...f, similarity: Number(f.similarity) }));
 }
 
 /**

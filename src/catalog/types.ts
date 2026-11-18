@@ -77,6 +77,11 @@ export interface FamilyResult {
 export interface ResultPage {
   families: FamilyResult[];
   next: number | null;
+  /**
+   * Search only, first page: the name of the first result when it's a typo match (no family on
+   * sale matched the query as typed) - for "Mente du: ...?". null otherwise.
+   */
+  suggestion?: string | null;
 }
 
 /** What the browser keeps in its basket. */
