@@ -18,6 +18,8 @@ export function cheapestListItem(family: FamilyResult): BasketItem | null {
     step: pack.contentAmount,
     unit: best.unit,
     packLabel: pack.packLabel ?? undefined,
+    // Which pack this was, so the list can say when a shop is priced with another one.
+    productId: pack.productId,
     // Newsletter packs have no photo: fall back to another pack of the family.
     imageUrl: (pack.imageUrl ?? family.packs.find((p) => p.imageUrl)?.imageUrl) || undefined,
   };

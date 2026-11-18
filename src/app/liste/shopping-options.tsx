@@ -3,9 +3,9 @@ import { useEffect, useState } from "react";
 import { NEWSLETTER_SHOPS } from "@/catalog/compare";
 import { MIN_SAVING_PER_EXTRA_STORE, shoppingOptions, type ShoppingOption } from "@/catalog/plan";
 import { CAR_TYPES, type CarType, oneWayKm, oneWayMinutes, regionOf } from "@/catalog/trips";
-import type { LineResult, Shop, ShopResult } from "@/catalog/types";
+import type { BasketItem, LineResult, Shop, ShopResult } from "@/catalog/types";
 import { CouponBadge, MultiBuyBadge, OfferBadge } from "@/components/badges";
-import { updateBasketItem } from "@/components/basket";
+import { replaceBasketItem, updateBasketItem, useBasket } from "@/components/basket";
 import { InfoTip } from "@/components/info-tip";
 import { shopSearchUrl } from "@/catalog/shop-search";
 import { ReportLink } from "@/components/report-link";
@@ -178,16 +178,23 @@ function OptionCard({
   const items = o.missing.length + o.stops.reduce((n, s) => n + s.lines.length, 0);
   const diff = compare ? Math.round(Math.abs(compare.total - o.total)) : 0;
   const compareName = compare?.stops.map((s) => s.name).join(" + ");
+  // Too much of the total is estimated to call it cheapest (compare.ts): it's still first, but not crowned.
+  const crowned = best && !o.uncertain;
 
   return (
-    <li className={`rounded-xl border bg-zinc-100 p-4 ${best ? "border-emerald-500 ring-1 ring-emerald-500" : "border-zinc-200 dark:border-zinc-800"}`}>
+    <li className={`rounded-xl border bg-zinc-100 p-4 ${crowned ? "border-emerald-500 ring-1 ring-emerald-500" : "border-zinc-200 dark:border-zinc-800"}`}>
       <div className="flex items-baseline justify-between gap-3">
         <div className="min-w-0">
           <h3 className="font-semibold">
             {o.stops.map((s) => s.name).join(" + ")}
-            {best && (
+            {crowned && (
               <span className="ml-2 inline-block whitespace-nowrap rounded bg-emerald-600 px-1.5 py-0.5 text-xs font-medium text-white">
                 Billigst
+              </span>
+            )}
+            {best && o.uncertain && (
+              <span className="ml-2 inline-block whitespace-nowrap rounded bg-zinc-200 px-1.5 py-0.5 text-xs font-medium text-zinc-800">
+                Usikker
               </span>
             )}
           </h3>
@@ -206,7 +213,12 @@ function OptionCard({
           )}
         </div>
       </div>
-      {best && compare && (
+      {best && o.uncertain && (
+        <p className="mt-2 text-sm text-zinc-700">
+          Laveste pris lige nu, men for mange af varerne er estimeret til at sige, om den er billigst.
+        </p>
+      )}
+      {crowned && compare && (
         <p className="mt-2 text-sm font-medium text-emerald-700 dark:text-emerald-400">
           {diff > 0 ? `${krRound(diff)} kr. billigere end ${compareName}` : `Samme pris som ${compareName}`}
         </p>
@@ -360,6 +372,7 @@ function DealNote({ itemKey, buy }: { itemKey: string; buy: NonNullable<LineResu
 function LineRow({ line: l, shop }: { line: LineResult; shop: Shop | undefined }) {
   // Newsletter shops only show part of their range, so the item is probably there.
   const newsletter = !!shop && NEWSLETTER_SHOPS.has(shop.id);
+  const item = useBasket().find((i) => i.key === l.key);
   return (
     <li className="flex justify-between gap-3 py-1">
       {l.buy ? (
@@ -372,6 +385,7 @@ function LineRow({ line: l, shop }: { line: LineResult; shop: Shop | undefined }
             {l.buy.multiBuy && <MultiBuyBadge quantity={l.buy.multiBuy.quantity} price={l.buy.multiBuy.price} />}
             {l.buy.coupon && <CouponBadge />}
             <DealNote itemKey={l.key} buy={l.buy} />
+            {item && <OtherPackNote item={item} buy={l.buy} />}
           </div>
           <span className="shrink-0 tabular-nums">
             {kr(l.cost!)}
@@ -391,4 +405,72 @@ function LineRow({ line: l, shop }: { line: LineResult; shop: Shop | undefined }
       )}
     </li>
   );
+}
+
+/** "24 x 0,33 l" and "24x0,33L" are the same pack label. */
+const samePack = (a: string, b: string) => a.toLowerCase().replace(/\s+/g, "") === b.toLowerCase().replace(/\s+/g, "");
+
+/**
+ * When a shop's price is for another pack than the one put on the list - cans priced as PET
+ * bottles, 6 x 0,75 l wine as a 3 l bag-in-box - say so on the line, with the pack's photo.
+ * Families pick the cheapest pack per liter/kg in each shop (by design), so this is about
+ * showing what was matched, not a warning.
+ */
+function OtherPackNote({ item, buy }: { item: BasketItem; buy: NonNullable<LineResult["buy"]> }) {
+  let added: string | undefined;
+  let other = false;
+  if (item.kind === "family") {
+    added = item.packLabel;
+    // The exact product when the item knows it (lists from 2026-11-18 on), else the pack label.
+    const otherProduct = item.productId !== undefined && buy.productId !== item.productId;
+    const otherLabel = !!added && !!buy.packLabel && !samePack(added, buy.packLabel);
+    other = otherProduct || otherLabel;
+  } else {
+    // An exact product: a shop selling it in another (smaller) size needs more pieces for the same amount (compare.ts).
+    other = buy.quantity !== item.quantity;
+  }
+  if (!other) return null;
+  return (
+    <span className="mt-1 flex items-center gap-2 rounded-md border border-sky-200 bg-sky-50 p-1.5 text-xs text-sky-900">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded bg-white">
+        {buy.imageUrl && (
+          // The shop's own photo, linked like elsewhere on the site.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={buy.imageUrl} alt="" width={36} height={36} loading="lazy" decoding="async" className="h-full w-full object-contain" />
+        )}
+      </span>
+      <span className="min-w-0">
+        <span className="font-medium">Anden pakning:</span> prisen er for {buy.quantity} ×{" "}
+        {buy.packLabel ?? buy.productName}
+        {added && !samePack(added, buy.packLabel ?? "") && <span className="text-sky-800"> (du valgte {added})</span>}
+        {item.kind === "family" && item.productId !== undefined && item.packLabel && (
+          <button
+            type="button"
+            onClick={() => keepExactPack(item)}
+            title="Prissæt præcis den pakning i alle butikker – butikker uden den får en estimeret pris"
+            className="ml-1 cursor-pointer py-2 font-medium underline underline-offset-2 hover:text-emerald-800"
+          >
+            Kun {item.packLabel}
+          </button>
+        )}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * "Kun 24 x 0,33 l": the family item becomes the exact product it was added from, so every
+ * shop is priced for that pack (shops without it get an estimate). Whole packs of the same
+ * amount; the key stays, so search still shows it as on the list.
+ */
+function keepExactPack(item: Extract<BasketItem, { kind: "family" }>) {
+  replaceBasketItem(item.key, {
+    key: item.key,
+    kind: "product",
+    productId: item.productId!,
+    label: `${item.label} ${item.packLabel}`,
+    quantity: Math.max(1, Math.round(item.amount / item.step)),
+    singlePrice: item.singlePrice,
+    imageUrl: item.imageUrl,
+  });
 }

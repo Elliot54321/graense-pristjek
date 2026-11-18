@@ -83,6 +83,11 @@ export function updateBasketItem(key: string, change: { quantity?: number; amoun
   );
 }
 
+/** Swaps an item for another in the same place (e.g. "Kun denne pakning": a family becomes its exact product). */
+export function replaceBasketItem(key: string, item: BasketItem) {
+  write(read().map((i) => (i.key === key ? item : i)));
+}
+
 export function removeFromBasket(key: string) {
   write(read().filter((i) => i.key !== key));
 }

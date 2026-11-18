@@ -995,6 +995,18 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   categories (1-3 per category per page), so it needs a per-category popular read (`popularFamilies(page, category)`,
   Catalog). Fixed in passing: duplicate React keys in "Priser i alle N butikker" when a newsletter shop lists the same
   pack twice with the same link.
+- **Other pack and uncertain totals on the list (2026-11-18, Matching audit; data from the Catalog chat):** a family
+  line could silently switch packs (4 crates of cans priced as 5 x 6 x 1,25 l PET; wine as a 3 l bag-in-box). Each shop
+  line now shows a small blue note with the pack's photo when the price uses another pack than the one added: "Anden
+  pakning: prisen er for 5 × 6 x 1,25 l (du valgte 24 x 0,33 l)". "Billigste på listen" now stores the pack's
+  `productId`; lists from before compare the pack label instead (cans vs bottles of the same size only show from
+  then on), exact products compare piece counts (a shop selling a smaller size needs more pieces). When the first option is `uncertain` (too much
+  estimated, Catalog's `isUncertain()`), it keeps its place but gets a grey "Usikker" badge and "Laveste pris lige
+  nu, men for mange af varerne er estimeret til at sige, om den er billigst" instead of the green "Billigst" frame and
+  "X kr. billigere". The note offers **"Kun 24 x 0,33 l"** (user's choice, like "Brug stk.-pris"): it turns the family item
+  into the exact product it was added from (whole packs of the same amount, same list key so search still shows it as
+  on the list), so every shop is priced for that pack and shops without it get an estimate. One-way: to go back,
+  remove it and add "Billigste på listen" again. Only for items that know their pack (added from 2026-11-18).
 
 ### Working setup: architect and area chats (2026-11-14)
 
