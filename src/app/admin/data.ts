@@ -57,8 +57,6 @@ export interface Suggestion {
   currentProduct: ProductInfo;
   target: ProductInfo | null; // null if the suggested product no longer exists
   targetListings: Listing[]; // listed only
-  /** Linked listings left off the card because they aren't on sale (e.g. an expired newsletter). */
-  hidden: HiddenListings;
   reason: string;
   priority: Priority;
 }
@@ -68,7 +66,6 @@ export interface LlmLink {
   product: ProductInfo;
   confidence: number;
   others: Listing[]; // other listed shop products linked to the same product
-  hidden: HiddenListings;
   priority: Priority;
 }
 
@@ -82,23 +79,15 @@ export interface WinnerCard {
   priority: Priority;
 }
 
-/** How many linked listings were hidden, and whether all of them were newsletter offers. */
-export interface HiddenListings {
-  count: number;
-  newsletterOnly: boolean;
-}
-
 /**
  * The card shows only listings on sale now. Expired ones stay linked in the database
  * (the same offer returns next month and reuses its match), but there's nothing to
  * judge on them - October's offers imported before source tracking even show a blank tile.
+ * `onlyGone`: every listing was hidden, so the card has nothing left to compare with.
  */
-function splitListed(listings: Listing[]): { shown: Listing[]; hidden: HiddenListings } {
-  const gone = listings.filter((l) => !l.listed);
-  return {
-    shown: listings.filter((l) => l.listed),
-    hidden: { count: gone.length, newsletterOnly: gone.every((l) => NEWSLETTER_SHOPS.has(l.shopId)) },
-  };
+function splitListed(listings: Listing[]): { shown: Listing[]; onlyGone: boolean } {
+  const shown = listings.filter((l) => l.listed);
+  return { shown, onlyGone: listings.length > 0 && shown.length === 0 };
 }
 
 interface MatchRow {
@@ -297,14 +286,15 @@ export async function loadReview(): Promise<{
     if (!p || !self || !self.listed) return [];
     const currentProduct = products.get(r.product_id) ?? unknownProduct(r.product_id);
     const target = products.get(p.targetId) ?? null;
-    const { shown: targetListings, hidden } = splitListed(byProduct.get(p.targetId) ?? []);
+    const { shown: targetListings, onlyGone } = splitListed(byProduct.get(p.targetId) ?? []);
+    // Suggested twin only in an earlier newsletter (or retired): nothing to compare until it returns.
+    if (onlyGone) return [];
     return [
       {
         self,
         currentProduct,
         target,
         targetListings,
-        hidden,
         reason: p.reason,
         priority: rank(self, [currentProduct, ...(target ? [target] : [])], targetListings),
       },
@@ -317,10 +307,11 @@ export async function loadReview(): Promise<{
     // Newsletter links shown on the site are checked through "winners" instead: only those decide answers.
     if (NEWSLETTER_SHOPS.has(self.shopId) && Number(r.confidence) >= SHOWN_CONFIDENCE) return [];
     const product = products.get(r.product_id) ?? unknownProduct(r.product_id);
-    const { shown: others, hidden } = splitListed(
+    const { shown: others, onlyGone } = splitListed(
       (byProduct.get(r.product_id) ?? []).filter((l) => l.shopProductId !== r.shop_product_id),
     );
-    return [{ self, product, confidence: Number(r.confidence), others, hidden, priority: rank(self, [product], others) }];
+    if (onlyGone) return []; // linked only to listings no longer on sale: nothing to compare until they return
+    return [{ self, product, confidence: Number(r.confidence), others, priority: rank(self, [product], others) }];
   });
 
   const byPriority = (a: { priority: Priority }, b: { priority: Priority }) => b.priority.score - a.priority.score;

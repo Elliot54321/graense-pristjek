@@ -1412,10 +1412,12 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
 - **Decision:** the links stay in the database (they're reused when the offer returns, and the site already ignores
   expired rows); only the admin view changes. `loadReview()` (`src/app/admin/data.ts`) now drops a suggestion or AI-link
   card whose own listing isn't on sale (`isListed`; nothing to decide), and leaves unlisted listings off suggestions'
-  targets, links' "others" and winners' rivals. The totals ("de 50 vigtigste af N") count only listed items. When
-  hiding leaves a side empty, it says "Kun i en tidligere avis." (all hidden were Fleggaard/Calle) or "Kun varer, der
-  ikke er til salg lige nu."
+  targets, links' "others" and winners' rivals. The totals ("de 50 vigtigste af N") count only listed items.
 - **Measured on live data:** Forslag 35 -> 3 (the 32 dropped: 20 retired ScandiPark listings, 12 expired Fleggaard
   offers), AI-links 469 -> 414, "Ikke til salg lige nu" tags 96 -> 0, listing tiles without photo or page 66 -> 0
   (32 Fleggaard, 34 ScandiPark); "Kun i en tidligere avis" shown on 10 cards. Winners unchanged (0 right now; they come
   from `matched_prices`, which is listed-only already). The "not on sale" penalty in `priority.ts` is now only a safeguard.
+- **Same day, user follow-up:** cards whose only comparison was an earlier newsletter ("Kun i en tidligere avis",
+  can't be judged without the page image) are dropped too - any suggestion or AI link whose other side has listings
+  but none on sale. Forslag 3 -> 0, AI-links 414 -> 353. Links stay in the database; the cards return when the offer
+  is in a current newsletter (with its page image).

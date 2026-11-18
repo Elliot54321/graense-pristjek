@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { confirmLink, linkSuggestion, logout, markReportHandled, rejectSuggestion, separate, unlink } from "./actions";
 import { adminConfigured, isAdmin } from "./auth";
-import { loadReview, SHOWN_CONFIDENCE, type HiddenListings, type Listing, type LlmLink, type ProductInfo, type Suggestion, type WinnerCard } from "./data";
+import { loadReview, SHOWN_CONFIDENCE, type Listing, type LlmLink, type ProductInfo, type Suggestion, type WinnerCard } from "./data";
 import { ActionButton, LoginForm } from "./forms";
 import { loadInsights, type SearchCount } from "./insights";
 
@@ -207,7 +207,7 @@ function SuggestionCard({ s }: { s: Suggestion }) {
           title="Foreslået samme som"
           product={s.target}
           listings={s.targetListings}
-          empty={s.target ? hiddenNote(s.hidden) ?? "Ingen varer på produktet." : "Det foreslåede produkt findes ikke længere."}
+          empty={s.target ? "Ingen varer på produktet." : "Det foreslåede produkt findes ikke længere."}
         />
       </div>
       <form className="mt-4 flex gap-3">
@@ -235,7 +235,7 @@ function LinkCard({ l }: { l: LlmLink }) {
       <PriceRange listings={[l.self, ...l.others]} />
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <Side title="Denne vare" product={null} listings={[l.self]} />
-        <Side title="Linket til" product={l.product} listings={l.others} empty={hiddenNote(l.hidden) ?? "Ingen andre varer på produktet."} />
+        <Side title="Linket til" product={l.product} listings={l.others} empty="Ingen andre varer på produktet." />
       </div>
       <form className="mt-4 flex gap-3">
         <input type="hidden" name="shopProductId" value={l.self.shopProductId} />
@@ -244,12 +244,6 @@ function LinkCard({ l }: { l: LlmLink }) {
       </form>
     </li>
   );
-}
-
-/** Why the other side is empty when its only listings aren't on sale (hidden from the card). */
-function hiddenNote(h: HiddenListings): string | null {
-  if (!h.count) return null;
-  return h.newsletterOnly ? "Kun i en tidligere avis." : "Kun varer, der ikke er til salg lige nu.";
 }
 
 function Side({
