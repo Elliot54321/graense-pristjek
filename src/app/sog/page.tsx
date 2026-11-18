@@ -84,7 +84,7 @@ function Examples({ title }: { title: string }) {
 }
 
 async function Results({ query }: { query: string }) {
-  const [{ families, next }, shops] = await Promise.all([searchFamilies(query), getShops()]);
+  const [{ families, next, suggestion }, shops] = await Promise.all([searchFamilies(query), getShops()]);
   // Logged after the page is sent, so it never slows the search down - and only for
   // real requests, never while Next.js prerenders the page.
   await connection();
@@ -103,6 +103,16 @@ async function Results({ query }: { query: string }) {
   return (
     <>
       <h1 className="mt-8 text-xl font-semibold tracking-tight">Resultater for “{query}”</h1>
+      {/* Set only when nothing matched as typed and the top hit is a typo match. */}
+      {suggestion && (
+        <p className="mt-1 text-zinc-700">
+          Mente du:{" "}
+          <a href={`/sog?q=${encodeURIComponent(suggestion)}`} className="font-semibold text-emerald-700 underline underline-offset-2 hover:text-emerald-800">
+            {suggestion}
+          </a>
+          ?
+        </p>
+      )}
       <FamilyList families={families} shops={shops} page={`/sog?q=${encodeURIComponent(query)}`} source={{ q: query }} next={next} />
     </>
   );

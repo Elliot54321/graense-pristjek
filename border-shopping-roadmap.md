@@ -1015,6 +1015,10 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   the bigger tiles shows it can be tapped. The big photo is the same shop address, scaled up into a square that fills
   the screen (many shop photos are only 225-300 px). No photo, or one that fails to load: a grey tile that can't be
   tapped; a failure in the big view says "Billedet kunne ikke hentes". No new library.
+- **"Mente du" on search (2026-11-18, Catalog chat request):** when `searchFamilies` returns a `suggestion` (nothing
+  matched as typed, the top hit is a typo match), the search page shows "Mente du: **Heineken**?" under the heading,
+  the name linking to `/sog?q=<name>`; otherwise nothing changes. Checked with marabu, heiniken, gamel dansk, redbull,
+  cocacola, john stagertee rom (all suggest) and cola, øl (none).
 
 ### Working setup: architect and area chats (2026-11-14)
 
@@ -1331,7 +1335,7 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   "john stagertee rom" -> Jagertee is only 0.53. Searches take 0.3-0.5 s once warm (1.2 s on a fresh server).
   Seen in passing, for Matching: "cola" lists "Lip Smacker Coca Cola" (lip balm) among the colas.
 - **For the UI chat:** `ResultPage.suggestion` (`string | null`, search page 1 only) is the first result's family name
-  when it's a typo match - no family on sale matched the query as typed - for "Mente du: Heineken?".
+  when it's a typo match - no family on sale matched the query as typed - for "Mente du: Heineken?". (Done by the UI chat 2026-11-18.)
 - **Before -> after** (83 queries: the 43 logged searches, 35 deliberate variants, 5 reference searches; page 1 ranked
   like the site; script in the shared notes folder `catalog-search/`):
   - "cola", "øl", "rødvin", "vodka", "chips": top 3 unchanged (Coca-Cola / Coca-Cola Zero / Pepsi Max; Tuborg Grøn /
