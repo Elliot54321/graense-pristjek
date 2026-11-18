@@ -37,6 +37,12 @@ export function parseQuantity(text: string | null | undefined): Quantity | null 
   return text ? quantities(text)[0] ?? null : null;
 }
 
+/**
+ * Non-breaking spaces become spaces, and a stray space before a decimal comma is dropped:
+ * BorderShop's "0 ,75 L" is 0,75 l, not 75 l (trust audit 2026-11-15).
+ */
+const tidy = (text: string) => text.replace(/\u00a0/g, " ").replace(/(\d) +([.,])(\d)/g, "$1$2$3");
+
 const BONUS = new RegExp(`(${PRICE_NUMBER})\\s*([a-zA-Z]+)\\s*\\+\\s*(${PRICE_NUMBER})\\s*([a-zA-Z]+)`);
 
 /**
@@ -44,7 +50,7 @@ const BONUS = new RegExp(`(${PRICE_NUMBER})\\s*([a-zA-Z]+)\\s*\\+\\s*(${PRICE_NU
  * top counts too: "Nutella 450g +50g gratis" holds 500 g (not the last figure, 50 g).
  */
 export function quantityFromName(name: string): Quantity | null {
-  const bonus = name.replace(/\u00a0/g, " ").match(BONUS);
+  const bonus = tidy(name).match(BONUS);
   if (bonus) {
     const [main, extra] = [toQuantity(bonus[1], bonus[2]), toQuantity(bonus[3], bonus[4])];
     if (main && extra && main.unit === extra.unit) {
@@ -56,7 +62,7 @@ export function quantityFromName(name: string): Quantity | null {
 
 /** All number + known unit pairs in a text, skipping things like "24 x". */
 function quantities(text: string): Quantity[] {
-  return [...text.replace(/\u00a0/g, " ").matchAll(QUANTITY)]
+  return [...tidy(text).matchAll(QUANTITY)]
     .map((m) => toQuantity(m[1], m[2]))
     .filter((q): q is Quantity => q !== null);
 }
@@ -85,4 +91,33 @@ export function unitPrice(
 ): number | null {
   if (!content || content.amount <= 0) return shopUnitPrice;
   return Math.round((price / content.amount) * 100) / 100;
+}
+
+const NUM = String.raw`\d+(?:[.,]\d+)?`;
+// "18 - 24 x 0,33 l", "40 - 65 x 20 ml": a range of counts, one size.
+const COUNT_RANGE = new RegExp(`(?:^|\\s)(${NUM})\\s*-\\s*(${NUM})\\s*[x×]\\s*(${NUM})\\s*(l|cl|ml|kg|g)\\b`, "i");
+// "312-378 g.", "0,7-1 l.", "8 x 80-90 g.": a range of sizes (not "17-37,5%").
+const SIZE_RANGE = new RegExp(`(?:^|\\s)(?:(\\d+)\\s*[x×]\\s*)?(${NUM})\\s*-\\s*(${NUM})\\s*(l|cl|ml|kg|g)\\b`, "i");
+
+/**
+ * The size range printed with a newsletter offer ("Kahlua 0,7-1 l. 16-30%" -> 0,7-1 l), as
+ * whole-pack contents in l/kg; null without one. One price on a range means every size in it
+ * sells at that price, so a matched product's size inside the range is a safe content for the
+ * offer; outside it, the offer is another size and should be left to the estimate.
+ * "Either/or" packs ("24 stk. el. 750-1000 ml.") give null.
+ */
+export function sizeRange(text: string): { min: number; max: number; unit: Quantity["unit"] } | null {
+  const t = tidy(text);
+  if (/\bel\./i.test(t)) return null;
+  const counts = t.match(COUNT_RANGE);
+  const sizes = counts ? null : t.match(SIZE_RANGE);
+  const m = counts ?? sizes;
+  if (!m) return null;
+  const unit = UNIT_FACTORS[m[4].toLowerCase()];
+  const n = (x: string) => parseDecimal(x)!;
+  const [min, max] = counts
+    ? [n(m[1]) * n(m[3]) * unit[1], n(m[2]) * n(m[3]) * unit[1]]
+    : [Number(m[1] ?? 1) * n(m[2]) * unit[1], Number(m[1] ?? 1) * n(m[3]) * unit[1]];
+  const r = (x: number) => Math.round(x * 1e6) / 1e6;
+  return min > 0 && max >= min ? { min: r(min), max: r(max), unit: unit[0] } : null;
 }

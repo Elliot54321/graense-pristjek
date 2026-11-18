@@ -66,20 +66,35 @@ async function listProductUrls(): Promise<string[]> {
 }
 
 /**
- * "24x0,33l dåser" -> 24 x 0,33 l; "4x25g" -> 4 x 25 g; "160g 4er Box" -> 4 x 160 g; "5L Fad" -> 1 x 5 l;
+ * "24x0,33l dåser" -> 24 x 0,33 l; "4x25g" -> 4 x 25 g; "4x6x0,33l" -> 24 x 0,33 l; "5L Fad" -> 1 x 5 l;
  * "5+1x0,5L" (one bottle free) -> 6 x 0,5 l.
+ *
+ * The count only multiplies a size printed right after it ("N x <size>"). Otherwise the
+ * printed size is the whole pack's: "Wrigleys 7er Pack 98g" is 98 g (7 x 14 g), "kinder Bueno
+ * White 8x2 312g" 312 g, "Twix 5x2er 250g" 250 g, "Mentos 3er Pack 114g" 114 g - these were
+ * stored as N x the total until 2026-11-18 (trust audit). Reading a total as one unit can
+ * only make a pack look dearer, never falsely cheapest.
  */
 export function packFromName(name: string): { count: number | null; unitSize: Quantity | null; total: Quantity | null } {
-  const unitSize = quantityFromName(name);
   const bonus = name.match(/(?:^|\s)(\d+)\s*\+\s*(\d+)\s*[x×]\s*(?=\d|\s)/i);
+  // "4x6x0,33l": 4 packs of 6.
+  const nested = name.match(/(?:^|\s)(\d+)\s*[x×]\s*(\d+)\s*[x×]\s*(?=\d)/i);
   const count =
     (bonus ? Number(bonus[1]) + Number(bonus[2]) : 0) ||
+    (nested ? Number(nested[1]) * Number(nested[2]) : 0) ||
     Number(name.match(/(?:^|\s)(\d+)\s*[x×]\s*(?=\d|\s)/i)?.[1]) ||
     Number(name.match(/(?:^|\s)(\d+)er[\s-]?(?:pack|box|set|karton|kiste|tray|packung)\b/i)?.[1]) ||
     null;
-  if (!unitSize) return { count, unitSize: null, total: null };
-  const total = { amount: Math.round((count ?? 1) * unitSize.amount * 1e6) / 1e6, unit: unitSize.unit };
-  return { count, unitSize, total };
+  // "N x 0,33l": the size of one item, right after the count.
+  const each = name.match(/(?:^|\s)(?:\d+\s*\+\s*)?(?:\d+\s*[x×]\s*)?\d+\s*[x×]\s*(\d+(?:[.,]\d+)?\s*[a-zA-Z]+)/i);
+  const unitSize = count && each ? quantityFromName(each[1]) : null;
+  if (unitSize) {
+    return { count, unitSize, total: { amount: Math.round(count! * unitSize.amount * 1e6) / 1e6, unit: unitSize.unit } };
+  }
+  const total = quantityFromName(name);
+  if (!total) return { count, unitSize: null, total: null };
+  if (!count || count < 2) return { count, unitSize: total, total };
+  return { count, unitSize: { amount: Math.round((total.amount / count) * 1e6) / 1e6, unit: total.unit }, total };
 }
 
 /** Parse a product page. Exported separately so it can be tested on saved HTML. */

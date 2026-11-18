@@ -2,7 +2,7 @@
  * Import newsletter offers (from `flyer:extract`) as a shop's prices.
  *
  *   npm run flyer:import -- <offers.json> --shop fleggaard --valid-to 2026-11-03 \
- *     [--section 26-38:2026-12-31] [--dry-run] [--no-pages]
+ *     [--section 26-38:2026-12-31] [--dry-run] [--no-pages] [--source-only]
  *
  * Every product an offer names (and every variety readable on the picture) becomes
  * a shop product with the offer's price. Products count as on sale until the
@@ -14,6 +14,10 @@
  * Each product remembers its issue (the offers file's name), page and the text printed
  * with the offer, and the pages are uploaded as images to a private bucket - so
  * /admin can show where a match came from (see pages.ts). --no-pages skips the upload.
+ *
+ * --source-only backfills just the issue, page and printed text (and page images) of rows
+ * that are still listed and have none - for issues imported before source tracking. Prices,
+ * listed_until and matches are untouched, nothing is retired, no new rows are created.
  */
 import { createHash } from "node:crypto";
 import path from "node:path";
@@ -59,11 +63,22 @@ function parseSections(args: string[]): { from: number; to: number; validTo: str
   });
 }
 
-/** Content of the whole sellable unit in liters/kg; null for ranges ("18-24 x") or pieces. */
-function content(o: Offer): { amount: number; unit: BaseUnit } | null {
+/** Household counts ("90 stk.", "6-12 rl.") as pieces - off until search/list compare within one unit (2026-11-18). */
+const STORE_PIECES = false;
+const COUNT = /^(\d+)\s*(stk|rl|ruller|vaske|kapsler|tabs)\.?$/i;
+
+/**
+ * Content of the whole sellable unit in liters/kg; null for ranges ("312-378 g.", "0,7-1 l.",
+ * "18-24 x"), which the site prices at the matched product's size only when that size lies
+ * inside the printed range (`sizeRange()` in quantity.ts; decision 2026-11-18).
+ */
+export function content(o: Pick<Offer, "pack" | "unit" | "unit_size" | "unit_count">): { amount: number; unit: BaseUnit } | null {
   // A range like "250-375 g." means several sizes; an alcohol range like "17-37,5%" doesn't.
-  const pack = o.pack.replace(/\d+(?:[,.]\d+)?\s*-\s*\d+(?:[,.]\d+)?\s*%/g, "");
-  if ((o.unit !== "l" && o.unit !== "kg") || !o.unit_size || /\d\s*-\s*\d/.test(pack.split("x")[0])) return null;
+  const pack = o.pack.replace(/\d+(?:[,.]\d+)?\s*-\s*\d+(?:[,.]\d+)?\s*%/g, "").trim();
+  if (/\d\s*-\s*\d/.test(pack.split("x")[0])) return null;
+  const count = pack.match(COUNT);
+  if (count && STORE_PIECES) return { amount: Number(count[1]), unit: "piece" };
+  if ((o.unit !== "l" && o.unit !== "kg") || !o.unit_size) return null;
   return { amount: Math.round((o.unit_count ?? 1) * o.unit_size * 1e6) / 1e6, unit: o.unit };
 }
 
@@ -219,6 +234,7 @@ async function main() {
   for (const p of products.slice(0, 12)) {
     console.log(`  ${p.name.slice(0, 55).padEnd(55)} ${String(p.price).padStart(7)}  ${p.totalContent ? `${p.totalContent.amount} ${p.totalContent.unit}` : "-"}  ${p.pricePerUnit ?? "-"}/unit${p.multiBuy ? `  ${p.multiBuy.quantity} for ${p.multiBuy.price}` : ""}`);
   }
+  if (args.includes("--source-only")) return backfillSource(args, file, shop, issue, products);
   if (args.includes("--dry-run")) return console.log("Dry run - nothing saved.");
 
   const db = adminClient();
@@ -240,6 +256,40 @@ async function main() {
   } catch (e) {
     await finishRun(db, runId, summary, String(e));
     throw e;
+  }
+}
+
+/** --source-only: fill source_issue/page/text on still-listed rows that have none. */
+async function backfillSource(args: string[], file: string, shop: string, issue: string, products: ScrapedProduct[]) {
+  const db = adminClient();
+  const today = new Date().toISOString().slice(0, 10);
+  const { data, error } = await db
+    .from("shop_products")
+    .select("id, shop_product_id, name")
+    .eq("shop_id", shop)
+    .is("source_issue", null)
+    .gte("listed_until", today);
+  if (error) throw error;
+  const byKey = new Map(products.map((p) => [p.shopProductId, p]));
+  const found = (data ?? []).filter((r) => byKey.has(r.shop_product_id));
+  const missing = (data ?? []).filter((r) => !byKey.has(r.shop_product_id));
+  console.log(`Source backfill: ${found.length} listed rows without a source found in ${issue}, ${missing.length} not in it.`);
+  for (const r of missing) console.log(`  not in this issue: ${r.name}`);
+  for (const r of found) console.log(`  p${byKey.get(r.shop_product_id)!.source!.page}  ${r.name}`);
+  if (args.includes("--dry-run")) return console.log("Dry run - nothing saved.");
+  for (const r of found) {
+    const { page, text } = byKey.get(r.shop_product_id)!.source!;
+    const { error: updateError } = await db
+      .from("shop_products")
+      .update({ source_issue: issue, source_page: page, source_text: text })
+      .eq("id", r.id);
+    if (updateError) throw updateError;
+  }
+  console.log(`Updated ${found.length} rows (source columns only).`);
+  if (!args.includes("--no-pages") && found.length) {
+    const pages = [...new Set(found.map((r) => byKey.get(r.shop_product_id)!.source!.page))].sort((a, b) => a - b);
+    await uploadPages(db, file.replace(/\.offers\.json$/, ".pdf"), issue, pages);
+    console.log(`Uploaded ${pages.length} page images for /admin (private bucket).`);
   }
 }
 
@@ -272,7 +322,10 @@ async function retireDropped(db: ReturnType<typeof adminClient>, shop: string, i
   console.log(`Retired ${dropped.length} products no longer in this issue: ${dropped.map((r) => r.name).join("; ")}`);
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+// Only as a command, so tests and dry-run scripts can import content().
+if (path.basename(process.argv[1] ?? "") === "import.ts") {
+  main().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}

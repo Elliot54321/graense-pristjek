@@ -1371,3 +1371,36 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
     sale first and never size-splits listings that aren't on sale. 33 product sizes corrected (Corny boxes 40 g -> 960 g,
     Niederegger 10-sachet boxes, Skippers Pipes 60x17g, ...), 12 bigger ScandiPark packs got their own size, 17 copies
     rejoined their now-correct product; a second dry run changes nothing.
+
+### October premium source backfill and size parsing (2026-11-18, Data & newsletters chat)
+
+- **October premium section in `/admin`:** 66 Fleggaard rows (pages 26-37 of `fleggaard-2026-oktober-2`, listed until
+  2026-12-31) had no source because they were imported before source tracking. New `flyer:import ... --source-only`
+  fills just `source_issue/page/text` on still-listed rows that have none, then uploads their pages (no API cost, no
+  retiring, no new rows). Run with the October file and `--section 26-38:2026-12-31`: 66 rows, 12 page images. Prices,
+  `listed_until`, `last_seen_at` and matches compared before/after: identical. Checked the signed page image for
+  Glenfiddich 12 YO (p26).
+- **Size parsing fixes (trust audits 2026-11-15/18), live with the next nightly scrape after deploy:**
+  - `quantity.ts`: a space before the decimal comma is dropped ("0 ,75 L" was 75 l). Changes only BorderShop's Brut
+    D'Argent Chardonnay 0,75 l (stored 75 l, both stores); 20 other "0 ,75L" names already used the order card.
+  - `scandipark.ts` `packFromName`: the count only multiplies a size printed right after it ("4x25g", "24x0,33l",
+    now also "4x6x0,33l"); otherwise the printed size is the pack's total. 19 listings change: Wrigley's 7er 686 -> 98 g
+    (x4), Mentos 3er 342 -> 114 g (x4), kinder Bueno White 8x2 2,496 kg -> 312 g, Malaco Kick 14er 3,724 kg -> 266 g,
+    Ga-Jol 8er 1,472 kg -> 184 g, Twix 5x2er 1,25 kg -> 250 g, Mamba 4x6 424 -> 106 g (x2), Kinder Cards 640 -> 128 g,
+    Mr.Tom 360 -> 120 g, Pott der Gute 3x0,04L 0,36 -> 0,12 l, Ritter Sport Mini Meter 72x16,67g 86,4 kg -> 1,2 kg, and
+    Warsteiner 4x6x0,33l 1,32 -> 7,92 l (the only one that gets bigger - it's 24 cans for 127,49).
+  - Not parser bugs (left as the shops' own data): BorderShop "Cloetta Polly Lakrids 400g" - the order card says 0,1 kg
+    and its price per kg matches (looks dearer, safe direction); Poetzsch Mr. Popgun 0,9 kg ("10 stks. pakke a 900 gram"),
+    Casillero del Diablo Shiraz 14,00 kr. (base price 18,67/l matches), Carletti P-taerter 60 g ("Pose a 60 gram").
+- **Newsletter size ranges - decision (user, 2026-11-18):** a range ("312-378 g.", "0,7-1 l.", "18 - 24 x 0,33 l") keeps
+  no content of its own; the site uses the matched product's (family) size, and otherwise the estimate. One price on a
+  range means each size in it sells at that price, so the product's size is safe **only inside the printed range**
+  (Kahlua "0,7-1 l" on a 1 l product: fine; a 1,5 l product: not). `sizeRange(text)` in `quantity.ts` returns
+  `{min, max, unit}` from a listing name (null for "el." either/or packs). **For the Catalog chat:** in `data.ts`
+  `offerContent`, when the listing has no content and `sizeRange(listing name)` is set, use the product's content only
+  if it lies within min-max (same unit), else treat the offer as unpriced.
+- **Household pieces - not switched on:** `import.ts` can store "90 stk."/"6-12 rl."-style counts as `piece`
+  (`STORE_PIECES`, off). 104 November rows would gain one, but 11 sit in families whose other packs are kg (Finish tabs,
+  Dolce Gusto, Livol), and search's family "best" (`priceFamilies` in `data.ts`, also the `family_best_prices` view)
+  takes the lowest price per unit across units - "3,89 kr./stk." would beat "176 kr./kg". **For the Catalog chat:** compare
+  within one unit (e.g. the family's most common unit) first; then pieces can be switched on.
