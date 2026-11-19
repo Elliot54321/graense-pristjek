@@ -1573,3 +1573,27 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
     1,210 ended and Calle 0 / 484, both fail.
   - **Known gap:** offers changed inside an issue that's already imported (a corrected price, an added page) are not
     picked up; the shops rarely do it. Rerun `npm run flyer:etilbudsavis -- <shop>` by hand to refresh all current issues.
+
+### Piece units: schema (2026-11-19, Catalog chat - "stk. prices" step 1)
+
+- **Migration `supabase/migrations/20261119000000_piece_units.sql`** (run by the user 2026-11-19). Columns only, no view or pricing change
+  (that's step 4, once the data is filled):
+  - `product_families.compare_unit` (`base_unit`: `l` / `kg` / `piece`, null = as today, unit from the products' content)
+    and `product_families.piece_label` (text, 1-20 characters, null = "stk."; e.g. "vask", "rulle"; ignored unless
+    `compare_unit = 'piece'`). **Matching fills both.**
+  - `shop_products.piece_count` and `products.piece_count` (integer > 0, null = unknown): pieces in one sellable pack,
+    counted in the family's `piece_label` (20 bin bags, 40 tabs, 48 rolls for "6 x 8 ruller", 28 washes). **Data fills
+    `shop_products.piece_count`** from names and newsletter text; `products.piece_count` is the matched product's
+    (Matching/EAN, or a human). Both, like content: when both are known and differ, the offer uses the **smaller**
+    (same rule as `offerContent`, so a misread listing never looks falsely cheap).
+- **Why not `pack_count`:** it already exists on `shop_products` as the *multipack* count (24 for a case of 24 cans;
+  Poetzsch fills it for every product, BorderShop for drink cases) and feeds the pack grouping in `data.ts`. It isn't a
+  count in the family's unit ("6 x 8 ruller" has pack_count 6 but 48 rolls), so it stays as it is.
+- **Replaces `content_unit = 'piece'` for counts:** the Data chat's `STORE_PIECES` idea (store "90 stk." as content
+  in pieces, off) should write `piece_count` instead and keep `content_*` for l/kg, so a pack can have both "1,2 kg" and
+  "40 tabs" (Finish), and the per-kg comparison of other families is untouched.
+- **Rule for step 4** (agreed): in a `piece` family a pack is priced per stk. only when its piece count is known; without
+  one it shows its pack price only and never a per-kg/l price. Packs are compared per stk. only when every pack involved
+  has a count, otherwise per pack.
+- New columns on existing tables: the table grants and "public read" policies already let the website read them. No
+  TypeScript change was needed (every read names its columns; no generated types).
