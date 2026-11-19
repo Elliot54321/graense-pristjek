@@ -1713,3 +1713,33 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
 - Checked on the build (no search logging) with Danæg (pr. stk.), Finish (pr. tab), Neutral/Omo (pr. vask), JT and
   Veltie toilet paper (pr. rulle / for pakken), Lavazza/Dolce Gusto (pr. kapsel), Senseo (pr. pude), Pickwick (pr. pose);
   Tuborg and Haribo unchanged. 375 px and desktop.
+
+### Trust audit of the piece families (2026-11-19, Matching chat - "stk. prices" final step)
+
+- **Tool:** `npx tsx --env-file-if-exists=.env.local src/matching/audit-pieces.ts [--all]` lists every `piece` family on
+  sale with each offer's count (listing / product / used, the smaller as on the site), price per piece, the cheapest, and
+  flags (no count, count differs, size read as count, "A x B" multipack miscounted, cheap/dear vs the family median,
+  washes and capsules mixed); report `data/llm-batches/audit-pieces.txt`. `--baskets [--base url]` prices two household
+  baskets through the live `/api/compare`.
+- **Verdict: trustworthy where a count exists.** 313 piece families on sale, 143 with a per-piece best. No listing and
+  product count disagree, no multipack misread, no laundry family mixing pods with liquid. Cheapest shop and pack were
+  right in every multi-shop family (Finish 100 tabs 0,70 kr./tab at BorderShop vs 70 at Calle 0,85 and 90 at Fleggaard
+  0,97; Omo 100 vaske 0,89 vs 50 at 1,00). Baskets: amounts, deal rates and the winning shop make sense; live search
+  ("finish tabs") shows the same.
+- **Fixed (saved, user OK) - sizes mixed in one family**, where the smaller size won "pr. pose/stk." (live: "JT
+  Affaldssække billigst 0,50 kr. pr. pose" was the 50 l bag, not the 120 l sack): split into one family per size - JT
+  Affaldssække 50 l / 120 l, JT Bleer Maxi / Junior / XL, JT Fryseposer 1 l / ZIP 3 l, ja! affaldsposer 10 / 25 / 35 /
+  50 / 60 / 120 l, ja! fryseposer 1 / 3 l, Gastro kaffebæger Lines 24 / 36 cl, and "ZAPP Lighter 50 stk." out of Zapp
+  optændingsblokke. No match changed.
+- **Units fixed:** Persil pulver Color/Universal ("72 væsk") -> pr. vask with `products.piece_count` 72 set by hand
+  (pieces.ts keeps it); 7 teas (5 Pukka, Yogi Classic, ja! Pebermyntete) -> pr. pose like their siblings. The other 91
+  null families stay null: mostly no content (gas bottles, mascara, foil, gift sets, pet snacks) - nothing to compare
+  wrongly.
+- **Gap = coverage, not correctness (Data):** 215 offers in piece families have no count, so those packs show "for
+  pakken" and the family no per-piece best. Examples: ranges ("Lambi 6-12 rl.", "Libero 20-47 stk.", "Livol 150-350
+  stk."), unread words ("Gillette Mach3 12klinger", "Oral-B Cross Action 8+2"), ScandiPark weights instead of counts
+  ("Dolce Gusto ... 160g", "Yogi ... 30,6g"), Poetzsch ja! names without counts ("ja! Affaldsposer 50 liter"), single
+  items with an implicit 1 ("Domestos WC-blok 35 g").
+- **Left as is:** "Batterilyskæde LED" holds three different chains (all 9,99, no counts - pack price only); "Finish
+  Power Essential" sits in Finish Power All in One by a human decision; Jollypaw toys are a catch-all with no counts
+  (the list takes an exact pack).
