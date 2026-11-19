@@ -4,10 +4,11 @@ export type Unit = "l" | "kg" | "piece";
 
 /**
  * How a family's price per unit is shown, display only (product_families.display_per): '100 ml'
- * shows a per-liter price divided by 10 ("149,98 kr. pr. 100 ml" for perfume). null = per
- * contentUnit as usual. Comparing and the cheapest pick stay per liter.
+ * shows a per-liter price divided by 10 ("149,98 kr. pr. 100 ml" for perfume), '100 g' a per-kg
+ * price divided by 10 ("166,63 kr. pr. 100 g" for a 30 g spice jar). null = per contentUnit as
+ * usual. Comparing and the cheapest pick stay per liter / kg.
  */
-export type DisplayPer = "100 ml";
+export type DisplayPer = "100 ml" | "100 g";
 
 export interface Shop {
   id: string;

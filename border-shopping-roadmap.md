@@ -1794,3 +1794,18 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
 - The shopping list shows no per-unit prices, and its pack labels stay "0,2 l": the list compares the saved label with
   the shop's (`LineResult.buy.packLabel`, which has no displayPer), so ml there would give a false "Anden pakning".
 - Seen in passing: "Calvin Klein CK One Set" (a gift set) has no displayPer, so it still reads per liter - Matching's call.
+
+### Small packs shown per 100 g (2026-11-21, Catalog chat)
+
+- **Why:** small-pack spices and cosmetics read e.g. "Santa Maria Oregano 30 g ... 1.666 kr. pr. kg"; it should be
+  "166,63 kr. pr. 100 g". Display only, like '100 ml': comparison stays per kg.
+- **Migration `supabase/migrations/20261121000000_display_per_100g.sql`** (not run yet): replaces the check on
+  `product_families.display_per` (`product_families_display_per_check`) to allow null, '100 ml' or '100 g'.
+  **Matching fills '100 g'** once it's run; until then the database rejects it.
+- **Code:** `DisplayPer` is now `'100 ml' | '100 g'`; `FamilyResult.displayPer` / `Pack.displayPer` pass the value through
+  unchanged. Nothing reads '100 g' specially, so pushing before the migration is safe. **The UI** divides the per-kg price
+  by 10 and writes "pr. 100 g", as for '100 ml'.
+- **100 g too (2026-11-20, UI chat):** `perUnit()` and `smallUnitWords()` (was `mlWords`) in `src/lib/format.ts` also
+  handle `displayPer` '100 g': the per-kg price ÷ 10 as "pr. 100 g" and pack sizes in g ("0,03 kg" -> "30 g"), for
+  spices and other small packs. Only for a family whose comparison unit matches (100 ml on l, 100 g on kg). Built and
+  checked before any family was marked: Santa Maria Oregano, shampoo and Jägermeister unchanged, Joop still per 100 ml.
