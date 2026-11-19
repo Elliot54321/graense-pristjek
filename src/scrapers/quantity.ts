@@ -127,7 +127,15 @@ export function sizeRange(text: string): { min: number; max: number; unit: Quant
 // Piece counts (shop_products.piece_count, 2026-11-19)
 
 /** Words that count the pieces themselves: "70 stk.", "90tabs", "8 ruller", "25 vaske". */
-const PIECE_WORDS = String.raw`stk|styk|stück|stuck|st\.|pcs|ruller|rl|roller|rollen|kapsler|kapseln|caps|tabs|tabletter|tabl|vaske|vask|WL|poser|beutel|breve|bind|bleer|bleier|tücher|servietter|klude|pads|ark|stikker|sticks|æg|lys|sække|bags`;
+// Singular and plural forms: "71 vasker", "1 rulle", "40 Wäschen", "30 Waschladungen".
+const PIECE_WORDS = [
+  String.raw`stk|styk|stykker|stück|stuck|st\.|pcs`,
+  "ruller|rulle|roller|rolle|rollen|rl",
+  "kapsler|kapsel|kapseln|caps|tabs|tabletter|tablet|tabl",
+  "vasker|vaske|vask|wäschen|waschladungen|WL",
+  "poser|pose|beutel|breve|brev|bind|bleer|ble|bleier|windeln",
+  "tücher|servietter|serviet|klude|klud|pads|ark|stikker|sticks|æg|lys|sække|sæk|bags",
+].join("|");
 /** Words that count packs within the sold pack: "4 pakker", "10-pack", "Mentos 3er", "8-pk.". */
 const PACK_WORDS = String.raw`pakker|pakke|pack|pak|pk|(?<=\d-?)er`;
 /** Sheets or blades: the count only when nothing else is printed (razor blades), not "200 Blade" on toilet paper. */

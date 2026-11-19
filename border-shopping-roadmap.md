@@ -1628,6 +1628,10 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   non-food (plates, cups, cutlery "50styk") 31. 61 live names have a count word but get null on purpose (ranges and
   either/or packs, almost all newsletter rows: "Livol 150-350 stk.", "Colgate 1 stk. el. 75 ml."). `--save` refuses
   until the migration has run.
+- **Inflected count words (2026-11-19, from the Catalog chat's check):** "Omo Liquid White 71 vasker" got no count -
+  only "vaske" was read. Now singular and plural forms: vasker, Wäschen, Waschladungen, kapsel, rulle/rolle, pose,
+  tablet, brev, ble, Windeln, serviet, klud, sæk, stykker. Backfill saved: 3 rows changed (Omo 71 vasker in both
+  BorderShop stores, a ScandiPark "2stykker").
 
 ### Comparison units per family (2026-11-19, Matching chat - "stk. prices" step 2)
 
