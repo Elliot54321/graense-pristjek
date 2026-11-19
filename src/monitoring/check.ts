@@ -4,9 +4,10 @@
  *
  * Fails on: a scraped shop without a finished run in 30 hours, a failed or stuck run,
  * products dropping more than 20 % against the past week, more than 10 % failed
- * pages, many price jumps in one run (something systematic), and a newsletter
- * that expires within 3 days or already has. Single price jumps happen most nights
- * (offers ending) and are only listed in the run summary.
+ * pages, many price jumps in one run (something systematic), and a newsletter shop
+ * whose issue has expired. Fleggaard and Calle release the next issue only when the
+ * current one expires, so the end date is just a note until then. Single price jumps
+ * happen most nights (offers ending) and are only listed in the run summary.
  */
 import { appendFileSync } from "node:fs";
 import { NEWSLETTER_SHOPS } from "../catalog/compare";
@@ -18,7 +19,6 @@ const STUCK_HOURS = 6;
 const MIN_SHARE_OF_USUAL = 0.8;
 const MAX_FAILED_SHARE = 0.1;
 const MAX_PRICE_JUMPS = 15;
-const NEWSLETTER_WARN_DAYS = 3;
 
 interface Run {
   shop_id: string;
@@ -96,9 +96,9 @@ async function main() {
     for (const r of rows) counts.set(r.listed_until!, (counts.get(r.listed_until!) ?? 0) + 1);
     const [until] = [...counts].sort((a, b) => b[1] - a[1])[0];
     const daysLeft = Math.round((Date.parse(until) - Date.parse(today)) / (24 * HOURS));
-    const line = `${shop.name}: newsletter valid until ${until} (${daysLeft} days left)`;
-    if (daysLeft <= NEWSLETTER_WARN_DAYS) problems.push(`${line} - import the next issue`);
-    else info.push(line);
+    // Info only: the shops publish the next issue when this one expires, so there is
+    // nothing to import before then (decision 2026-11-19).
+    info.push(`${shop.name}: newsletter valid until ${until} (${daysLeft} days left)`);
   }
 
   const report = [

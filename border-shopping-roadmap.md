@@ -616,7 +616,7 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
 
 ### Failure alerts and "Priser opdateret" on the site (2026-11-06)
 
-- **`npm run check:data`** (`src/monitoring/check.ts`) runs as the last job of the nightly workflow, even when earlier jobs failed, and **fails - so GitHub emails - when a human is needed**: a scraped shop without a finished run in 30 h, a failed or stuck (> 6 h) run, products down > 20 % against the past week's median, > 10 % failed pages, > 15 price jumps in one run, or a newsletter that expires within 3 days or already has. The report is on the run's summary page on GitHub.
+- **`npm run check:data`** (`src/monitoring/check.ts`) runs as the last job of the nightly workflow, even when earlier jobs failed, and **fails - so GitHub emails - when a human is needed**: a scraped shop without a finished run in 30 h, a failed or stuck (> 6 h) run, products down > 20 % against the past week's median, > 10 % failed pages, > 15 price jumps in one run, or a newsletter shop whose issue has expired (until then the end date is only a note - changed 2026-11-19, see "Newsletter gaps are expected"). The report is on the run's summary page on GitHub.
 - Single price jumps (> 50 %) happen most nights (1-3 per shop, mostly offers ending) and are only listed as notes - failing on them would be noise. One of them did catch the Marabou multi-buy error ("22,22 -> 100" on 5 Nov), so they're worth a glance.
 - GitHub emails failures of scheduled workflows to the account that last changed the workflow's schedule (the repo owner here); the GitHub notification setting for failed Actions runs must be on.
 - The site footer now says when prices were last updated ("Priser opdateret 6. november kl. 09.45"), names any scraped shop that's behind, and gives the newsletters' end date ("Calle og Fleggaard: avispriser gældende til 24. november", or "ingen gældende avis lige nu"). `getFreshness()` in `data.ts`, cached for an hour.
@@ -1455,3 +1455,13 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   seen them in store or on fleggaard.dk, which we don't scrape - they need a printed source (e.g. a December issue).
   ScandiPark multipacks (Wrigleys 7er, Malaco 14er, Ga-Jol 8er, Mentos 3er, kinder Bueno 8x2 312g) now parse to the printed
   total (c4eaa5b); the database picks it up at the next nightly scrape (Niederegger 10er 200g was already 0,2 kg).
+
+### Newsletter gaps are expected (2026-11-19, Data & newsletters chat)
+
+- **Decision (user):** Fleggaard and Calle release a new newsletter only when the current one expires, so there is nothing
+  to import before the end date. A short gap with no Fleggaard/Calle prices after expiry is expected; the new issues are
+  imported on the day the user brings the PDFs (`flyer:extract` -> `flyer:import` -> `match:new`).
+- **`check:data` changed accordingly:** the "valid until X (N days left)" line is a note only. The job fails, and GitHub
+  emails, only once a newsletter shop has no listed offers left ("has expired - import the new issue"). Before, it failed
+  from 3 days before expiry, which on 21-23 Nov would have emailed about something that couldn't be done yet. The
+  current issues run to 2026-11-24, so the first alert can come in the run after that.

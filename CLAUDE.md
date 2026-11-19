@@ -26,7 +26,9 @@ of truth. Read it when deciding what to work on.
 **Current phase:** Phase 3 (first usable version). Phase 1 (data pipeline) finished 2026-10-25
 after 8 unattended nightly runs; Phase 2 (matching) is largely done.
 - Data: Fleggaard and Calle prices come from their newsletters (no scraping allowed), imported by
-  hand per issue (`data/newsletters/`, git-ignored; current issues valid until 2026-11-24). Some
+  hand per issue (`data/newsletters/`, git-ignored; current issues valid until 2026-11-24). A new
+  issue is only released once the old one expires, so expect a short gap with no Fleggaard/Calle
+  prices on the site until the user brings the PDFs - import them the same day. Some
   Calle offers are coupon prices ("KUPONTILBUD") - always shown with a "Kuponpris" badge. Poetzsch, BorderShop (Puttgarden and Rostock) and Scandinavian Park scraped nightly on GitHub Actions
   (`.github/workflows/scrape.yml`: scrape -> EAN matching -> `match:new` for new products;
   scheduled 02:00 UTC, GitHub usually starts it ~06:45),
@@ -58,7 +60,7 @@ after 8 unattended nightly runs; Phase 2 (matching) is largely done.
   another shop, and which shops sell and link each item in `src/matching/common-items.ts`
   (only products on sale count; category rules shared with `match:new` in `src/matching/groups.ts`)
 - `npm run check:data` – nightly data check (last workflow job): fails, so GitHub emails, when a shop
-  run is missing/broken/shrunk or a newsletter expires within 3 days (`src/monitoring/check.ts`)
+  run is missing/broken/shrunk or a newsletter has expired (`src/monitoring/check.ts`)
 - `npm run scrape -- <shop> [--limit N] [--save]` – run a shop scraper; saves JSON
   to `data/scrapes/` (git-ignored), and with `--save` writes to Supabase and logs
   the run in `scrape_runs`. Needs the variables in `.env.example` set in `.env.local`.
