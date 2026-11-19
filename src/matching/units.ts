@@ -11,6 +11,8 @@
  *     collect <batch-id>    store a finished batch's answers in the cache
  *     apply [--save]        rules + cached answers -> counts, data/llm-batches/units.txt; --save writes
  *     perfume [--save]      perfume families -> display_per "100 ml" (shown pr. 100 ml, still compared per l)
+ *     dear [--save] [--with-100g]  families on sale at 1.000+ kr. per l/kg: one-at-a-time items -> piece,
+ *                           small cosmetics -> "100 ml", small food packs -> "100 g"; spirits/wine/beer left alone
  *     nightly [--max-usd N] families of the last 3 days without a unit: rules, then the model directly;
  *                           over the cap (default $0.50) the model isn't asked and the run exits 1
  *
@@ -435,6 +437,11 @@ async function nightly(maxUsd: number) {
   console.log(`Families of the last ${RECENT_DAYS} days without a unit: ${todo.length}; set now: ${await saveUnits(decided)}; left null: ${todo.length - decided.size}.`);
   const perfumes = await perfume(true, recentIds, true);
   console.log(perfumes === null ? "Perfume display: display_per column not there yet - skipped." : `Perfume families set to "pr. 100 ml": ${perfumes}.`);
+  // The 1.000 kr. flag on new families of every category (rules only; the rest a warning in the log).
+  const { data: recentAll, error: e2 } = await adminClient().from("product_families").select("id").gte("created_at", since);
+  if (e2) throw e2;
+  const flagged = await dear(true, true, new Set((recentAll ?? []).map((r) => r.id as number)), true);
+  console.log(`1.000+ kr. per unit: ${flagged.decided} families set, ${flagged.review} left for review.`);
   if (failed) process.exit(1);
 }
 
@@ -475,6 +482,143 @@ async function perfume(save: boolean, ids?: Set<number>, quiet = false): Promise
   return hitIds.length;
 }
 
+// ---------------------------------------------------------------------------------------
+// Review flag: 1.000 kr. or more per l/kg (decided 2026-11-20 - a flag, not a rule)
+
+const DEAR_PER_UNIT = 1000;
+/** Real prices that vary by bottle size: stay per l (a per-bottle price would let the small one win). */
+const DEAR_LEAVE = new Set(["spirits", "wine", "beer"]);
+/** Sold one at a time - weight/volume is meaningless: novelty candy with toys, gift sets, lip balm, toys. */
+const ONE_AT_A_TIME =
+  /\bpez\b|lolly pop ?up|kinder surprise|surprise fan|choco biterz|scan choco|chokoladefrø|gavesæt|gift ?set|\bset\b|lip smacker|plys|legetøj|holy (energy|hydration)/;
+
+interface DearDecision {
+  familyId: number;
+  name: string;
+  /** 'piece' with counts per product, or a display_per. */
+  action: { piece: Map<number, number | null> } | { displayPer: "100 g" | "100 ml" };
+  why: string;
+}
+
+/** Pieces in one pack from the name: "3x7g" 3, "7 overraskelsesæg" 7, "6er" 6; else 1 for a single novelty item; null if unsure. */
+function dearCount(names: string[], contentKg: number | null): number | null {
+  // Printed counts in the product name and its listings' names; two different ones -> unsure.
+  const printed = new Set<number>();
+  for (const name of names) {
+    const n = name.toLowerCase();
+    const m = n.match(/(\d+)\s*x\s*\d+(?:[.,]\d+)?\s*g\b/) ?? n.match(/(\d+)\s*(?:overraskelsesæg|stk\.?|styk|er)\b/);
+    if (m) printed.add(Number(m[1]));
+  }
+  if (printed.size) return printed.size === 1 ? [...printed][0] : null;
+  // HOLY sticks are sold as 3 x 7 g; a 21 g pack without the "3x7g" is the same pack.
+  if (names.some((n) => /holy/i.test(n))) return contentKg !== null && Math.abs(contentKg - 0.021) < 0.0005 ? 3 : null;
+  return 1;
+}
+
+/** Decide one flagged family (null = leave as is and list for review). */
+function dearDecision(
+  f: { id: number; name: string; category: string; compare_unit: string | null },
+  products: { id: number; name: string; content_amount: number | null; content_unit: string | null; listingNames?: string[] }[],
+): DearDecision | null {
+  if (DEAR_LEAVE.has(f.category) || f.compare_unit === "piece") return null;
+  const text = [f.name, ...products.map((p) => p.name)].join(" ; ").toLowerCase();
+  if (ONE_AT_A_TIME.test(text)) {
+    const counts = new Map(
+      products.map((p) => [p.id, dearCount([p.name, ...(p.listingNames ?? [])], p.content_unit === "kg" ? Number(p.content_amount) : null)] as const),
+    );
+    return { familyId: f.id, name: f.name, action: { piece: counts }, why: "sold one at a time" };
+  }
+  const units = new Set(products.map((p) => p.content_unit).filter(Boolean));
+  if (units.size !== 1) return null;
+  const [unit] = units;
+  const small = products.every((p) => p.content_amount !== null && Number(p.content_amount) <= 0.1);
+  if (unit === "l" && f.category === "household" && small) return { familyId: f.id, name: f.name, action: { displayPer: "100 ml" }, why: "small cosmetics pack" };
+  if (unit === "kg" && f.category === "groceries" && small) return { familyId: f.id, name: f.name, action: { displayPer: "100 g" }, why: "small food pack (spice, dried fruit, snack)" };
+  return null;
+}
+
+/**
+ * Families on sale at >= 1.000 kr. per l/kg (matched_prices.price_per_unit), without a display_per:
+ * rules move one-at-a-time items to 'piece' (with piece counts on their products), small cosmetics
+ * to "pr. 100 ml" and small food packs to "pr. 100 g"; spirits, wine and beer are left alone (real
+ * prices). Anything else is listed for review. `ids`: only these families (nightly: recent ones).
+ * '100 g' is only written with `with100g` (needs migration 2026-11-20 allowing that value).
+ */
+async function dear(save: boolean, with100g: boolean, ids?: Set<number>, quiet = false) {
+  const db = adminClient();
+  const rows = await fetchAll<{ product_id: number; shop_product_id: number; price_per_unit: number }>((f, t) =>
+    db.from("matched_prices").select("product_id, shop_product_id, price_per_unit").gte("price_per_unit", DEAR_PER_UNIT).order("product_id").order("shop_product_id").range(f, t),
+  );
+  const flaggedProducts = [...new Set(rows.map((r) => r.product_id))];
+  const prodRows = await fetchAll<{ id: number; family_id: number | null }>((f, t) => db.from("products").select("id, family_id").in("id", flaggedProducts).order("id").range(f, t));
+  const familyIds = [...new Set(prodRows.map((p) => p.family_id).filter((x): x is number => x !== null))].filter((id) => !ids || ids.has(id));
+  if (!familyIds.length) {
+    if (!quiet) console.log("No flagged families.");
+    return { decided: 0, review: 0 };
+  }
+  const fams = await fetchAll<{ id: number; name: string; category: string; compare_unit: string | null; display_per: string | null }>((f, t) =>
+    db.from("product_families").select("id, name, category, compare_unit, display_per").in("id", familyIds).order("id").range(f, t),
+  );
+  const prods = await fetchAll<{ id: number; name: string; family_id: number; content_amount: number | null; content_unit: string | null; piece_count: number | null }>((f, t) =>
+    db.from("products").select("id, name, family_id, content_amount, content_unit, piece_count").in("family_id", familyIds).order("id").range(f, t),
+  );
+  // The shops' own names, for printed counts ("Mascot fyldt med 7 overraskelsesæg").
+  const listed = await fetchAll<{ product_id: number; shop_product_id: number; name: string }>((f, t) =>
+    db.from("matched_prices").select("product_id, shop_product_id, name").in("product_id", prods.map((p) => p.id)).order("product_id").order("shop_product_id").range(f, t),
+  );
+  const withNames = prods.map((p) => ({ ...p, listingNames: listed.filter((l) => l.product_id === p.id).map((l) => l.name) }));
+  const decisions: DearDecision[] = [];
+  const review: string[] = [];
+  let left = 0;
+  for (const f of fams.filter((x) => !x.display_per).sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name, "da"))) {
+    const ps = withNames.filter((p) => p.family_id === f.id);
+    const d = dearDecision(f, ps);
+    if (d) decisions.push(d);
+    else if (DEAR_LEAVE.has(f.category) || f.compare_unit === "piece") left++;
+    else review.push(`f${f.id} ${f.category} ${f.name} | ${ps.slice(0, 2).map((p) => `${p.name} [${p.content_amount ?? "?"} ${p.content_unit ?? ""}]`).join("; ")}`);
+  }
+  if (!quiet) {
+    for (const d of decisions) {
+      const what =
+        "piece" in d.action
+          ? `-> pr. stk.: ${[...d.action.piece].map(([id, n]) => `#${id} ${prods.find((p) => p.id === id)!.name} = ${n ?? "?"}`).join(", ")}`
+          : `-> pr. ${d.action.displayPer}${d.action.displayPer === "100 g" && !with100g ? " (waits for the migration)" : ""}`;
+      console.log(`  f${d.familyId} ${d.name} ${what}  (${d.why})`);
+    }
+    console.log(`\nLeft as is (spirits/wine/beer, or already per piece): ${left}`);
+    console.log(`For review (flagged, no rule): ${review.length}`);
+    for (const r of review) console.log(`  ? ${r}`);
+  } else for (const r of review) console.log(`::warning::1.000+ kr. per unit, no rule: ${r}`);
+  if (!save) return { decided: decisions.length, review: review.length };
+
+  let n = 0;
+  for (const d of decisions) {
+    if ("piece" in d.action) {
+      // Only families whose unit isn't already a human's 'piece' (handled above); counts only where none is set.
+      const { error } = await db.from("product_families").update({ compare_unit: "piece", piece_label: null }).eq("id", d.familyId);
+      if (error) throw error;
+      for (const [pid, count] of d.action.piece) {
+        if (count === null) continue;
+        const { error: e2 } = await db.from("products").update({ piece_count: count }).eq("id", pid).is("piece_count", null);
+        if (e2) throw e2;
+      }
+      n++;
+    } else {
+      if (d.action.displayPer === "100 g" && !with100g) continue;
+      const { error } = await db.from("product_families").update({ display_per: d.action.displayPer }).eq("id", d.familyId).is("display_per", null);
+      // 23514: the check constraint doesn't allow '100 g' yet (migration not run) - skip, don't fail the night.
+      if (error?.code === "23514") {
+        console.warn(`display_per '${d.action.displayPer}' not allowed yet - f${d.familyId} skipped.`);
+        continue;
+      }
+      if (error) throw error;
+      n++;
+    }
+  }
+  if (!quiet) console.log(`Saved ${n} families.`);
+  return { decided: n, review: review.length };
+}
+
 /** Every rule decision, for checking the rules: data/llm-batches/units-rules.txt. */
 async function rules() {
   const { families, set } = await load();
@@ -499,9 +643,13 @@ async function main() {
     if (process.argv.includes("--save") && n !== null) console.log(`Saved ${n} families.`);
     else console.log("Dry run - nothing saved.");
   }
-  else if (cmd === "nightly") {
+  else if (cmd === "dear") {
+    const save = process.argv.includes("--save");
+    await dear(save, process.argv.includes("--with-100g"));
+    if (!save) console.log("Dry run - nothing saved.");
+  } else if (cmd === "nightly") {
     const i = process.argv.indexOf("--max-usd");
     await nightly(i > 0 ? Number(process.argv[i + 1]) : 0.5);
-  } else console.error("Usage: units.ts plan | rules | submit | collect <batch-id> | apply [--save] | perfume [--save] | nightly [--max-usd N]");
+  } else console.error("Usage: units.ts plan | rules | submit | collect <batch-id> | apply [--save] | perfume [--save] | dear [--save] [--with-100g] | nightly [--max-usd N]");
 }
 if (process.argv[1]?.endsWith("units.ts")) main();

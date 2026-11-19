@@ -1809,3 +1809,23 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   handle `displayPer` '100 g': the per-kg price ÷ 10 as "pr. 100 g" and pack sizes in g ("0,03 kg" -> "30 g"), for
   spices and other small packs. Only for a family whose comparison unit matches (100 ml on l, 100 g on kg). Built and
   checked before any family was marked: Santa Maria Oregano, shampoo and Jägermeister unchanged, Joop still per 100 ml.
+
+### 1.000 kr. per unit as a review flag (2026-11-20, Matching chat)
+
+- **`units.ts dear [--save] [--with-100g]`** (rules only, no Claude): families on sale with
+  `matched_prices.price_per_unit >= 1000` and no `display_per`. Spirits, wine and beer are left alone (real prices;
+  per bottle would let the small one win), as are families already per piece. Items sold one at a time (PEZ, Lolly Pop
+  Up, Kinder Surprise, Surprise Fan, Choco Biterz, chocolate frog, gift sets, Lip Smacker, toys, HOLY sticks) -> `piece`,
+  with `products.piece_count` from a printed count in the product or listing names ("3x7g" 3, "7 overraskelsesæg" 7,
+  "6er" 6; two different printed counts -> null), else 1 (HOLY: 3 when the pack is 21 g). Small household packs in l
+  (<= 100 ml) -> `display_per '100 ml'`; small grocery packs in kg (<= 100 g) -> `'100 g'` (only with `--with-100g`,
+  needs the Catalog migration). Anything else flagged is listed for review. `units.ts nightly` runs it on families of
+  the last 3 days in every category (unmatched ones as `::warning::` lines; a refused '100 g' is skipped, not a failure).
+- **Saved 2026-11-20 (user OK):** 26 families to per piece (3 Lolly Pop Up, 2 PEZ Twin, 4 Scan Choco Biterz, Surprise
+  Fan, Harry Potter Chokoladefrø, Kinder Surprise Aviator = 7 eggs and Paw Patrol box, 4 HOLY = 3 sticks, CK One Set,
+  Rituals Amsterdam Set, 5 Lip Smacker 4 g + the 6-can pack = 6, Chrisco Plys) and 2 to "pr. 100 ml" (Autan Akut Gel
+  25 ml, Derma Sun Ansigtslotion 50 ml). 151 left as is.
+- **Waiting for the '100 g' migration:** Santa Maria Oregano 30 g, Kluth frysetørrede hindbær 15 g, NutriPur Frugtsnacks
+  25 g (`units.ts dear --save --with-100g` once it's run).
+- **For Data:** Carletti P-Tærter Extra Dark at BorderShop (both stores) is stored as 50 g for 59,95 kr. (1.199 kr./kg);
+  the product is 0,5 kg - probably a misread size.
