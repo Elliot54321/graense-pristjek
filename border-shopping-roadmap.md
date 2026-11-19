@@ -76,7 +76,7 @@ created: 2026-10-16
 - [x] Group products into **product families** (same drink/candy regardless of pack size) so baskets compare price per liter/kg - see "Decisions" below (`product_families`, done by the LLM run)
 - [x] Compute price per liter or kg for everything (done in the scrapers: price ÷ content)
 - [x] Build a small admin view to review uncertain matches (`/admin`, password in `ADMIN_PASSWORD`; LLM suggestions and LLM links - EAN matches with confidence 0.6 not shown yet)
-- [ ] Go through the open suggestions and LLM links in `/admin` - **deferred to the final stages** (decided 2026-10-22; a few were reviewed already). Fine-tune pairings once the comparison works end to end.
+- [x] Go through the open suggestions and LLM links in `/admin` - **deferred to the final stages** (decided 2026-10-22; a few were reviewed already; full review done by the user 2026-11-19). Fine-tune pairings once the comparison works end to end.
 - [x] Keep the monthly newsletter review small (2026-11-11): `/admin` "Avistilbud der vinder" lists only unreviewed newsletter offers that are cheapest in their family; reviewed decisions carry over to reworded offers; weak (0.75) unreviewed links are held back from the site
 
 **Done when:** The common items (`src/matching/common-items.ts`, 120+ and growing) match correctly across both shops, and most of each category's shared range (soda, beer, candy/chocolate, spirits) is linked. Comparing prices is the whole point of the site, so broad coverage matters more than a short list.
@@ -103,7 +103,6 @@ created: 2026-10-16
 
 **Goal:** Account for what actually affects the real total cost.
 
-- [ ] Include Pfand (deposit) in the real cost
 - [x] Danish import limits for alcohol and tobacco, with warnings (alcohol done 2026-10-30 on `/kurv`; tobacco not, as the site has no tobacco)
 - [x] Travel cost from the user's location to each shop (2026-11-01: trip cards on `/kurv` with postcode, rough distance/time and fuel per car type; ferry ticket entered by the user)
 - [x] Optional "split across two shops" suggestion, only if saving beats extra driving (2026-11-01: within the Padborg area, when it covers more items or saves >= 50 kr.)
@@ -1465,3 +1464,10 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   emails, only once a newsletter shop has no listed offers left ("has expired - import the new issue"). Before, it failed
   from 3 days before expiry, which on 21-23 Nov would have emailed about something that couldn't be done yet. The
   current issues run to 2026-11-24, so the first alert can come in the run after that.
+
+### Pfand dropped, admin review done (2026-11-19, architect)
+
+- **Pfand is not part of the cost (user decision).** With the export declaration most cans carry no deposit, so the
+  "include Pfand in the real cost" item is removed from Phase 4 and no Pfand note is added to the site.
+- **`/admin` review finished** by the user, so the held-back staple links (Poetzsch Carlsberg/Harboe Pilsner, ScandiPark
+  Absolut 1 l, M&M's, ...) are no longer pending.
