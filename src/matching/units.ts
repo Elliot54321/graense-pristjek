@@ -10,6 +10,7 @@
  *     submit                the families the rules leave, as one Batch API job (half price)
  *     collect <batch-id>    store a finished batch's answers in the cache
  *     apply [--save]        rules + cached answers -> counts, data/llm-batches/units.txt; --save writes
+ *     perfume [--save]      perfume families -> display_per "100 ml" (shown pr. 100 ml, still compared per l)
  *     nightly [--max-usd N] families of the last 3 days without a unit: rules, then the model directly;
  *                           over the cap (default $0.50) the model isn't asked and the run exits 1
  *
@@ -50,7 +51,25 @@ interface Decision {
 interface Family extends FamilyInfo {
   /** Content units of the family's products (null = unknown), and product names with content. */
   units: (string | null)[];
+  /** Content in liters per product (null when not in l). */
+  liters: (number | null)[];
   products: string[];
+}
+
+// ---------------------------------------------------------------------------------------
+// Perfume: shown "pr. 100 ml" (display only - still compared per liter; decided 2026-11-19)
+
+const PERFUME = /eau de toilette|eau de parfum|eau de cologne|\bparfum\b|\bparfume\b|\bperfume\b|\bparfüm\b|\bcologne\b|\bedt[sp]?\b|\bedp\b|after ?shave|body ?mist/;
+/** Per liter on purpose: deodorant, shampoo, shower gel, soap, creams - and "parfumefri" products. */
+const NOT_PERFUME = /deo|antiperspirant|roll-on|shampoo|balsam|balm|shower|brusegel|brusebad|dusch|sæbe|soap|seife|lotion|creme|cream|parfumefri|uden parfume|ohne parfum|parfümfrei|fragrance.?free/;
+/** Perfume sizes: every product with a known content at most this many liters (aftershave and body mist included). */
+const PERFUME_MAX_L = 0.25;
+
+export function isPerfume(f: Family): boolean {
+  if (f.category !== "household") return false;
+  const t = textOf(f);
+  if (!PERFUME.test(t) || NOT_PERFUME.test(t)) return false;
+  return f.liters.every((l) => l === null || l <= PERFUME_MAX_L) && f.units.every((u) => u === null || u === "l");
 }
 
 // ---------------------------------------------------------------------------------------
@@ -209,6 +228,7 @@ async function load(): Promise<{ families: Family[]; set: Map<number, { unit: st
     return {
       ...f,
       units: ps.map((p) => p.content_unit),
+      liters: ps.map((p) => (p.content_unit === "l" && p.content_amount !== null ? Number(p.content_amount) : null)),
       products: ps.map((p) => `${p.name} [${p.content_amount ?? "?"} ${p.content_unit ?? "?"}]`),
     };
   });
@@ -413,7 +433,46 @@ async function nightly(maxUsd: number) {
     console.log(`  f${id} ${f.name}: ${d.unit}${d.label ? `/${d.label}` : ""} (${d.why})`);
   }
   console.log(`Families of the last ${RECENT_DAYS} days without a unit: ${todo.length}; set now: ${await saveUnits(decided)}; left null: ${todo.length - decided.size}.`);
+  const perfumes = await perfume(true, recentIds, true);
+  console.log(perfumes === null ? "Perfume display: display_per column not there yet - skipped." : `Perfume families set to "pr. 100 ml": ${perfumes}.`);
   if (failed) process.exit(1);
+}
+
+/**
+ * Perfume families -> display_per '100 ml'. Only fills null. `ids`: limit to these families
+ * (nightly: recent ones). Returns how many were set, or null when the column doesn't exist yet.
+ */
+async function perfume(save: boolean, ids?: Set<number>, quiet = false): Promise<number | null> {
+  const db = adminClient();
+  const probe = await db.from("product_families").select("id, display_per").limit(1);
+  const columnExists = !probe.error;
+  const current = new Map<number, string | null>();
+  if (columnExists) {
+    const rows = await fetchAll<{ id: number; display_per: string | null }>((f, t) =>
+      db.from("product_families").select("id, display_per").eq("category", "household").order("id").range(f, t),
+    );
+    for (const r of rows) current.set(r.id, r.display_per);
+  }
+  const { families } = await load();
+  const hits = families.filter((f) => (!ids || ids.has(f.id)) && isPerfume(f) && !current.get(f.id));
+  if (!quiet) {
+    for (const f of hits.sort((a, b) => a.name.localeCompare(b.name, "da"))) console.log(`  f${f.id} ${f.name} | ${f.products.slice(0, 2).join("; ")}`);
+    // What the rule leaves out among perfume-sounding families, to check the exclusions.
+    const near = families.filter((f) => (!ids || ids.has(f.id)) && f.category === "household" && PERFUME.test(textOf(f)) && !isPerfume(f));
+    console.log(`\nLeft per liter (perfume words, but excluded or not perfume-sized): ${near.length}`);
+    for (const f of near) console.log(`  - f${f.id} ${f.name} | ${f.products.slice(0, 2).join("; ")}`);
+    console.log(`\nPerfume families to show "pr. 100 ml": ${hits.length}${columnExists ? "" : " (display_per column not there yet)"}`);
+  }
+  if (!save || !columnExists) {
+    if (save) console.log("display_per doesn't exist yet - run the migration first; nothing saved.");
+    return columnExists ? 0 : null;
+  }
+  const hitIds = hits.map((f) => f.id);
+  for (let i = 0; i < hitIds.length; i += 200) {
+    const { error } = await db.from("product_families").update({ display_per: "100 ml" }).in("id", hitIds.slice(i, i + 200)).is("display_per", null);
+    if (error) throw error;
+  }
+  return hitIds.length;
 }
 
 /** Every rule decision, for checking the rules: data/llm-batches/units-rules.txt. */
@@ -435,9 +494,14 @@ async function main() {
   else if (cmd === "collect" && arg) await collect(arg);
   else if (cmd === "apply") await apply(process.argv.includes("--save"));
   else if (cmd === "rules") await rules();
+  else if (cmd === "perfume") {
+    const n = await perfume(process.argv.includes("--save"));
+    if (process.argv.includes("--save") && n !== null) console.log(`Saved ${n} families.`);
+    else console.log("Dry run - nothing saved.");
+  }
   else if (cmd === "nightly") {
     const i = process.argv.indexOf("--max-usd");
     await nightly(i > 0 ? Number(process.argv[i + 1]) : 0.5);
-  } else console.error("Usage: units.ts plan | rules | submit | collect <batch-id> | apply [--save] | nightly [--max-usd N]");
+  } else console.error("Usage: units.ts plan | rules | submit | collect <batch-id> | apply [--save] | perfume [--save] | nightly [--max-usd N]");
 }
-main();
+if (process.argv[1]?.endsWith("units.ts")) main();

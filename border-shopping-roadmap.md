@@ -1768,3 +1768,19 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   `compareUnit` / `pieceLabel`. Prices stay per liter in the data; **the UI** divides by 10 and writes "pr. 100 ml".
 - `loadPacks` falls back to the old columns on error 42703, so search and the list keep working if the code deploys
   before the migration is run (checked locally: perfume families come back with `displayPer: null`, prices unchanged).
+
+### Perfume families marked "pr. 100 ml" (2026-11-20, Matching chat)
+
+- **`units.ts perfume [--save]`** sets `product_families.display_per = '100 ml'` (display only; compared per liter) on
+  household families whose name or products say Eau de Toilette/Parfum/Cologne, Parfum, EdT/EdTS/EdP, aftershave or
+  body mist, with every product at most 250 ml. Never deodorant, antiperspirant/roll-on, shampoo, balsam, shower gel,
+  soap, lotion/creme or "parfumefri" (those stay per liter, decided). Only fills null. `units.ts nightly` runs the same
+  rule on families from the last 3 days.
+- **Saved 2026-11-20 (user OK): 12 families** (Boss Orange Woman, 4 Calvin Klein, Davidoff Cool Water, DKNY Duo Set,
+  D&G Light Blue, Hugo Boss Deep Red, Joop Homme, Juicy Couture, Paco Rabanne Phantom). Check on Fleggaard's "Parfumer"
+  issue (eTilbudsavis, imported from 25 Nov): 35 of 38 offers are perfume, the 3 deodorants (Paco Rabanne Deo Stick,
+  Davidoff Deospray/Deo Stick) stay per liter.
+- **Gap (not done, a scope decision):** of 330 perfume listings on sale only 28 are in a family. BorderShop's perfumes
+  (~300, both stores) sit in its top category "More" (432 listings), which `groups.ts` maps to no group, so `match:new`
+  never gives them a family and they don't show on the site. Mapping "More" (or only its perfume) to household would
+  put them through the nightly LLM matching (cost: roughly $0.50 for ~430 products).
