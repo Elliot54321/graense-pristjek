@@ -135,14 +135,19 @@ const PIECE_WORDS = [
   "vasker|vaske|vask|wäschen|waschladungen|WL",
   "poser|pose|beutel|breve|brev|bind|bleer|ble|bleier|windeln",
   "tücher|servietter|serviet|klude|klud|pads|ark|stikker|sticks|æg|lys|sække|sæk|bags",
+  // Razor blades, brush heads, vitamins, drinks and coffee/tea portions (2026-11-19 coverage pass).
+  "børstehoveder|brusetabletter|brt|minitabletter|gums|ampuller|portioner|teebeutel|tebreve|kaffepuder|puder",
 ].join("|");
 /** Words that count packs within the sold pack: "4 pakker", "10-pack", "Mentos 3er", "8-pk.". */
 const PACK_WORDS = String.raw`pakker|pakke|pack|pak|pk|(?<=\d-?)er`;
-/** Sheets or blades: the count only when nothing else is printed (razor blades), not "200 Blade" on toilet paper. */
-const SHEET_WORDS = String.raw`blade|blatt`;
+/**
+ * Sheets or blades: the count only when nothing else is printed - "Gillette Fusion 8 klinger" is
+ * 8 blades, but "Venus 3Klinger 4styk" is a 3-blade razor, 4 of them, and "200 Blade" are sheets.
+ */
+const SHEET_WORDS = String.raw`blade|blatt|klinger|klinge|klingen`;
 
 const counted = (words: string, flags = "gi") =>
-  new RegExp(String.raw`(?<![\d,.])(?:(\d+)\s*[x×]\s*)?(\d{1,3}(?:\.\d{3})+|\d+)\s*-?\s*(?:${words})(?![a-zæøåäöü])\.?`, flags);
+  new RegExp(String.raw`(?<![\d,.])(?:(\d+)\s*[x×]\s*)?(\d{1,3}(?:\.\d{3})+|\d+)\s*(?:[x×]\s*)?-?\s*(?:${words})(?![a-zæøåäöü])\.?`, flags);
 /** "16-60 stk.", "6-12 rl.": a range of counts. */
 const COUNT_RANGE_BEFORE = /\d\s*-\s*$/;
 
@@ -151,7 +156,13 @@ function countsOf(text: string, words: string, flags?: string): number[] {
   for (const m of text.matchAll(counted(words, flags))) {
     if (COUNT_RANGE_BEFORE.test(text.slice(0, m.index))) return [NaN];
     // "1.200 Stk." uses a dot as thousands separator.
-    const n = Number(m[2].replace(/\./g, "")) * (m[1] ? Number(m[1]) : 1);
+    let n = Number(m[2].replace(/\./g, "")) * (m[1] ? Number(m[1]) : 1);
+    // Bonus pieces are in the pack: "8+2 børstehoveder" 10, "40 vaske + 5 gratis" 45.
+    // Only "8+2" written together: "Longo Vital 50+ 180 stk." is an age group.
+    const before = text.slice(0, m.index).match(/(\d+)\+$/);
+    if (before && !m[1]) n += Number(before[1]);
+    const after = text.slice(m.index! + m[0].length).match(new RegExp(String.raw`^\s*\+\s*(\d+)\s*(?:(?:${words})\.?\s*)?gratis`, "i"));
+    if (after) n += Number(after[1]);
     out.push(n);
   }
   return out;
@@ -197,7 +208,18 @@ export function listingPieces(name: string, content: Quantity | null, ...texts: 
     const n = pieceCount(t);
     if (n) return n;
   }
-  return content?.unit === "piece" && Number.isInteger(content.amount) && content.amount > 0 ? content.amount : null;
+  if (content?.unit === "piece" && Number.isInteger(content.amount) && content.amount > 0) return content.amount;
+  return singleItem(name) ? 1 : null;
+}
+
+/**
+ * Things only ever sold one at a time, so a name without any count is 1 (2026-11-19): a WC block
+ * ("Domestos WC-Blok 35 g"), cat scratching posts, pet toys and bowls, plush toys. Deliberately
+ * short: a pack word or number in front ("3-pak", "2 x") rules it out, and null is always safe.
+ */
+const SINGLE_ITEMS = /wc-?blok|kradse(?:træ|tårn|søjle|pap)|legetunnel|kølemåtte|rejseskål|drikkeflaske med drikkeskål|plyshund|plysbamse|plys kanin|\bi plys\b|\bplys (?:med|uden)\b/i;
+export function singleItem(name: string): boolean {
+  return SINGLE_ITEMS.test(name) && !/\d+\s*(?:[x×]|-?\s*(?:pak|pk|pack|er\b|stk|styk))/i.test(name);
 }
 
 /**

@@ -66,7 +66,8 @@ export function parseProductPage(html: string, url: string): ScrapedProduct | nu
     packCount,
     unitSize,
     totalContent,
-    pieceCount: listingPieces(name, totalContent, specs.get("Samlet indhold"), specs.get("Pakke")),
+    // The subtitle under the name: "Pakke à 10 stk." (ja! toilet paper) - often the only count.
+    pieceCount: listingPieces(name, totalContent, specs.get("Samlet indhold"), specs.get("Pakke"), $(".wgtl-detail-subtitle").first().text()),
     pricePerUnit: unitPrice(price, totalContent, shopUnitPrice),
     onOffer: $(".wgtl-detail-badge--tilbud").length > 0,
     regularPrice: null,

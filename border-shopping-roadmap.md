@@ -1632,6 +1632,19 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   only "vaske" was read. Now singular and plural forms: vasker, Wäschen, Waschladungen, kapsel, rulle/rolle, pose,
   tablet, brev, ble, Windeln, serviet, klud, sæk, stykker. Backfill saved: 3 rows changed (Omo 71 vasker in both
   BorderShop stores, a ScandiPark "2stykker").
+- **Coverage pass (2026-11-19, from the Matching chat's piece audit):** live listings in 'piece' families without a
+  count went from 234 to 202 (backfill saved: 38 rows, no existing count changed).
+  - **New count forms:** klinger/Klingen (only when no stk count is printed: "Venus 3Klinger 4styk" is 4),
+    "10x Klingen", børstehoveder, brusetabletter/"Brt.", minitabletter, Gums, Ampuller, portioner, Teebeutel, puder;
+    bonus packs "8+2 børstehoveder" (10, only written together - "Longo Vital 50+ 180 stk." stays 180) and
+    "40 vaske + 5 gratis" (45).
+  - **Single items count as 1** when nothing else is printed: WC blocks, cat scratching posts, pet toys and bowls,
+    plush toys ("Domestos WC-Blok 35 g", "Jollypaw Kradsetårn"). Not bare "plys" ("Peter Plys" is a LEGO set).
+  - **Poetzsch's subtitle** ("Pakke à 10 stk." on ja! toilet paper) is now read; it isn't stored, so those counts
+    arrive with the next nightly scrape.
+  - **Left null on purpose:** newsletter ranges/either-or (~20; neither the PDF reading nor eTilbudsavis gives one
+    count - its `pieces` is the deal size); ScandiPark capsules and tea (the page has only a weight; counts are never
+    derived from weight); Poetzsch Yogi Tea and Gastro tableware (no count on the page); "24 LED", "4x64 blad", "30x10".
 
 ### Comparison units per family (2026-11-19, Matching chat - "stk. prices" step 2)
 
