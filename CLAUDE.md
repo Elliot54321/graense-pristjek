@@ -30,7 +30,7 @@ after 8 unattended nightly runs; Phase 2 (matching) is largely done.
   (`flyer:etilbudsavis`, decided 2026-11-19: Fleggaard allows newsletter use); PDF issues by hand
   (`data/newsletters/`, git-ignored) remain the fallback and the only source of Calle's coupon offers.
   Current issues are valid until 2026-11-24. A new issue only appears once the old one expires, so
-  expect a short gap with no Fleggaard/Calle prices - import the same day. Some
+  expect a gap of up to a night with no Fleggaard/Calle prices until the nightly import picks it up. Some
   Calle offers are coupon prices ("KUPONTILBUD") - always shown with a "Kuponpris" badge. Poetzsch, BorderShop (Puttgarden and Rostock) and Scandinavian Park scraped nightly on GitHub Actions
   (`.github/workflows/scrape.yml`: scrape -> EAN matching -> `match:new` for new products;
   scheduled 02:00 UTC, GitHub usually starts it ~06:45),
