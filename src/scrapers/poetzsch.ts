@@ -1,6 +1,6 @@
 import * as cheerio from "cheerio";
 import { fetchSitemap, fetchText, ogImage, sitemapLocs } from "./http";
-import { PRICE_NUMBER, parseDecimal, parseQuantity, unitPrice } from "./quantity";
+import { PRICE_NUMBER, listingPieces, parseDecimal, parseQuantity, unitPrice } from "./quantity";
 import type { ScrapedProduct, Scraper } from "./types";
 
 const BASE = "https://www.poetzsch-padborg.dk";
@@ -66,6 +66,7 @@ export function parseProductPage(html: string, url: string): ScrapedProduct | nu
     packCount,
     unitSize,
     totalContent,
+    pieceCount: listingPieces(name, totalContent, specs.get("Samlet indhold"), specs.get("Pakke")),
     pricePerUnit: unitPrice(price, totalContent, shopUnitPrice),
     onOffer: $(".wgtl-detail-badge--tilbud").length > 0,
     regularPrice: null,

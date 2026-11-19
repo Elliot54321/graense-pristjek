@@ -28,6 +28,11 @@ export interface ScrapedProduct {
   unitSize: Quantity | null;
   /** Total content of the sellable unit (7.92 l). */
   totalContent: Quantity | null;
+  /**
+   * Pieces in the sellable unit (70 tabs, 48 rolls for "6 x 8 ruller"), null when unknown -
+   * not packCount, which counts the items of a multipack. Undefined leaves the column alone.
+   */
+  pieceCount?: number | null;
   /** Price per base unit (DKK per liter/kg/piece): price ÷ content, or the shop's own figure when content is unknown. */
   pricePerUnit: number | null;
   /** True when the shop marks the price as an offer. */

@@ -50,6 +50,7 @@ const BONUS = new RegExp(`(${PRICE_NUMBER})\\s*([a-zA-Z]+)\\s*\\+\\s*(${PRICE_NU
  * top counts too: "Nutella 450g +50g gratis" holds 500 g (not the last figure, 50 g).
  */
 export function quantityFromName(name: string): Quantity | null {
+  if (isCapacity(name)) return null;
   const bonus = tidy(name).match(BONUS);
   if (bonus) {
     const [main, extra] = [toQuantity(bonus[1], bonus[2]), toQuantity(bonus[3], bonus[4])];
@@ -120,4 +121,81 @@ export function sizeRange(text: string): { min: number; max: number; unit: Quant
     : [Number(m[1] ?? 1) * n(m[2]) * unit[1], Number(m[1] ?? 1) * n(m[3]) * unit[1]];
   const r = (x: number) => Math.round(x * 1e6) / 1e6;
   return min > 0 && max >= min ? { min: r(min), max: r(max), unit: unit[0] } : null;
+}
+
+// ---------------------------------------------------------------------------------------
+// Piece counts (shop_products.piece_count, 2026-11-19)
+
+/** Words that count the pieces themselves: "70 stk.", "90tabs", "8 ruller", "25 vaske". */
+const PIECE_WORDS = String.raw`stk|styk|stück|stuck|st\.|pcs|ruller|rl|roller|rollen|kapsler|kapseln|caps|tabs|tabletter|tabl|vaske|vask|WL|poser|beutel|breve|bind|bleer|bleier|tücher|servietter|klude|pads|ark|stikker|sticks|æg|lys|sække|bags`;
+/** Words that count packs within the sold pack: "4 pakker", "10-pack", "Mentos 3er", "8-pk.". */
+const PACK_WORDS = String.raw`pakker|pakke|pack|pak|pk|(?<=\d-?)er`;
+/** Sheets or blades: the count only when nothing else is printed (razor blades), not "200 Blade" on toilet paper. */
+const SHEET_WORDS = String.raw`blade|blatt`;
+
+const counted = (words: string, flags = "gi") =>
+  new RegExp(String.raw`(?<![\d,.])(?:(\d+)\s*[x×]\s*)?(\d{1,3}(?:\.\d{3})+|\d+)\s*-?\s*(?:${words})(?![a-zæøåäöü])\.?`, flags);
+/** "16-60 stk.", "6-12 rl.": a range of counts. */
+const COUNT_RANGE_BEFORE = /\d\s*-\s*$/;
+
+function countsOf(text: string, words: string, flags?: string): number[] {
+  const out: number[] = [];
+  for (const m of text.matchAll(counted(words, flags))) {
+    if (COUNT_RANGE_BEFORE.test(text.slice(0, m.index))) return [NaN];
+    // "1.200 Stk." uses a dot as thousands separator.
+    const n = Number(m[2].replace(/\./g, "")) * (m[1] ? Number(m[1]) : 1);
+    out.push(n);
+  }
+  return out;
+}
+
+/**
+ * Pieces in one sold pack, from a name or printed pack text, or null when unknown or unsure:
+ * "70 stk." 70, "4x56stk" 224, "6 x 8 ruller" 48, "70 vaske" 70 (washes count as pieces),
+ * "Mentos 3er" 3, "24x85g" 24. Ranges ("16-60 stk."), either/or ("1 stk. el. 300 ml") and
+ * two different counts of the same kind give null - a wrong count is worse than none.
+ * Sizes are never counts ("Affaldssæk 50L 20styk" is 20; "3-lags" is not 3).
+ */
+export function pieceCount(text: string | null | undefined): number | null {
+  if (!text) return null;
+  // "3-lags" (ply) and "All-in-1" / "3-i-1" are no counts.
+  const t = tidy(text).replace(/(\d+)\s*-\s*lags?\b/gi, " ").replace(/(?:\d+\s*-\s*)?\b(?:in|i)\s*-\s*\d+\b/gi, " ");
+  if (/\sel\.\s/i.test(t)) return null;
+  const pick = (ns: number[]) => {
+    if (!ns.length) return undefined;
+    const distinct = [...new Set(ns)];
+    return distinct.length === 1 && Number.isInteger(distinct[0]) && distinct[0] > 0 && distinct[0] <= 10000 ? distinct[0] : null;
+  };
+  // Pieces first, then packs ("1er Cru" is a wine, so a pack word needs 2+), then "N x size".
+  // "150St" with a capital S; "1st Edition" is not a count.
+  const pieces = pick([...countsOf(t, PIECE_WORDS), ...countsOf(t, "St", "g")]);
+  if (pieces !== undefined) return pieces;
+  const packs = pick(countsOf(t, PACK_WORDS).filter((n) => n >= 2 || Number.isNaN(n)));
+  if (packs !== undefined) return packs;
+  const multi = [...t.matchAll(/(?<![\d,.])(\d+)\s*[x×]\s*(?:(\d+)\s*[x×]\s*)?\d+(?:[.,]\d+)?\s*(?:kg|g|l|cl|ml)\b/gi)].map(
+    (m) => Number(m[1]) * (m[2] ? Number(m[2]) : 1),
+  );
+  const fromMulti = pick(multi);
+  if (fromMulti !== undefined) return fromMulti;
+  return pick(countsOf(t, SHEET_WORDS)) ?? null;
+}
+
+/**
+ * A listing's piece count: from its name, then other printed texts (a spec line), then a
+ * content the shop gives in pieces ("Indhold: 70 stk.").
+ */
+export function listingPieces(name: string, content: Quantity | null, ...texts: (string | null | undefined)[]): number | null {
+  for (const t of [name, ...texts]) {
+    const n = pieceCount(t);
+    if (n) return n;
+  }
+  return content?.unit === "piece" && Number.isInteger(content.amount) && content.amount > 0 ? content.amount : null;
+}
+
+/**
+ * Bags and sacks print their capacity ("Affaldssæk 50L 20styk", "fryseposer 100er 1l"),
+ * which is not the content of the pack.
+ */
+export function isCapacity(name: string): boolean {
+  return /affald|skrald|fryse?pose|frostbeutel|müllbeutel|müllsäcke?|müllsack|sæk\b|sække\b/i.test(name) && !/bag[- ]?in[- ]?box/i.test(name);
 }

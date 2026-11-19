@@ -22,7 +22,7 @@
 import { createHash } from "node:crypto";
 import path from "node:path";
 import { readFileSync } from "node:fs";
-import { unitPrice } from "../scrapers/quantity";
+import { isCapacity, listingPieces, unitPrice } from "../scrapers/quantity";
 import { uploadPages } from "./pages";
 import { packPrice, printedSingle, singlePrice } from "./prices";
 import { adminClient, finishRun, saveProducts, startRun, type RunSummary } from "../scrapers/save";
@@ -170,12 +170,13 @@ export function offersToProducts(
             `stored ${(o.multi_buy.total_price / o.multi_buy.quantity).toFixed(2)} per item. Check the page; add "Pr. stk. X" to limit_note if it's printed.`,
         );
       }
-      const total = content(o);
       // One unit's price, for the whole pack (see prices.ts).
       const price = packPrice(o, singlePrice(o));
       const names = [...new Set([...o.products, ...o.visible_variants].map((n) => n.trim()).filter(Boolean))];
       for (const name of names) {
         const key = productKey(name, o.pack);
+        // Bags print their capacity ("Affaldsposer 20 liter"), not their content.
+        const total = isCapacity(name) ? null : content(o);
         const product: ScrapedProduct = {
           shop,
           shopProductId: key,
@@ -190,6 +191,8 @@ export function offersToProducts(
           packCount: o.unit_count,
           unitSize: o.unit_size && (o.unit === "l" || o.unit === "kg") ? { amount: o.unit_size, unit: o.unit } : null,
           totalContent: total,
+          // "Danæg 30 stk.", "Finish ... 90 stk.": from the name with its pack.
+          pieceCount: listingPieces(`${name} ${o.pack}`, null),
           // The printed per-kg price may be the multi-buy one ("v/merkøb"), so only trust our own.
           pricePerUnit: unitPrice(price, total, o.price_per_is_max || price !== o.price ? null : o.price_per_liter_or_kg),
           onOffer: !o.always_low_price,

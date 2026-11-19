@@ -109,6 +109,17 @@ function hasChanged(prev: PriceRow, next: PriceRow): boolean {
 }
 
 /**
+ * Whether shop_products has piece_count yet (migration 20261119000000_piece_units.sql, run by
+ * hand): until it does, piece counts are left out so saving keeps working.
+ */
+async function hasPieceCount(db: SupabaseClient): Promise<boolean> {
+  const { error } = await db.from("shop_products").select("piece_count").limit(1);
+  if (!error) return true;
+  if (error.code === "42703") return false;
+  throw error;
+}
+
+/**
  * Upsert the products and add a price row for every product whose price or
  * offer changed since the last run. Returns the number of price rows added and
  * warnings for suspicious price jumps.
@@ -125,6 +136,7 @@ export async function saveProducts(
   const newPrices: PriceRow[] = [];
   const warnings: string[] = [];
   const unique = [...byShopId.values()];
+  const pieces = await hasPieceCount(db);
 
   for (let i = 0; i < unique.length; i += BATCH_SIZE) {
     const batch = unique.slice(i, i + BATCH_SIZE);
@@ -144,6 +156,7 @@ export async function saveProducts(
           unit_size_unit: p.unitSize?.unit ?? null,
           content_amount: p.totalContent?.amount ?? null,
           content_unit: p.totalContent?.unit ?? null,
+          ...(pieces && p.pieceCount !== undefined ? { piece_count: p.pieceCount } : {}),
           last_seen_at: now,
           listed_until: p.listedUntil ?? null,
           ...(p.imageUrl !== undefined ? { image_url: p.imageUrl } : {}),

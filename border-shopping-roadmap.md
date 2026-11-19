@@ -1597,3 +1597,34 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   has a count, otherwise per pack.
 - New columns on existing tables: the table grants and "public read" policies already let the website read them. No
   TypeScript change was needed (every read names its columns; no generated types).
+
+### Piece counts per listing (2026-11-19, Data & newsletters chat)
+
+- **Step 3 of the "stk. prices" plan:** `pieceCount()` in `src/scrapers/quantity.ts` reads how many pieces one sold pack
+  holds, into `shop_products.piece_count` (migration `20261119000000_piece_units.sql`). Not `pack_count`: "6 x 8
+  ruller" is pack_count 6, piece_count 48. Tested on real names (`npx tsx --test src/scrapers/quantity.test.ts`).
+  - **Order of evidence:** piece words first (stk/styk/Stück/"150St", ruller/Rollen, kapsler, tabs/tabletter,
+    vaske/WL - washes count as pieces -, poser/Beutel, breve, bind, bleer, Tücher, servietter, ark, æg, ...), with an
+    "N x" in front multiplying ("4x56stk" 224); then pack words ("4 pakker", "10-pack", "8-pk.", "Mentos 3er" - 2 or
+    more, so "1er Cru" isn't one); then "N x size" ("24 x 0,33 l" 24, "4x6x0,33l" 24); "Blade"/"Blatt" only when
+    nothing else is printed (razor blades yes, "200 Blade" sheets on toilet paper no).
+  - **Null when unsure** (a wrong count is worse than none): ranges ("16-60 stk.", "6-12 rl."), either/or ("1 stk. el.
+    75 ml."), two different counts of the same kind. Not counts: sizes ("50L 20styk" is 20), "3-lags", "All-in-1" /
+    "3-i-1", "1st Edition" ("St" needs a capital S). "1.200 Stk." is 1200.
+  - **Used by** all three scrapers (name, then Poetzsch's "Samlet indhold"/"Pakke", then a content the shop gives in
+    pieces - the 25 such live rows all agree with the name), `flyer:import` and `flyer:etilbudsavis` (name + printed
+    pack, e.g. "Danæg 30 stk."). The content stays l/kg as before; `STORE_PIECES` in `import.ts` stays off - piece
+    counts go to `piece_count` instead of `content_unit = 'piece'`.
+  - **Saving before the migration:** `saveProducts` checks once per run whether the column exists and leaves
+    `piece_count` out until it does, so the nightly scrape keeps working whenever the migration is run.
+- **Bag capacity was stored as content (fixed):** "JT Affaldssæk 50L 20styk" got 50 l because the last quantity in the
+  name was taken. `isCapacity()` (rubbish/freezer bags, Müllbeutel; not Bag-in-Box wine) makes `quantityFromName` and the
+  newsletter import give no content for those. 7 rows to clear: 5 ScandiPark bags plus BorderShop's "hundeaffaldsposer
+  340 g" in both stores. Newsletter imports are unchanged by all this (1,971 rows compared).
+- **Backfill (`npx tsx --env-file=.env.local src/scrapers/backfill-pieces.ts [--save]`; report in
+  `data/scrapes/piece-count-backfill.txt`)** - dry run 2026-11-19 over 20,619 rows (17,704 live): 2,206 get a count.
+  Live, per family category: beer 468 of 642 and soda 376 of 703 (cases: "24 x 0,33 l"), candy 350 of 3,583, groceries
+  191, spirits 159, household 139 of 907 (pet food "24x85g", washes "25 vaske", tabs), wine 29; unmatched ScandiPark
+  non-food (plates, cups, cutlery "50styk") 31. 61 live names have a count word but get null on purpose (ranges and
+  either/or packs, almost all newsletter rows: "Livol 150-350 stk.", "Colgate 1 stk. el. 75 ml."). `--save` refuses
+  until the migration has run.

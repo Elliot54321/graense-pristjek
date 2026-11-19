@@ -1,6 +1,6 @@
 import * as cheerio from "cheerio";
 import { fetchSitemap, fetchText, ogImage, sitemapLocs } from "./http";
-import { PRICE_NUMBER, parseDecimal, parseQuantity, quantityFromName, unitPrice } from "./quantity";
+import { PRICE_NUMBER, listingPieces, parseDecimal, parseQuantity, quantityFromName, unitPrice } from "./quantity";
 import type { ScrapedProduct, Scraper } from "./types";
 
 const BASE = "https://www.bordershop.com";
@@ -115,6 +115,7 @@ export function parseProductPage(html: string, url: string, shop: ShopId = "bord
     packCount: pack?.packCount ?? null,
     unitSize: pack?.unitSize ?? null,
     totalContent,
+    pieceCount: listingPieces(name, totalContent),
     pricePerUnit: unitPrice(price, totalContent, shopUnitPrice),
     onOffer,
     regularPrice,

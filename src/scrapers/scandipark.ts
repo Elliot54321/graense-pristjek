@@ -1,6 +1,6 @@
 import * as cheerio from "cheerio";
 import { fetchText, ogImage } from "./http";
-import { parseDecimal, quantityFromName, unitPrice } from "./quantity";
+import { listingPieces, parseDecimal, quantityFromName, unitPrice } from "./quantity";
 import type { Quantity, ScrapedProduct, Scraper } from "./types";
 
 /**
@@ -154,6 +154,7 @@ export function parseProductPage(html: string, url: string): ScrapedProduct | nu
     packCount: count,
     unitSize,
     totalContent: total,
+    pieceCount: listingPieces(name, total),
     pricePerUnit: unitPrice(price, total, shopUnitPrice),
     onOffer,
     regularPrice: onOffer ? regular : null,
