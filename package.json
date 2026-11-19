@@ -15,6 +15,7 @@
     "match:llm": "tsx --env-file-if-exists=.env.local src/matching/llm-run.ts",
     "flyer:extract": "tsx --env-file-if-exists=.env.local src/flyers/extract.ts",
     "flyer:import": "tsx --env-file-if-exists=.env.local src/flyers/import.ts",
+    "flyer:etilbudsavis": "tsx --env-file-if-exists=.env.local src/flyers/etilbudsavis.ts",
     "match:new": "tsx --env-file-if-exists=.env.local src/matching/llm-new.ts",
     "check:data": "tsx --env-file-if-exists=.env.local src/monitoring/check.ts"
   },

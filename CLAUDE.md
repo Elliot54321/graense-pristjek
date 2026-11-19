@@ -25,10 +25,12 @@ of truth. Read it when deciding what to work on.
 
 **Current phase:** Phase 3 (first usable version). Phase 1 (data pipeline) finished 2026-10-25
 after 8 unattended nightly runs; Phase 2 (matching) is largely done.
-- Data: Fleggaard and Calle prices come from their newsletters (no scraping allowed), imported by
-  hand per issue (`data/newsletters/`, git-ignored; current issues valid until 2026-11-24). A new
-  issue is only released once the old one expires, so expect a short gap with no Fleggaard/Calle
-  prices on the site until the user brings the PDFs - import them the same day. Some
+- Data: Fleggaard and Calle prices come from their newsletters (their websites must not be scraped).
+  Every current issue, web-only ones included, can be read as structured offers from eTilbudsavis
+  (`flyer:etilbudsavis`, decided 2026-11-19: Fleggaard allows newsletter use); PDF issues by hand
+  (`data/newsletters/`, git-ignored) remain the fallback and the only source of Calle's coupon offers.
+  Current issues are valid until 2026-11-24. A new issue only appears once the old one expires, so
+  expect a short gap with no Fleggaard/Calle prices - import the same day. Some
   Calle offers are coupon prices ("KUPONTILBUD") - always shown with a "Kuponpris" badge. Poetzsch, BorderShop (Puttgarden and Rostock) and Scandinavian Park scraped nightly on GitHub Actions
   (`.github/workflows/scrape.yml`: scrape -> EAN matching -> `match:new` for new products;
   scheduled 02:00 UTC, GitHub usually starts it ~06:45),
@@ -104,6 +106,11 @@ after 8 unattended nightly runs; Phase 2 (matching) is largely done.
   Uses the Batch API by default (half price; waits for the result, rerun the same command to resume);
   `--direct` for the normal API.
   Newsletters live in `data/newsletters/` (git-ignored). Needs poppler (`pdftoppm`, `pdftotext`).
+- `src/flyers/etilbudsavis.ts` – `npm run flyer:etilbudsavis -- <fleggaard|calle> [--skip ids] [--dry-run]`:
+  reads every current issue of the shop from eTilbudsavis (Tjek's public squid API, unofficial - crawl lightly),
+  raw data in `data/etilbudsavis/` (git-ignored), and imports with the `flyer:import` rules (cheaper offer wins
+  across issues, never overwrites a cheaper PDF price). The API has no coupon flag (Calle KUPONTILBUD) and no
+  category; Claude splits combined headings into product names. Then run `npm run match:new`.
 - `src/catalog/` – website data: `data.ts` (cached reads with the publishable key: search,
   packs for a basket, shops), `ranking.ts` (search scoring; bestsellers in `common-items.ts`),
   `compare.ts` (basket price per shop), `import-limits.ts` (Danish guide amounts for alcohol,

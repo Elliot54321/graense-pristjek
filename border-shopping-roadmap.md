@@ -1471,3 +1471,78 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   "include Pfand in the real cost" item is removed from Phase 4 and no Pfand note is added to the site.
 - **`/admin` review finished** by the user, so the held-back staple links (Poetzsch Carlsberg/Harboe Pilsner, ScandiPark
   Absolut 1 l, M&M's, ...) are no longer pending.
+
+### eTilbudsavis as a newsletter source (2026-11-19, architect)
+
+- **What it has:** etilbudsavis.dk/Fleggaard lists five current Fleggaard issues, all valid 4-24 Nov except "Parfumer"
+  (all of 2026). Calle (dealer 44d0Q) has "Køb stort ind hos Calle" (HnQxKDqD, 192 offers, 4-24 Nov; the issue we
+  import) and "Julefavoritter" (8QWDlwpX, 113 offers, 2 Sep-24 Dec; not imported). Tjek's public API (`squid-api.tjek.com/v2/catalogs/<id>`, `/v2/offers?catalog_id=`)
+  returns each offer as **structured data**: heading, description, price, size and pieces. No vision step is needed for
+  these, though the data quality hasn't been checked.
+- **Rules:** robots.txt allows everything. Tjek's terms (tjek.com/terms) are written for business customers, not visitors.
+  Rights in the content are owned by or licensed to Tjek (11); use outside their platforms needs approval (8.3).
+- **Decision (user):** Fleggaard allows using the newsletter and only said no to scraping its website, so reading the same
+  newsletter from eTilbudsavis is fine. Crawl lightly, with the bot User-Agent.
+- **Are the smaller issues sections of the big one? Mostly no.** The 58-page "Mere JUL for pengene" (U-ACNUNL, 333 offers)
+  is the issue we import: 334 of our 336 offers have a matching price. Fuzzy name+price matching against it found:
+  - "Altid lav pris" (KV4qddNp): 85 offers, ~28 in the big issue
+  - "Hverdagsfavoritter" (1NRp-JGF): 102 offers, ~26 in the big issue; mostly groceries such as dairy, meat and juice
+  - the other "Mere JUL for pengene" (exefg6lF): 137 offers, ~60 in the big issue
+  - The matching is rough, so this is a lower bound on the overlap. Still, roughly 200 Fleggaard offers this month are not
+    on the site. Some are the same item at a different deal price.
+- **Next:** decide whether to import these issues, from eTilbudsavis' structured offers or the page images. Check the
+  structured data's quality against one page before trusting it.
+- **Quality check (2026-11-19, Data & newsletters chat)** - the API's main issues against our PDF extractions, offer by
+  offer (paired on name + price; the API's `catalog_page` doesn't follow the PDF's page numbers, so pages can't be used):
+  - **Fleggaard U-ACNUNL:** 332 of 336 offers pair, prices equal (one exception: Bakkedal Smørbar, 7,99 in the PDF
+    and in neither API issue at that price). **All 37 multi-buys agree.** Missing from the API: Villa Antinori Rosso.
+  - **Calle HnQxKDqD:** 188 of 192 pair, all 30 multi-buys agree. **The 3 KUPONTILBUD offers (Daim, Pama, Fever-Tree) are
+    not in the API at all** - its `offer_count` (192) includes them, but they're never served (same for 2 of 1NRp-JGF's
+    102 offers; paging itself is fine). So coupon prices can't come wrongly from the API; they just stay missing unless
+    taken from the PDF.
+  - **How a deal is encoded:** `pricing.price` is the deal total and `quantity.pieces` the number of items in the deal,
+    in packs times their count for cases (Royal "3 for 209,99" on 24 x 0,33 l = 72 pieces); the single price is in the
+    description ("Pr. ks. 71,99."), like the PDF's small print. A multipack's own count is also `pieces` (Albani 24 x
+    0,33 l = 24 pieces, no single price), so a deal = pieces > 1 **and** a printed single price below the total.
+  - **Missing compared with the PDF:** no category (fine: `match:new` already sorts uncategorised rows), no extra
+    varieties read off the picture, and product names are one heading per offer ("Galliano, Passoã el. Kahlua").
+    Splitting headings by rule ("," / "el.", borrowing the brand) gets 422 of 520 exactly right, but the misses make
+    wrong names ("Wine Gum Tower" without Malaco, "Coca Zero"), so the split needs a model or must be skipped.
+  - **Finding all issues:** `/v2/catalogs?dealer_ids=<id>` lists only the paged (PDF-like) issue; add
+    `types=paged,incito` to get the web-only ones too. Fleggaard is dealer `6e09Z`, Calle `44d0Q`. The incito issues
+    have no page images (`page_count` null), so `/admin` can't show a page for them - the printed text is kept.
+  - **Same item in two issues:** the import key is name + pack, so importing issues one at a time would let a later,
+    dearer issue overwrite a cheaper listed price. The importer must take all of a shop's issues in one run and keep
+    the cheapest, and must not overwrite a cheaper row already imported from the PDF.
+- **Importer built (2026-11-19, Data & newsletters chat): `npm run flyer:etilbudsavis -- <fleggaard|calle> [--skip
+  <catalogId,...>] [--dry-run]`** (`src/flyers/etilbudsavis.ts`). Lists every current issue of the shop (`types=paged,incito`),
+  fetches all offers (raw JSON in `data/etilbudsavis/`, ~8 requests per shop), turns each into the `flyer:extract` shape
+  and runs it through the same import rules (`offersToProducts`), with `listed_until` = the issue's last day in Danish
+  time. Issue name `<shop>-etilbudsavis-<catalogId>`. All of a shop's issues go in one run: the cheapest listing per
+  row wins, and a row still listed from another issue (the PDF import) is only overwritten when the new price is lower.
+  - **Converter checked against the PDF extractions:** 515 of 518 paired offers give the same stored price, content and
+    deal. The 3 others: Neutral Shower (no single price in the API, so stored at the full 5-pack price - dearer, never
+    falsely cheap), Husk (the import now sees a 2-for deal the PDF reading missed), Mentos 8-pk (gets a content the PDF
+    reading lacked). The item size comes from the printed pack text, not the API's `size` (sometimes the pack total:
+    Underberg 30 x 20 ml as 600 ml); offers with no pack printed (meat "Pr. kg 249,98") take the API size only when it
+    agrees with the printed per-kg price. A deal needs pieces > 1, pieces != the pack's own count, and a printed single
+    price whose N-fold beats the total by 2 % (eggs "15 stk. Pr. stk. 2,67" are no deal).
+  - **Web-only (incito) issues encode deals differently:** `price` is the single price and `pieces` includes the deal
+    ("Tuborg Squash 59,99, 72 pieces, 3 ks."), with no deal total - stored as one case at 59,99 (deal lost, never too
+    cheap). Their "Pr. ks. 59,99" (the case at its own price) made `singlesWithDeal` turn the case into one can at
+    59,99 with "24 for 59,99"; it now needs the printed single price below the offer's price. The November and
+    October PDF imports are unchanged by this (1,971 rows compared).
+  - **Names:** Claude (Sonnet 5.5) splits each heading into product names and picks the category, cached per batch in
+    `data/llm-batches/cache/split-*`; `--dry-run` never calls it and uses the rule split instead (so dry-run names
+    like "8 og 11 l" are not what a real run saves). Offer images are not stored (Tjek's content terms).
+  - **Dry run 2026-11-19 (all current issues, no credits):** Fleggaard 5 issues (693 offers; Parfumer runs to 31 Dec),
+    Calle 3 - there's a third Calle issue, "Kom og spar i Calle" (LvAjtNM3, 83 offers). With the main issues included,
+    354 Fleggaard and 215 Calle offers equal or beat nothing and are left to the PDF rows; 10 are genuinely cheaper in a
+    smaller issue (Fleggaard's second Christmas issue: Wolfberger 49,99 vs 59,99, Aalborg Jule Akvavit 159,99 vs 169,99;
+    Calle's "Kom og spar": Hanuta/Knoppers/Kinder Crispy 19,99 vs 27,99, Tuborg 69,99 vs 79,99).
+  - **Decision (user, 2026-11-19): use it from December**, not for the November extras (5 days left). Name split for
+    a month's issues costs about $0.20-0.30 (~1,100 offers), `match:new` after it about $0.50-1.
+  - **Next (proposal):** use it for the December issues instead of `flyer:extract` (Calle's coupon offers still need
+    the PDF: run `flyer:import` on just those, or accept them missing). Then add it to the nightly workflow after
+    `scrape`: a step running `flyer:etilbudsavis` for both shops before `match-new`, which picks up a new issue the
+    night it appears (needs `ANTHROPIC_API_KEY`, already a secret; the split is cached, so unchanged issues cost nothing).

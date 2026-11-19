@@ -30,7 +30,7 @@ import type { BaseUnit, ScrapedProduct } from "../scrapers/types";
 
 const SHOP_WEBSITES: Record<string, string> = { fleggaard: "https://www.fleggaard.dk", calle: "https://www.calle.dk" };
 
-interface Offer {
+export interface Offer {
   products: string[];
   visible_variants: string[];
   category: string;
@@ -49,7 +49,7 @@ interface Offer {
   /** Missing in extractions made before coupons were read (2026-11-05). */
   coupon?: boolean;
 }
-interface Extracted {
+export interface Extracted {
   pdf: string;
   pages: { page: number; result: { offers: Offer[] } }[];
 }
@@ -125,7 +125,9 @@ function singlesWithDeal(o: Offer): Offer {
   const note = o.limit_note ?? "";
   const printed = note.match(/Pr\.\s*(?:stk|pk|ks|fl|ps|ds|bk|pose)\.?\s*(\d+(?:[.,]\d+)?)/i);
   const each = printed ? Number(printed[1].replace(",", ".")) : NaN;
-  if (!/merkøb/i.test(note) || !(each * n > o.price * 1.05)) return o;
+  // The single price must be one item's, below the pack's: web issues print the case itself
+  // as "Pr. ks. 59,99" at its own price (eTilbudsavis, 2026-11-19).
+  if (!/merkøb/i.test(note) || !(each < o.price) || !(each * n > o.price * 1.05)) return o;
   // The printed per-kg/l is the deal's ("v/merkøb"), so let the import compute the single one.
   return { ...single, price: each, price_per_liter_or_kg: null, multi_buy: { quantity: n, total_price: o.price } };
 }
@@ -181,7 +183,7 @@ export function offersToProducts(
           name: `${name} ${o.pack}`.trim(),
           brand: null,
           ean: null,
-          categories: [o.category],
+          categories: o.category ? [o.category] : [],
           price,
           currency: "DKK",
           packText: o.pack,
@@ -298,7 +300,7 @@ async function backfillSource(args: string[], file: string, shop: string, issue:
  * read as "30 stk. x 60 g." - are taken off the site: listed until yesterday and last seen
  * more than 3 days ago (the website shows products seen in the last 3 days or still listed).
  */
-async function retireDropped(db: ReturnType<typeof adminClient>, shop: string, issue: string, products: ScrapedProduct[]) {
+export async function retireDropped(db: ReturnType<typeof adminClient>, shop: string, issue: string, products: ScrapedProduct[]) {
   const keep = new Set(products.map((p) => p.shopProductId));
   const today = new Date().toISOString().slice(0, 10);
   const { data, error } = await db
