@@ -1628,3 +1628,26 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   non-food (plates, cups, cutlery "50styk") 31. 61 live names have a count word but get null on purpose (ranges and
   either/or packs, almost all newsletter rows: "Livol 150-350 stk.", "Colgate 1 stk. el. 75 ml."). `--save` refuses
   until the migration has run.
+
+### Comparison units per family (2026-11-19, Matching chat - "stk. prices" step 2)
+
+- **`src/matching/units.ts`** (`npx tsx --env-file-if-exists=.env.local src/matching/units.ts plan | rules | submit |
+  collect <id> | apply [--save]`) sets `compare_unit`/`piece_label` on grocery and household families. It only fills
+  families still null, so a unit set by hand is never overwritten. Rules first, on family and listing names (piece counts
+  aren't used: names give them for too few products); Sonnet 5.5 (Batch API) for the families no rule settles; "not
+  sure" stays null (as today). Answers are cached per family in `data/llm-batches/cache/unit-*`.
+- **Rules:** pet food and liquids/creams/powders/sprays keep their content unit (kg/l). `piece` for dishwasher tabs
+  ("tab"), coffee capsules/Tassimo/Dolce Gusto ("kapsel"), Senseo/kaffepuder ("pude"), toilet/kitchen rolls ("rulle"),
+  rubbish/freezer/dog bags ("pose"), and as plain stk. eggs, nappies, sanitary pads, wipes, moist toilet paper (a pack of
+  wipes, not rolls), disposable tableware, candles/lighters, razor blades, toothbrush heads, batteries, WC blocks,
+  vitamin/sweetener tablets. Laundry is `piece` "vask" only when a listing prints washes ("71 vasker", "130WL") or is
+  pods/caps; other laundry, fabric softener without washes and Vanish stay l/kg. Tea goes to the model (bags vs loose).
+  - Pitfall: JS `\b` doesn't count æ/ø/å as letters, so `\bæg\b` matched "pålæg"; eggs use explicit letter classes.
+    Also "opvaskemiddel" contains "vaskemiddel" and "Invincible" contains "ble".
+- **Run 2026-11-19:** 2,890 families with products; rules decided 2,535, Sonnet the other 355 ($0.08 batch). Result:
+  kg 1,787, l 669, piece 334 (stk. 158, kapsel 54, pose 52 - mostly tea bags -, vask 36, rulle 17, pude 10, tab 7);
+  100 left null (unsure). Aluminium foil/baking paper are sold by length - no fitting unit, left as today.
+- **Review list:** `data/llm-batches/units.txt` (git-ignored) - every `piece` family with its products, on-sale first
+  ("-" = not on sale), with the rule or "model" that decided it, for the trust audit.
+- **Next (architect):** copy piece counts onto `products.piece_count` once `shop_products.piece_count` is backfilled;
+  new families from `match:new` don't get a unit yet (they stay null = as today).
