@@ -1809,6 +1809,9 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   handle `displayPer` '100 g': the per-kg price ÷ 10 as "pr. 100 g" and pack sizes in g ("0,03 kg" -> "30 g"), for
   spices and other small packs. Only for a family whose comparison unit matches (100 ml on l, 100 g on kg). Built and
   checked before any family was marked: Santa Maria Oregano, shampoo and Jägermeister unchanged, Joop still per 100 ml.
+  After Matching marked 3 families: Santa Maria Oregano "166,63 kr. pr. 100 g" / "30 g", Kluth Himbeeren "133,27 kr. pr.
+  100 g", NutriPur Hindbær "133,96 kr. pr. 100 g" / "25 g"; shampoo, Jägermeister and Joop unchanged. Seen in passing:
+  Santa Maria Citronpeber (not marked) still reads "183,82 kr. pr. kg" - Matching's call whether more spices get 100 g.
 
 ### 1.000 kr. per unit as a review flag (2026-11-20, Matching chat)
 

@@ -6,7 +6,7 @@ import { CouponBadge, COUPON_NOTE, MultiBuyBadge, OfferBadge } from "@/component
 import { ReportLink } from "@/components/report-link";
 import { ZoomablePhoto } from "@/components/zoomable-photo";
 import { ChevronDown } from "lucide-react";
-import { kr, mlWords, perUnit as shownPerUnit, pieceWords } from "@/lib/format";
+import { kr, smallUnitWords, perUnit as shownPerUnit, pieceWords } from "@/lib/format";
 import { FamilyMore, type ResultSource } from "./family-more";
 
 /** The two-column result grid; each card spans three rows through a subgrid (see FamilyCard). */
@@ -142,7 +142,7 @@ function PackRow({ pack, shops, page }: { pack: Pack; shops: Map<string, Shop>; 
   const perUnit = best.pricePerUnit !== null && pack.contentUnit ? (best.pricePerUnit * low) / best.price : null;
   const deal = dealPerPiece(best) !== null ? best.multiBuy : null;
   // "40 kapsler" rather than the catalog's "40 stk." in piece families, "100 ml" rather than "0,1 l" for perfume.
-  const label = mlWords(pieceWords(pack.packLabel, pack.pieceLabel), pack.displayPer);
+  const label = smallUnitWords(pieceWords(pack.packLabel, pack.pieceLabel), pack.displayPer);
   const shown = perUnit !== null && pack.contentUnit ? shownPerUnit(perUnit, pack.contentUnit, pack) : null;
   const packPrice = (
     <>
@@ -278,7 +278,7 @@ function VariantThumbs({ packs }: { packs: Pack[] }) {
 
 /** "24 x 0,33 l, 0,5 l, 4 x 1,5 l og flere" - the pack sizes on offer, so people see the choice. */
 function variantSummary(packs: Pack[]): string {
-  const labels = [...new Set(packs.flatMap((p) => (p.packLabel ? [mlWords(pieceWords(p.packLabel, p.pieceLabel), p.displayPer)] : [])))];
+  const labels = [...new Set(packs.flatMap((p) => (p.packLabel ? [smallUnitWords(pieceWords(p.packLabel, p.pieceLabel), p.displayPer)] : [])))];
   if (!labels.length) return "Andre pakninger og størrelser";
   return labels.slice(0, 3).join(", ") + (labels.length > 3 ? " og flere" : "");
 }

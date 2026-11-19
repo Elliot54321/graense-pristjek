@@ -31,23 +31,37 @@ export function perUnitLabel(unit: Unit, pieceLabel?: string | null): string {
 }
 
 /**
- * A price per unit as shown: the number and its label. Families shown per 100 ml (perfume,
- * FamilyResult/Pack.displayPer) get the per-liter price ÷ 10 and "pr. 100 ml"; everything else
- * as perUnitLabel ("pr. liter", "pr. kg", "pr. kapsel").
+ * Families shown per 100 ml / 100 g (FamilyResult/Pack.displayPer: perfume, spices): their
+ * comparison unit, the small unit for pack sizes and its factor (1 l = 1000 ml).
+ */
+const SMALL_UNITS: Record<string, { unit: Unit; small: string }> = {
+  "100 ml": { unit: "l", small: "ml" },
+  "100 g": { unit: "kg", small: "g" },
+};
+
+/**
+ * A price per unit as shown: the number and its label. Families shown per 100 ml or 100 g get
+ * the per-liter/kg price ÷ 10 and "pr. 100 ml" / "pr. 100 g"; everything else as perUnitLabel
+ * ("pr. liter", "pr. kg", "pr. kapsel").
  */
 export function perUnit(
   pricePerUnit: number,
   unit: Unit,
   { pieceLabel, displayPer }: { pieceLabel?: string | null; displayPer?: string | null } = {},
 ): { price: number; label: string } {
-  if (displayPer === "100 ml" && unit === "l") return { price: pricePerUnit / 10, label: "pr. 100 ml" };
+  if (displayPer && SMALL_UNITS[displayPer]?.unit === unit) return { price: pricePerUnit / 10, label: `pr. ${displayPer}` };
   return { price: pricePerUnit, label: perUnitLabel(unit, pieceLabel) };
 }
 
-/** Liters in a pack label as ml, for families shown per 100 ml: "0,1 l" -> "100 ml", "2 x 0,05 l" -> "2 x 50 ml". */
-export function mlWords(label: string | null, displayPer?: string | null): string | null {
-  if (!label || displayPer !== "100 ml") return label;
-  return label.replace(/([\d.,]+) l\b/g, (_, n: string) => `${amount(Number(n.replace(/\./g, "").replace(",", ".")) * 1000)} ml`);
+/**
+ * Pack sizes in the small unit for families shown per 100 ml / 100 g: "0,1 l" -> "100 ml",
+ * "2 x 0,05 l" -> "2 x 50 ml", "0,03 kg" -> "30 g". Other labels are left as they are.
+ */
+export function smallUnitWords(label: string | null, displayPer?: string | null): string | null {
+  const small = displayPer ? SMALL_UNITS[displayPer] : undefined;
+  if (!label || !small) return label;
+  const unit = new RegExp(`([\\d.,]+) ${UNIT_LABEL[small.unit]}\\b`, "g");
+  return label.replace(unit, (_, n: string) => `${amount(Number(n.replace(/\./g, "").replace(",", ".")) * 1000)} ${small.small}`);
 }
 
 /** An amount in its unit: "2 kg", "1,5 l", "40 kapsler". */

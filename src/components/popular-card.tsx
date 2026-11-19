@@ -4,7 +4,7 @@ import { X } from "lucide-react";
 import { useRef } from "react";
 import { dealPerPiece, effectivePrice } from "@/catalog/compare";
 import type { FamilyResult, Shop } from "@/catalog/types";
-import { kr, mlWords, perUnit, pieceWords } from "@/lib/format";
+import { kr, smallUnitWords, perUnit, pieceWords } from "@/lib/format";
 import { AddToBasket } from "./add-to-basket";
 import { useBasket } from "./basket";
 import { CouponBadge, MultiBuyBadge, OfferBadge } from "./badges";
@@ -25,7 +25,7 @@ export function PopularCard({ family: f, shops }: { family: FamilyResult; shops:
   // The photo of the most widely sold pack - the one people recognise - not necessarily the
   // cheapest per liter (for Jägermeister that's a 3-litre bottle).
   const image = [...f.packs].filter((p) => p.imageUrl).sort((a, b) => b.offers.length - a.offers.length)[0]?.imageUrl ?? null;
-  const sizes = [...new Set(f.packs.flatMap((p) => (p.packLabel ? [mlWords(pieceWords(p.packLabel, p.pieceLabel), p.displayPer)] : [])))];
+  const sizes = [...new Set(f.packs.flatMap((p) => (p.packLabel ? [smallUnitWords(pieceWords(p.packLabel, p.pieceLabel), p.displayPer)] : [])))];
   // "149,99 kr. pr. 100 ml" for perfume, else per liter/kg/piece.
   const shown = f.best ? perUnit(f.best.pricePerUnit, f.best.unit, f) : null;
   const item = cheapestListItem(f);
