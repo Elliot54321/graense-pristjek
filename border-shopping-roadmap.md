@@ -1443,6 +1443,10 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   price is 100/3, so the site reads like "3 for 100"; Fleggaard's November issue has no rows for Colgate (Tandpasta,
   Tandbørste, Triple Action, Anti-Cavity), TRESemmé (Shampoo, Balsam, 3 for 99,99) or Finish Power Essential, which the
   user says it prints at Calle's prices - only Calle's rows exist (Fleggaard's are from the October issue).
+- **Larsen cognac (same day, user):** BorderShop's (Puttgarden + Rostock) Larsen VS and VSOP are different products from
+  Poetzsch's and ScandiPark's -> own families "Larsen VS Cognac (BorderShop)" and "Larsen VSOP Cognac (BorderShop)" (the
+  VSOP one also holds BorderShop's 4 cl mini as its own size). They share barcodes with ScandiPark's VS and Poetzsch's VSOP;
+  those were marked reviewed, so `match:ean` leaves both sides alone.
   *Data & newsletters reply (2026-11-19):* both are as printed, nothing re-imported. Fazermint p21 prints "4 pk. 100,-"
   and "Pr. pk. 33,33" (one pack 33,33, four for 100 = 25 each; max 109,65/kg checks out at 228 g), which is exactly what
   is stored - if the site reads like "3 for 100" that's display (UI), not data. Its content stays empty until the range guard
