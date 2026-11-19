@@ -10,6 +10,8 @@
  *     submit                the families the rules leave, as one Batch API job (half price)
  *     collect <batch-id>    store a finished batch's answers in the cache
  *     apply [--save]        rules + cached answers -> counts, data/llm-batches/units.txt; --save writes
+ *     nightly [--max-usd N] families of the last 3 days without a unit: rules, then the model directly;
+ *                           over the cap (default $0.50) the model isn't asked and the run exits 1
  *
  * Rules first, on the family name and its shop listings: pet food and clear liquids/powders
  * keep their content unit; clear count words (tabs, kapsler, toiletpapir, affaldsposer, bleer,
@@ -36,6 +38,8 @@ const CACHE_DIR = "data/llm-batches/cache";
 const MANIFEST_DIR = "data/llm-batches";
 const REVIEW_FILE = `${MANIFEST_DIR}/units.txt`;
 const CHUNK = 100;
+/** `nightly` looks at families created this many days back (a missed night is caught up). */
+const RECENT_DAYS = 3;
 
 type Unit = "l" | "kg" | "piece";
 interface Decision {
@@ -329,15 +333,87 @@ async function apply(save: boolean) {
 
   if (!save) return console.log("Dry run - nothing saved.");
   if (!set.size) throw new Error("product_families.compare_unit doesn't exist yet - run the migration first.");
+  console.log(`Saved ${await saveUnits(decided)} families.`);
+}
+
+/** Write units, one update per unit/label. Only where still unset, so a unit set meanwhile (by hand) is never overwritten. */
+async function saveUnits(decided: Map<number, Decision>) {
   const db = adminClient();
-  let n = 0;
+  const groups = new Map<string, { d: Decision; ids: number[] }>();
   for (const [id, d] of decided) {
-    // Only where still unset, so a unit set meanwhile (by hand) is never overwritten.
-    const { error } = await db.from("product_families").update({ compare_unit: d.unit, piece_label: d.label }).eq("id", id).is("compare_unit", null);
-    if (error) throw error;
-    n++;
+    const k = `${d.unit}|${d.label ?? ""}`;
+    groups.set(k, { d, ids: [...(groups.get(k)?.ids ?? []), id] });
   }
-  console.log(`Saved ${n} families.`);
+  for (const { d, ids } of groups.values()) {
+    for (let i = 0; i < ids.length; i += 200) {
+      const { error } = await db
+        .from("product_families")
+        .update({ compare_unit: d.unit, piece_label: d.label })
+        .in("id", ids.slice(i, i + 200))
+        .is("compare_unit", null);
+      if (error) throw error;
+    }
+  }
+  return decided.size;
+}
+
+/**
+ * Nightly, after match:new: units for families that still have none (new families). Rules
+ * first; the rest asked directly (cached). If the estimate for those is over `maxUsd`, the
+ * rule decisions are still saved but the model isn't asked and the run fails (exit 1), so
+ * GitHub emails - a big set should go through submit/collect/apply by hand instead.
+ */
+async function nightly(maxUsd: number) {
+  const { families, set } = await load();
+  if (!set.size) throw new Error("product_families.compare_unit doesn't exist yet - run the migration first.");
+  // Only recent families: the runner has no answer cache, so older ones the model was unsure
+  // about (left null on purpose) would otherwise be asked again every night.
+  const since = new Date(Date.now() - RECENT_DAYS * 24 * 3600 * 1000).toISOString();
+  const { data: recent, error } = await adminClient().from("product_families").select("id").gte("created_at", since).in("category", CATEGORIES);
+  if (error) throw error;
+  const recentIds = new Set((recent ?? []).map((r) => r.id as number));
+  const todo = open(families, set).filter((f) => recentIds.has(f.id));
+  const decided = new Map<number, Decision>();
+  const ask: Family[] = [];
+  for (const f of todo) {
+    const d = ruleUnit(f) ?? accept(cached(f));
+    if (d) decided.set(f.id, d);
+    else if (!cached(f)) ask.push(f);
+  }
+  const est = estimate(ask) * 2; // direct API: full price, not batch
+  let failed = false;
+  if (ask.length && est > maxUsd) {
+    console.error(`::error::${ask.length} families need the model (~$${est.toFixed(2)}), over the $${maxUsd} cap - not asked. Run units.ts submit / collect / apply --save by hand.`);
+    failed = true;
+  } else if (ask.length) {
+    const client = new Anthropic();
+    let cost = 0;
+    for (let i = 0; i < ask.length; i += CHUNK) {
+      const part = ask.slice(i, i + CHUNK);
+      const response = await client.messages.parse(request(part));
+      if (response.stop_reason !== "end_turn" || !response.parsed_output) {
+        console.warn(`  stopped with ${response.stop_reason} - ${part.length} families left for the next run`);
+        continue;
+      }
+      cost += costUsd(UNIT_MODEL, response.usage.input_tokens, response.usage.output_tokens);
+      mkdirSync(CACHE_DIR, { recursive: true });
+      const byId = new Map(response.parsed_output.items.map((a) => [a.id, a]));
+      for (const f of part) {
+        const a = byId.get(f.id);
+        if (!a) continue;
+        writeFileSync(cacheFile(f), JSON.stringify(a));
+        const d = accept(a);
+        if (d) decided.set(f.id, d);
+      }
+    }
+    console.log(`Asked ${UNIT_MODEL} about ${ask.length} families: $${cost.toFixed(3)}.`);
+  }
+  for (const [id, d] of decided) {
+    const f = families.find((x) => x.id === id)!;
+    console.log(`  f${id} ${f.name}: ${d.unit}${d.label ? `/${d.label}` : ""} (${d.why})`);
+  }
+  console.log(`Families of the last ${RECENT_DAYS} days without a unit: ${todo.length}; set now: ${await saveUnits(decided)}; left null: ${todo.length - decided.size}.`);
+  if (failed) process.exit(1);
 }
 
 /** Every rule decision, for checking the rules: data/llm-batches/units-rules.txt. */
@@ -359,6 +435,9 @@ async function main() {
   else if (cmd === "collect" && arg) await collect(arg);
   else if (cmd === "apply") await apply(process.argv.includes("--save"));
   else if (cmd === "rules") await rules();
-  else console.error("Usage: units.ts plan | rules | submit | collect <batch-id> | apply [--save]");
+  else if (cmd === "nightly") {
+    const i = process.argv.indexOf("--max-usd");
+    await nightly(i > 0 ? Number(process.argv[i + 1]) : 0.5);
+  } else console.error("Usage: units.ts plan | rules | submit | collect <batch-id> | apply [--save] | nightly [--max-usd N]");
 }
 main();

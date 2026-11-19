@@ -1649,5 +1649,17 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   100 left null (unsure). Aluminium foil/baking paper are sold by length - no fitting unit, left as today.
 - **Review list:** `data/llm-batches/units.txt` (git-ignored) - every `piece` family with its products, on-sale first
   ("-" = not on sale), with the rule or "model" that decided it, for the trust audit.
-- **Next (architect):** copy piece counts onto `products.piece_count` once `shop_products.piece_count` is backfilled;
-  new families from `match:new` don't get a unit yet (they stay null = as today).
+- **Nightly units for new families:** `units.ts nightly [--max-usd 0.5]` - families created in the last 3 days without a
+  unit: rules, then Sonnet directly. Only recent ones because the runner has no answer cache (the 100 "unsure" families
+  would be asked again every night). Over the cap the rule decisions are still saved, the model isn't asked and the
+  run exits 1 (GitHub emails). Workflow lines for the `match-new` job sent to the architect for the Data chat
+  (`scrape.yml` is theirs).
+- **Piece counts on products (`src/matching/pieces.ts [--save]`, saved 2026-11-19, user OK):** `products.piece_count`
+  from the linked listings' `shop_products.piece_count`, like product content in `ean.ts`: listings on sale first (all
+  when none on sale has a count), then a human decision (reviewed/manual match; humans disagreeing -> null), then all
+  agree, then a majority of more than half, else null. Products have no reviewed flag, so a value no listing gives
+  counts as hand-set and is never changed. Only differences are written (a second run: 0 changes), so it runs nightly
+  after `match:new`. Result: 1,380 of 13,007 products (948 one listing, 302 agree, 129 human, 1 majority); 2 left null -
+  Albani Mosaic IPA (BorderShop 18 vs Fleggaard/Calle "18-24"), Toffifee (Poetzsch 5 packs vs ScandiPark 75 pieces).
+  Report: `data/llm-batches/piece-counts.txt` (git-ignored). Candy counts mix packs and bars (Kinder 32 bars -> 4 by
+  majority); harmless while candy isn't compared per piece, and the smaller count wins on the site anyway.
