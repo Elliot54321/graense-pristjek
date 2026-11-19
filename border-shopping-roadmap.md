@@ -1663,3 +1663,29 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   Albani Mosaic IPA (BorderShop 18 vs Fleggaard/Calle "18-24"), Toffifee (Poetzsch 5 packs vs ScandiPark 75 pieces).
   Report: `data/llm-batches/piece-counts.txt` (git-ignored). Candy counts mix packs and bars (Kinder 32 bars -> 4 by
   majority); harmless while candy isn't compared per piece, and the smaller count wins on the site anyway.
+
+### Piece families priced per piece (2026-11-19, Catalog chat - "stk. prices" step 4)
+
+- **No migration:** the website doesn't read the best-price views (search and the list compute in `data.ts`), so they
+  stay as they are. `loadPacks` reads `shop_products.piece_count` (via `matched_prices.shop_product_id`),
+  `products.piece_count` and the family's `compare_unit` / `piece_label`.
+- **In a `piece` family:** an offer's content is its piece count (the smaller of listing and product, `offerPieces`),
+  unit 'piece', and its price per unit is per piece; without a count it has no price per unit (never per kg/l). A pack's
+  count is the product's, else the smallest of its offers' when every offer has one. The family gets a per-piece `best`
+  only when every pack on sale has a count; otherwise `best` is null and `listPack` puts an exact pack on the list.
+- **List:** a piece family item is a number of pieces, bought only from packs with a count. Saved lists whose unit no
+  longer fits (a kg/l item of a family now 'piece', or the reverse) are re-expressed by `asComparable` in `compare.ts`:
+  amount / step packs of the pack it was added with, as pieces (or l/kg) of the family ("2,5 l" of a 25-wash pack = 50
+  washes), or that exact pack when counts are missing. The stored basket shape is unchanged, nothing for `basket.ts`.
+- **Fields for the UI (step 5):** `Pack.compareUnit`, `Pack.pieceLabel` (singular word from Matching, "stk." by default;
+  null outside piece families), `FamilyResult.compareUnit` / `pieceLabel`, `LineResult.buy.pieceLabel`. A per-piece
+  price exists when `FamilyResult.best.unit === "piece"` (family) or `Pack.contentUnit === "piece"` (pack). Counted packs
+  get `packLabel` "40 stk." (plural forms like "40 kapsler" are for the UI). Old list items still show their saved
+  amount ("2,5 l") until the UI converts them; the prices are already right.
+- **Before/after** (44 category, subcategory and search pages, 449 families, 8 lists; script `catalog-piece/` in the
+  shared notes folder): families with `compare_unit` null (268), l (17) and kg (76) unchanged (ignoring pack order,
+  which the products query never fixed); page order unchanged; beer, candy and grocery lists unchanged. Of 88 piece
+  families: 36 now per piece (Neutral 100 tabs: 551 kr./kg from a misread 145 g -> 0,80 kr. per tab), 22 lost a
+  per-kg/l price (pack price only), 30 had none before or after. Household lists: the cheapest shop is the same in all
+  five; Fleggaard's 90-tab Finish and 50-wash Omo now compete per piece (they had no comparable weight), which also
+  raises the estimate for shops lacking them. For Data: "Omo Liquid White 71 vasker" has no count ("vasker" not parsed).

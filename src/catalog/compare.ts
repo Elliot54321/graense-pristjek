@@ -21,6 +21,12 @@
  *   liter/kg uses. One barcode can be shared by sizes, and pricing BorderShop's 0,25 l
  *   Hans Baer as the product's 0,75 l made it look 3x too cheap (trust audit
  *   2026-11-15). So a shop selling smaller packs needs more of them.
+ * - A family compared per piece (Pack.compareUnit 'piece', 2026-11-19) is a number of pieces on
+ *   the list, bought only as packs whose piece count is known (contentUnit 'piece', see data.ts).
+ *   A pack without a count goes on the list as that exact product, by pack (FamilyResult.listPack).
+ *   A list saved before a family's unit changed (an amount in kg/l of a family now compared per
+ *   piece, or pieces of one now compared per l/kg) is re-expressed from the pack it was added
+ *   with: amount / step of those packs, in the family's unit (asComparable below).
  */
 import { packLabel } from "@/lib/format";
 import type { BasketItem, LineResult, Offer, Pack, Shop, ShopResult } from "./types";
@@ -103,6 +109,7 @@ function buyLine(item: BasketItem, pack: Pack, offer: Offer, quantity: number): 
       packLabel: otherSize ? packLabel(null, null, own!.unit, own!.amount) : pack.packLabel,
       contentAmount: own?.amount ?? null,
       contentUnit: own?.unit ?? null,
+      pieceLabel: pack.pieceLabel,
       imageUrl: pack.imageUrl,
       quantity,
       price: offer.price,
@@ -144,6 +151,8 @@ function priceLine(item: BasketItem, packs: Pack[], shopId: string): LineResult 
   // A family: the offer (any pack, at its own content) with the lowest total for the amount.
   for (const pack of packs) {
     if (pack.familyId !== item.familyId) continue;
+    // Pieces only from packs with a known count, so every pack compared per piece has one.
+    if (item.unit === "piece" && pack.contentUnit !== "piece") continue;
     for (const offer of pack.offers) {
       if (offer.shopId !== shopId) continue;
       const quantity = piecesFor(pack, offer, item.amount, item.unit);
@@ -153,8 +162,39 @@ function priceLine(item: BasketItem, packs: Pack[], shopId: string): LineResult 
   return best ?? none;
 }
 
+/**
+ * A family item whose unit no longer fits its family (saved before the family's compare unit was
+ * set or changed): amount / step packs of the pack it was added from (for lists older than
+ * productId, the family's most widely sold pack), as that much of the family in its unit - "2,5 l"
+ * of a 1,25 l / 25-wash pack becomes 50 washes, so every shop's packs still compete. When that
+ * can't be compared (the pack, or for pieces any pack of the family, has no count), it becomes
+ * those packs as an exact product. Families with no compare unit are left alone, as before.
+ */
+export function asComparable(item: BasketItem, packs: Pack[]): BasketItem {
+  if (item.kind !== "family") return item;
+  const own = packs.filter((p) => p.familyId === item.familyId);
+  const unit = own[0]?.compareUnit;
+  if (!unit || (unit === "piece") === (item.unit === "piece")) return item;
+  const shops = (p: Pack) => new Set(p.offers.map((o) => o.shopId)).size;
+  const pack = own.find((p) => p.productId === item.productId) ?? [...own].sort((a, b) => shops(b) - shops(a))[0];
+  const count = Math.max(1, Math.round(item.amount / item.step));
+  const counted = unit !== "piece" || own.every((p) => p.contentUnit === "piece");
+  if (counted && pack.contentAmount && pack.contentUnit) {
+    return { ...item, amount: count * pack.contentAmount, step: pack.contentAmount, unit: pack.contentUnit, productId: pack.productId };
+  }
+  return {
+    key: item.key,
+    kind: "product",
+    productId: pack.productId,
+    label: item.label,
+    quantity: count,
+    singlePrice: item.singlePrice,
+  };
+}
+
 /** One result per shop, cheapest first once missing items are counted at their estimate. */
-export function compareBasket(items: BasketItem[], packs: Pack[], shops: Shop[]): ShopResult[] {
+export function compareBasket(listed: BasketItem[], packs: Pack[], shops: Shop[]): ShopResult[] {
+  const items = listed.map((item) => asComparable(item, packs));
   const linesPerShop = shops.map((shop) => items.map((item) => priceLine(item, packs, shop.id)));
   // Highest price per item across shops; null if no shop has it (then it's left out everywhere).
   const highest = items.map((_, i) => {

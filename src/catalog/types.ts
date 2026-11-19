@@ -18,10 +18,13 @@ export interface Offer {
    * What one piece of this offer contains, used for its price per l/kg in search and for the
    * list: the smaller of the shop's own content and the product's (see offerContent() in
    * data.ts); null if neither is known. Usually both agree.
+   * In a 'piece' family (Pack.compareUnit): its piece count, unit 'piece' - the smaller of the
+   * listing's and the product's - or null when unknown; never l/kg there.
    */
   contentAmount: number | null;
   contentUnit: Unit | null;
   price: number;
+  /** Per contentUnit; in a 'piece' family per piece, or null when the count is unknown. */
   pricePerUnit: number | null;
   onOffer: boolean;
   regularPrice: number | null;
@@ -41,9 +44,17 @@ export interface Pack {
   productId: number;
   name: string;
   familyId: number | null;
+  /**
+   * How the family is compared ('l' / 'kg' / 'piece'); null = from the products' content, as
+   * before 2026-11-19. In a 'piece' family contentAmount is the pack's piece count (unit
+   * 'piece'), or null with contentUnit null when unknown - such a pack has only a pack price.
+   */
+  compareUnit: Unit | null;
+  /** 'piece' families: the word per piece ("stk.", "vask", "kapsel", singular); null otherwise. */
+  pieceLabel: string | null;
   contentAmount: number | null;
   contentUnit: Unit | null;
-  /** "24 x 0,33 l" - how the shops sell it; contentAmount (7,92 l) is for comparing per liter. */
+  /** "24 x 0,33 l" - how the shops sell it; contentAmount (7,92 l) is for comparing per liter. "40 stk." for counted piece packs. */
   packLabel: string | null;
   /** Product photo on a shop's own site (og:image); null for newsletter-only products. */
   imageUrl: string | null;
@@ -54,7 +65,13 @@ export interface FamilyResult {
   id: number;
   name: string;
   category: string;
-  /** Cheapest price per liter/kg/piece across all packs and shops. */
+  /** Pack.compareUnit and Pack.pieceLabel of its packs (null for families with no packs on sale). */
+  compareUnit: Unit | null;
+  pieceLabel: string | null;
+  /**
+   * Cheapest price per liter/kg/piece across all packs and shops. A 'piece' family has one
+   * (unit 'piece') only when every pack has a piece count; otherwise null and listPack is set.
+   */
   /** deal: set when the price is a multi-buy rate ("ved 3 stk."). */
   best: {
     pricePerUnit: number;
@@ -107,6 +124,8 @@ export interface LineResult {
     /** One piece of the offer (its own content, see offerContent() in compare.ts); null if unknown. */
     contentAmount: number | null;
     contentUnit: Unit | null;
+    /** The pack's Pack.pieceLabel ('piece' families only), for "40 kapsler" / "pr. kapsel". */
+    pieceLabel: string | null;
     /** The pack's photo (null for newsletter-only products). */
     imageUrl: string | null;
     quantity: number;

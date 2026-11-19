@@ -20,15 +20,24 @@ import type { FamilyResult, Offer, Pack, ResultPage, Shop, Unit } from "./types"
 /** Most families rankFamilies() returns (pages are smaller; see RESULTS_PAGE and POPULAR_PAGE). */
 const MAX_FAMILIES = 30;
 
+interface FamilyUnitRow {
+  compare_unit: Unit | null;
+  piece_label: string | null;
+}
+
 interface ProductRow {
   id: number;
   name: string;
   family_id: number | null;
   content_amount: number | null;
   content_unit: Unit | null;
+  piece_count: number | null;
+  product_families: FamilyUnitRow | FamilyUnitRow[] | null;
 }
 
 interface ListingShape {
+  id: number;
+  piece_count: number | null;
   pack_count: number | null;
   unit_size_amount: number | null;
   unit_size_unit: Unit | null;
@@ -42,6 +51,7 @@ interface ListingRow {
 
 interface PriceRow {
   product_id: number;
+  shop_product_id: number;
   shop_id: string;
   name: string;
   content_amount: number | null;
@@ -140,6 +150,15 @@ function offerContent(
   return own.amount < theirs.amount ? own : theirs;
 }
 
+/**
+ * Pieces in one offer of a 'piece' family: the smaller of the listing's count and the product's
+ * when both are known (the content rule above, for the same reason), else whichever is known.
+ */
+function offerPieces(listing: number | null | undefined, product: number | null): number | null {
+  const counts = [listing, product].filter((n): n is number => Number(n) > 0).map(Number);
+  return counts.length ? Math.min(...counts) : null;
+}
+
 async function loadPacks(productIds: number[], familyIds: number[]): Promise<Pack[]> {
   const db = publicClient();
   const filters: string[] = [];
@@ -149,7 +168,7 @@ async function loadPacks(productIds: number[], familyIds: number[]): Promise<Pac
 
   const { data: products, error } = await db
     .from("products")
-    .select("id, name, family_id, content_amount, content_unit")
+    .select("id, name, family_id, content_amount, content_unit, piece_count, product_families(compare_unit, piece_label)")
     .or(filters.join(","));
   if (error) throw error;
   if (!products.length) return [];
@@ -157,7 +176,7 @@ async function loadPacks(productIds: number[], familyIds: number[]): Promise<Pac
   const { data: prices, error: priceError } = await db
     .from("matched_prices")
     .select(
-      "product_id, shop_id, name, content_amount, content_unit, price, price_per_unit, on_offer, regular_price, offer_ends_at, url, observed_at, multi_buy_quantity, multi_buy_price, saving_vs_dk_percent, coupon",
+      "product_id, shop_product_id, shop_id, name, content_amount, content_unit, price, price_per_unit, on_offer, regular_price, offer_ends_at, url, observed_at, multi_buy_quantity, multi_buy_price, saving_vs_dk_percent, coupon",
     )
     .in("product_id", products.map((p) => p.id));
   if (priceError) throw priceError;
@@ -166,13 +185,15 @@ async function loadPacks(productIds: number[], familyIds: number[]): Promise<Pac
   // The photo is the first one a scraped shop has (newsletter listings have none).
   const { data: listings, error: listingError } = await db
     .from("product_matches")
-    .select("product_id, shop_products(pack_count, unit_size_amount, unit_size_unit, image_url)")
+    .select("product_id, shop_products(id, piece_count, pack_count, unit_size_amount, unit_size_unit, image_url)")
     .in("product_id", products.map((p) => p.id));
   if (listingError) throw listingError;
   const shapes = new Map<number, Map<string, number>>();
   const images = new Map<number, string>();
+  const listingPieces = new Map<number, number | null>();
   for (const l of listings as unknown as ListingRow[]) {
     const sp = Array.isArray(l.shop_products) ? l.shop_products[0] : l.shop_products;
+    if (sp) listingPieces.set(sp.id, sp.piece_count);
     if (sp?.image_url && !images.has(l.product_id)) images.set(l.product_id, sp.image_url);
     if (!sp?.unit_size_amount || !sp.unit_size_unit) continue;
     const key = `${sp.pack_count ?? 1}|${Number(sp.unit_size_amount)}|${sp.unit_size_unit}`;
@@ -187,9 +208,19 @@ async function loadPacks(productIds: number[], familyIds: number[]): Promise<Pac
   };
 
   const productById = new Map((products as ProductRow[]).map((p) => [p.id, p]));
+  const unitOf = (p: ProductRow | undefined): FamilyUnitRow | null =>
+    (Array.isArray(p?.product_families) ? p.product_families[0] : p?.product_families) ?? null;
+  // A 'piece' family is priced per piece only, never per l/kg: an offer's "content" is its piece
+  // count (unit 'piece'), or unknown - then it has no price per unit and the list buys it by pack.
+  const isPieceFamily = (p: ProductRow | undefined) => unitOf(p)?.compare_unit === "piece";
   const offersByProduct = new Map<number, Offer[]>();
   for (const r of prices as PriceRow[]) {
-    const content = offerContent(r, productById.get(r.product_id));
+    const product = productById.get(r.product_id);
+    let content: { amount: number; unit: Unit } | null;
+    if (isPieceFamily(product)) {
+      const pieces = offerPieces(listingPieces.get(r.shop_product_id), product!.piece_count);
+      content = pieces ? { amount: pieces, unit: "piece" } : null;
+    } else content = offerContent(r, product);
     const offer: Offer = {
       productId: r.product_id,
       shopId: r.shop_id,
@@ -197,7 +228,11 @@ async function loadPacks(productIds: number[], familyIds: number[]): Promise<Pac
       contentAmount: content?.amount ?? null,
       contentUnit: content?.unit ?? null,
       price: Number(r.price),
-      pricePerUnit: content ? Number(r.price) / content.amount : r.price_per_unit === null ? null : Number(r.price_per_unit),
+      pricePerUnit: content
+        ? Number(r.price) / content.amount
+        : r.price_per_unit === null || isPieceFamily(product)
+          ? null
+          : Number(r.price_per_unit),
       onOffer: r.on_offer,
       regularPrice: r.regular_price === null ? null : Number(r.regular_price),
       offerEndsAt: r.offer_ends_at,
@@ -214,23 +249,41 @@ async function loadPacks(productIds: number[], familyIds: number[]): Promise<Pac
   }
 
   return (products as ProductRow[])
-    .map((p) => ({
-      productId: p.id,
-      name: p.name,
-      familyId: p.family_id,
-      contentAmount: p.content_amount === null ? null : Number(p.content_amount),
-      contentUnit: p.content_unit,
-      packLabel: (() => {
-        const shape = shapeOf(p.id);
-        const content = p.content_amount === null ? null : Number(p.content_amount);
-        // Only trust the shape if it adds up to the product's content (7,92 = 24 x 0,33).
-        const fits = shape && content && shape.unit === p.content_unit && Math.abs(shape.count * shape.size - content) / content < 0.02;
-        return fits ? packLabel(shape.count, shape.size, shape.unit, content) : packLabel(null, null, p.content_unit, content);
-      })(),
-      imageUrl: images.get(p.id) ?? null,
-      // Cheapest first at the price a bulk shopper pays (multi-buy rate when there is one).
-      offers: (offersByProduct.get(p.id) ?? []).sort((a, b) => effectivePrice(a) - effectivePrice(b) || a.price - b.price),
-    }))
+    .map((p): Pack => {
+      const offers = (offersByProduct.get(p.id) ?? []).sort((a, b) => effectivePrice(a) - effectivePrice(b) || a.price - b.price);
+      const family = unitOf(p);
+      const common = {
+        productId: p.id,
+        name: p.name,
+        familyId: p.family_id,
+        compareUnit: family?.compare_unit ?? null,
+        pieceLabel: family?.compare_unit === "piece" ? family.piece_label || "stk." : null,
+        imageUrl: images.get(p.id) ?? null,
+        // Cheapest first at the price a bulk shopper pays (multi-buy rate when there is one).
+        offers,
+      };
+      if (common.compareUnit === "piece") {
+        // The pack's piece count: the product's, else the smallest its offers know - only when every
+        // offer knows one (a pack whose count is unknown somewhere is compared per pack).
+        const counts = offers.map((o) => o.contentAmount);
+        const pieces = Number(p.piece_count) > 0 ? Number(p.piece_count) : counts.length && counts.every((c) => c !== null) ? Math.min(...(counts as number[])) : null;
+        // Without a count the label still says what the pack is ("1,2 kg"), just never a price per kg.
+        const label = pieces ? `${pieces} stk.` : packLabel(null, null, p.content_unit, p.content_amount === null ? null : Number(p.content_amount));
+        return { ...common, contentAmount: pieces, contentUnit: pieces ? "piece" : null, packLabel: label };
+      }
+      return {
+        ...common,
+        contentAmount: p.content_amount === null ? null : Number(p.content_amount),
+        contentUnit: p.content_unit,
+        packLabel: (() => {
+          const shape = shapeOf(p.id);
+          const content = p.content_amount === null ? null : Number(p.content_amount);
+          // Only trust the shape if it adds up to the product's content (7,92 = 24 x 0,33).
+          const fits = shape && content && shape.unit === p.content_unit && Math.abs(shape.count * shape.size - content) / content < 0.02;
+          return fits ? packLabel(shape.count, shape.size, shape.unit, content) : packLabel(null, null, p.content_unit, content);
+        })(),
+      };
+    })
     .filter((p) => p.offers.length > 0); // products no shop currently sells are left out
 }
 
@@ -552,8 +605,12 @@ async function priceFamilies(families: FamilyRow[], pre: Map<number, number>): P
   const packs = await loadPacks([], families.map((f) => f.id));
   return families.map((f) => {
     const own = packs.filter((p) => p.familyId === f.id);
+    const compareUnit = own[0]?.compareUnit ?? null;
+    // A 'piece' family compares per piece only when every pack has a count; otherwise per pack
+    // (no `best`, the list takes an exact pack), never per l/kg.
+    const comparable = compareUnit !== "piece" || own.every((p) => p.contentUnit === "piece");
     let best: FamilyResult["best"] = null;
-    for (const pack of own) {
+    for (const pack of comparable ? own : []) {
       for (const o of pack.offers) {
         if (o.pricePerUnit === null || !pack.contentUnit) continue;
         // At the multi-buy rate when there is one, like the basket (compare.ts).
@@ -565,7 +622,15 @@ async function priceFamilies(families: FamilyRow[], pre: Map<number, number>): P
       }
     }
     const shops = new Set(own.flatMap((p) => p.offers.map((o) => o.shopId))).size;
-    const result: FamilyResult = { id: f.id, name: f.name, category: f.category, best, packs: own };
+    const result: FamilyResult = {
+      id: f.id,
+      name: f.name,
+      category: f.category,
+      compareUnit,
+      pieceLabel: own[0]?.pieceLabel ?? null,
+      best,
+      packs: own,
+    };
     // Nothing to compare per liter/kg: the list takes an exact pack instead (see FamilyResult.listPack).
     if (!best && own.length) {
       const pack = [...own].sort(
