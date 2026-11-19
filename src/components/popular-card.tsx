@@ -4,7 +4,7 @@ import { X } from "lucide-react";
 import { useRef } from "react";
 import { dealPerPiece, effectivePrice } from "@/catalog/compare";
 import type { FamilyResult, Shop } from "@/catalog/types";
-import { kr, perUnitLabel, pieceWords } from "@/lib/format";
+import { kr, mlWords, perUnit, pieceWords } from "@/lib/format";
 import { AddToBasket } from "./add-to-basket";
 import { useBasket } from "./basket";
 import { CouponBadge, MultiBuyBadge, OfferBadge } from "./badges";
@@ -25,7 +25,9 @@ export function PopularCard({ family: f, shops }: { family: FamilyResult; shops:
   // The photo of the most widely sold pack - the one people recognise - not necessarily the
   // cheapest per liter (for Jägermeister that's a 3-litre bottle).
   const image = [...f.packs].filter((p) => p.imageUrl).sort((a, b) => b.offers.length - a.offers.length)[0]?.imageUrl ?? null;
-  const sizes = [...new Set(f.packs.flatMap((p) => (p.packLabel ? [pieceWords(p.packLabel, p.pieceLabel)] : [])))];
+  const sizes = [...new Set(f.packs.flatMap((p) => (p.packLabel ? [mlWords(pieceWords(p.packLabel, p.pieceLabel), p.displayPer)] : [])))];
+  // "149,99 kr. pr. 100 ml" for perfume, else per liter/kg/piece.
+  const shown = f.best ? perUnit(f.best.pricePerUnit, f.best.unit, f) : null;
   const item = cheapestListItem(f);
   // No price per liter/kg/piece (a piece family whose packs aren't all counted): the cheapest pack price.
   const packOffer = f.best
@@ -54,8 +56,8 @@ export function PopularCard({ family: f, shops }: { family: FamilyResult; shops:
         {f.best && (
           <p className="mt-auto pt-1.5 leading-tight">
             <span className="text-xs text-zinc-600">fra </span>
-            <strong className="text-lg text-emerald-700">{kr(f.best.pricePerUnit)} kr.</strong>{" "}
-            <span className="text-xs text-zinc-600">{perUnitLabel(f.best.unit, f.pieceLabel)}</span>
+            <strong className="text-lg text-emerald-700">{kr(shown!.price)} kr.</strong>{" "}
+            <span className="text-xs text-zinc-600">{shown!.label}</span>
             <span className="block truncate text-xs text-zinc-600">
               hos {shopById.get(f.best.shopId)?.name ?? f.best.shopId}
               {f.best.deal && ` ved ${f.best.deal.quantity} stk.`}

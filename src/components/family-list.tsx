@@ -1,12 +1,12 @@
 import { dealPerPiece, effectivePrice } from "@/catalog/compare";
-import type { FamilyResult, Offer, Pack, Shop } from "@/catalog/types";
+import type { DisplayPer, FamilyResult, Offer, Pack, Shop, Unit } from "@/catalog/types";
 import { AddToBasket } from "@/components/add-to-basket";
 import { cheapestListItem } from "@/components/list-item";
 import { CouponBadge, COUPON_NOTE, MultiBuyBadge, OfferBadge } from "@/components/badges";
 import { ReportLink } from "@/components/report-link";
 import { ZoomablePhoto } from "@/components/zoomable-photo";
 import { ChevronDown } from "lucide-react";
-import { kr, perUnitLabel, pieceWords } from "@/lib/format";
+import { kr, mlWords, perUnit as shownPerUnit, pieceWords } from "@/lib/format";
 import { FamilyMore, type ResultSource } from "./family-more";
 
 /** The two-column result grid; each card spans three rows through a subgrid (see FamilyCard). */
@@ -85,7 +85,7 @@ export function FamilyCard({
           <h2 className="text-lg font-semibold leading-snug">{family.name}</h2>
           {family.best && (
             <p className="mt-0.5 text-sm text-zinc-700 dark:text-zinc-300">
-              Billigst <strong className="text-emerald-700 dark:text-emerald-400">{kr(family.best.pricePerUnit)} kr. {perUnitLabel(family.best.unit, family.pieceLabel)}</strong>{" "}
+              Billigst <strong className="text-emerald-700 dark:text-emerald-400">{perUnitText(family.best.pricePerUnit, family.best.unit, family)}</strong>{" "}
               hos {shopName(shops, family.best.shopId)}
               {family.best.deal && <span className="text-zinc-500"> ved {family.best.deal.quantity} stk.</span>}
               {family.best.coupon && <CouponBadge />}
@@ -141,8 +141,9 @@ function PackRow({ pack, shops, page }: { pack: Pack; shops: Map<string, Shop>; 
   // between variants (a 9 kr. bottle vs a 69 kr. crate). The pack price is what you pay, shown under it.
   const perUnit = best.pricePerUnit !== null && pack.contentUnit ? (best.pricePerUnit * low) / best.price : null;
   const deal = dealPerPiece(best) !== null ? best.multiBuy : null;
-  // "40 kapsler" rather than the catalog's "40 stk." in piece families.
-  const label = pieceWords(pack.packLabel, pack.pieceLabel);
+  // "40 kapsler" rather than the catalog's "40 stk." in piece families, "100 ml" rather than "0,1 l" for perfume.
+  const label = mlWords(pieceWords(pack.packLabel, pack.pieceLabel), pack.displayPer);
+  const shown = perUnit !== null && pack.contentUnit ? shownPerUnit(perUnit, pack.contentUnit, pack) : null;
   const packPrice = (
     <>
       {kr(low)} kr.{low < best.price && " stk."}
@@ -162,8 +163,8 @@ function PackRow({ pack, shops, page }: { pack: Pack; shops: Map<string, Shop>; 
           {perUnit !== null && pack.contentUnit ? (
             <>
               <p className="mt-1">
-                <strong className="text-lg tabular-nums">{kr(perUnit)} kr.</strong>{" "}
-                <span className="text-sm font-medium">{perUnitLabel(pack.contentUnit, pack.pieceLabel)}</span>
+                <strong className="text-lg tabular-nums">{kr(shown!.price)} kr.</strong>{" "}
+                <span className="text-sm font-medium">{shown!.label}</span>
                 {deal && <span className="text-sm text-zinc-500"> ved {deal.quantity} stk.</span>}
               </p>
               <p className="text-sm text-zinc-700 dark:text-zinc-300">
@@ -234,7 +235,7 @@ function OfferDetails({ offer: o, pack, page, perUnit = true }: { offer: Offer; 
     <div className="text-xs text-zinc-500">
       {perUnit && o.pricePerUnit !== null && pack.contentUnit && (
         <span>
-          {kr((o.pricePerUnit * effectivePrice(o)) / o.price)} kr. {perUnitLabel(pack.contentUnit, pack.pieceLabel)}
+          {perUnitText((o.pricePerUnit * effectivePrice(o)) / o.price, pack.contentUnit, pack)}
         </span>
       )}
       {deal && <MultiBuyBadge quantity={deal.quantity} price={deal.price} />}
@@ -245,6 +246,12 @@ function OfferDetails({ offer: o, pack, page, perUnit = true }: { offer: Offer; 
       <ReportLink shop={o.shopId} product={pack.name} price={o.price} page={page} />
     </div>
   );
+}
+
+/** "149,99 kr. pr. 100 ml", "9,85 kr. pr. liter", "0,70 kr. pr. tab" - see perUnit() in format.ts. */
+function perUnitText(price: number, unit: Unit, of: { pieceLabel: string | null; displayPer: DisplayPer | null }): string {
+  const p = shownPerUnit(price, unit, of);
+  return `${kr(p.price)} kr. ${p.label}`;
 }
 
 /** Up to three overlapping photos of the other variants, with "+N" for the rest. */
@@ -271,7 +278,7 @@ function VariantThumbs({ packs }: { packs: Pack[] }) {
 
 /** "24 x 0,33 l, 0,5 l, 4 x 1,5 l og flere" - the pack sizes on offer, so people see the choice. */
 function variantSummary(packs: Pack[]): string {
-  const labels = [...new Set(packs.flatMap((p) => (p.packLabel ? [pieceWords(p.packLabel, p.pieceLabel)] : [])))];
+  const labels = [...new Set(packs.flatMap((p) => (p.packLabel ? [mlWords(pieceWords(p.packLabel, p.pieceLabel), p.displayPer)] : [])))];
   if (!labels.length) return "Andre pakninger og størrelser";
   return labels.slice(0, 3).join(", ") + (labels.length > 3 ? " og flere" : "");
 }

@@ -30,6 +30,26 @@ export function perUnitLabel(unit: Unit, pieceLabel?: string | null): string {
   return unit === "piece" ? `pr. ${pieceLabel || "stk."}` : PER_UNIT_LABEL[unit];
 }
 
+/**
+ * A price per unit as shown: the number and its label. Families shown per 100 ml (perfume,
+ * FamilyResult/Pack.displayPer) get the per-liter price ÷ 10 and "pr. 100 ml"; everything else
+ * as perUnitLabel ("pr. liter", "pr. kg", "pr. kapsel").
+ */
+export function perUnit(
+  pricePerUnit: number,
+  unit: Unit,
+  { pieceLabel, displayPer }: { pieceLabel?: string | null; displayPer?: string | null } = {},
+): { price: number; label: string } {
+  if (displayPer === "100 ml" && unit === "l") return { price: pricePerUnit / 10, label: "pr. 100 ml" };
+  return { price: pricePerUnit, label: perUnitLabel(unit, pieceLabel) };
+}
+
+/** Liters in a pack label as ml, for families shown per 100 ml: "0,1 l" -> "100 ml", "2 x 0,05 l" -> "2 x 50 ml". */
+export function mlWords(label: string | null, displayPer?: string | null): string | null {
+  if (!label || displayPer !== "100 ml") return label;
+  return label.replace(/([\d.,]+) l\b/g, (_, n: string) => `${amount(Number(n.replace(/\./g, "").replace(",", ".")) * 1000)} ml`);
+}
+
 /** An amount in its unit: "2 kg", "1,5 l", "40 kapsler". */
 export function unitAmount(n: number, unit: Unit, pieceLabel?: string | null): string {
   return unit === "piece" ? pieces(n, pieceLabel) : `${amount(n)} ${UNIT_LABEL[unit]}`;

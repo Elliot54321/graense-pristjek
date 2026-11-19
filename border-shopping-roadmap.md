@@ -1784,3 +1784,13 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   (~300, both stores) sit in its top category "More" (432 listings), which `groups.ts` maps to no group, so `match:new`
   never gives them a family and they don't show on the site. Mapping "More" (or only its perfume) to household would
   put them through the nightly LLM matching (cost: roughly $0.50 for ~430 products).
+
+### Perfume per 100 ml in the UI (2026-11-20, UI chat)
+
+- Families with `displayPer` '100 ml' (Catalog, ef5eb7a) show their price per liter ÷ 10 as "pr. 100 ml" everywhere a
+  per-unit price is shown: search/category cards, popular cards, pack rows and "Priser i alle N butikker" (`perUnit()` in
+  `src/lib/format.ts`). Their pack labels read in ml ("200 ml", `mlWords()`). Joop Homme: "1.499,75 kr. pr. liter" ->
+  "149,97 kr. pr. 100 ml"; shampoo (Stuhr, TRESemmé) unchanged per liter.
+- The shopping list shows no per-unit prices, and its pack labels stay "0,2 l": the list compares the saved label with
+  the shop's (`LineResult.buy.packLabel`, which has no displayPer), so ml there would give a false "Anden pakning".
+- Seen in passing: "Calvin Klein CK One Set" (a gift set) has no displayPer, so it still reads per liter - Matching's call.
