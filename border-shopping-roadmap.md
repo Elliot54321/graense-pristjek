@@ -1426,3 +1426,28 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   being read. Now the decision actions only save; the card (`DecisionCard` in `forms.tsx`) stays in place at the same
   height, dimmed, with a "✓ Linket"/"Bekræftet"/... row where the buttons were, so nothing on the page moves. "Hent
   flere" under each list reloads the queue (decided cards leave). Errors show on the card. No undo yet.
+
+### User-reported mix-ups (2026-11-19, Matching chat)
+
+- **Split on the user's word (fixed, matches set to manual + reviewed):** Toms mini *karamel*skildpadder (BorderShop,
+  Rostock, ScandiPark) -> own family "Toms Mini Karamelskildpadder"; Somersby *Hyldeblomst* (BorderShop, Rostock) -> own
+  family, apart from Elderflower & Lime although Poetzsch's Elderflower & Lime has the same barcode (5740700975370);
+  Stauning *Rye* (Poetzsch, ScandiPark) -> own family "Stauning Rye Whisky", apart from Floormaltet Rye although
+  ScandiPark's shares BorderShop's Floormaltet barcode; Red Band *super gedde* (ScandiPark, was hand-linked to Zungen
+  Super Sauer) -> own family. Listings that share a barcode with a moved one and stay were marked reviewed, so
+  `match:ean` sees two human decisions and leaves the barcode alone (it would otherwise drag them along).
+- **Already right:** Quality Street at ScandiPark shows 199,99 kr. = 80 kr./kg (the "267 stk" reading came from the
+  retired German-shop listing, no longer used since the 2026-11-18 ean.ts change); Fleggaard and Calle "Finish Power All
+  in 1 90 stk." are one product at the same price (99,99, 4 for 350).
+- **Newsletter import (Data):** Fleggaard "Fazermint 228-295 g." is stored as single 33,33 with "4 for 100" - the single
+  price is 100/3, so the site reads like "3 for 100"; Fleggaard's November issue has no rows for Colgate (Tandpasta,
+  Tandbørste, Triple Action, Anti-Cavity), TRESemmé (Shampoo, Balsam, 3 for 99,99) or Finish Power Essential, which the
+  user says it prints at Calle's prices - only Calle's rows exist (Fleggaard's are from the October issue).
+  *Data & newsletters reply (2026-11-19):* both are as printed, nothing re-imported. Fazermint p21 prints "4 pk. 100,-"
+  and "Pr. pk. 33,33" (one pack 33,33, four for 100 = 25 each; max 109,65/kg checks out at 228 g), which is exactly what
+  is stored - if the site reads like "3 for 100" that's display (UI), not data. Its content stays empty until the range guard
+  in `offerContent` (Catalog) is done. Fleggaard's November PDF has no Colgate, TRESemmé or Finish Power Essential on any page
+  (text of all 60 pages searched; the 5 pages with no offers are ads): p55 has Zendium and Stuhr instead. The user may have
+  seen them in store or on fleggaard.dk, which we don't scrape - they need a printed source (e.g. a December issue).
+  ScandiPark multipacks (Wrigleys 7er, Malaco 14er, Ga-Jol 8er, Mentos 3er, kinder Bueno 8x2 312g) now parse to the printed
+  total (c4eaa5b); the database picks it up at the next nightly scrape (Niederegger 10er 200g was already 0,2 kg).
