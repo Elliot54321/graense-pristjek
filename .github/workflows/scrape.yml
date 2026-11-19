@@ -123,6 +123,21 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      # The next two steps run even if match:new failed (`!cancelled()`), but the job still
+      # ends failed then, so GitHub emails as before.
+      # Comparison unit for new grocery/household families (rules, then Sonnet; fails over the cap).
+      - run: npx tsx src/matching/units.ts nightly --max-usd 0.5
+        if: ${{ !cancelled() }}
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      # Piece counts from the listings onto products (only differences are written).
+      - run: npx tsx src/matching/pieces.ts --save
+        if: ${{ !cancelled() }}
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
       # What was linked and what became a suggestion, kept for a week.
       - uses: actions/upload-artifact@v5
         if: always()
