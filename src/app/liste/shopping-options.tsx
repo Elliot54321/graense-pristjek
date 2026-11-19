@@ -10,7 +10,7 @@ import { InfoTip } from "@/components/info-tip";
 import { shopSearchUrl } from "@/catalog/shop-search";
 import { ReportLink } from "@/components/report-link";
 import { ZoomablePhoto } from "@/components/zoomable-photo";
-import { duration, kr, krRound } from "@/lib/format";
+import { duration, kr, krRound, pieceWords } from "@/lib/format";
 
 type Home = { point: [number, number]; place: string; region: NonNullable<ReturnType<typeof regionOf>> };
 
@@ -418,13 +418,15 @@ const samePack = (a: string, b: string) => a.toLowerCase().replace(/\s+/g, "") =
  * showing what was matched, not a warning.
  */
 function OtherPackNote({ item, buy }: { item: BasketItem; buy: NonNullable<LineResult["buy"]> }) {
+  // Pack labels in the family's piece word ("40 kapsler"), for lists saved with "40 stk." too.
+  const bought = pieceWords(buy.packLabel, buy.pieceLabel);
   let added: string | undefined;
   let other = false;
   if (item.kind === "family") {
-    added = item.packLabel;
+    added = pieceWords(item.packLabel, buy.pieceLabel) ?? undefined;
     // The exact product when the item knows it (lists from 2026-11-18 on), else the pack label.
     const otherProduct = item.productId !== undefined && buy.productId !== item.productId;
-    const otherLabel = !!added && !!buy.packLabel && !samePack(added, buy.packLabel);
+    const otherLabel = !!added && !!bought && !samePack(added, bought);
     other = otherProduct || otherLabel;
   } else {
     // An exact product: a shop selling it in another (smaller) size needs more pieces for the same amount (compare.ts).
@@ -433,19 +435,19 @@ function OtherPackNote({ item, buy }: { item: BasketItem; buy: NonNullable<LineR
   if (!other) return null;
   return (
     <div className="mt-1 flex items-center gap-2 rounded-md border border-sky-200 bg-sky-50 p-1.5 text-xs text-sky-900">
-      <ZoomablePhoto url={buy.imageUrl} name={buy.productName} pack={buy.packLabel} className="h-9 w-9 rounded border-0" zoomIcon={false} />
+      <ZoomablePhoto url={buy.imageUrl} name={buy.productName} pack={bought} className="h-9 w-9 rounded border-0" zoomIcon={false} />
       <span className="min-w-0">
         <span className="font-medium">Anden pakning:</span> prisen er for {buy.quantity} ×{" "}
-        {buy.packLabel ?? buy.productName}
-        {added && !samePack(added, buy.packLabel ?? "") && <span className="text-sky-800"> (du valgte {added})</span>}
+        {bought ?? buy.productName}
+        {added && !samePack(added, bought ?? "") && <span className="text-sky-800"> (du valgte {added})</span>}
         {item.kind === "family" && item.productId !== undefined && item.packLabel && (
           <button
             type="button"
-            onClick={() => keepExactPack(item)}
+            onClick={() => keepExactPack(item, added!)}
             title="Prissæt præcis den pakning i alle butikker – butikker uden den får en estimeret pris"
             className="ml-1 cursor-pointer py-2 font-medium underline underline-offset-2 hover:text-emerald-800"
           >
-            Kun {item.packLabel}
+            Kun {added}
           </button>
         )}
       </span>
@@ -458,12 +460,12 @@ function OtherPackNote({ item, buy }: { item: BasketItem; buy: NonNullable<LineR
  * shop is priced for that pack (shops without it get an estimate). Whole packs of the same
  * amount; the key stays, so search still shows it as on the list.
  */
-function keepExactPack(item: Extract<BasketItem, { kind: "family" }>) {
+function keepExactPack(item: Extract<BasketItem, { kind: "family" }>, pack: string) {
   replaceBasketItem(item.key, {
     key: item.key,
     kind: "product",
     productId: item.productId!,
-    label: `${item.label} ${item.packLabel}`,
+    label: `${item.label} ${pack}`,
     quantity: Math.max(1, Math.round(item.amount / item.step)),
     singlePrice: item.singlePrice,
     imageUrl: item.imageUrl,

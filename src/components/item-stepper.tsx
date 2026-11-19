@@ -1,7 +1,7 @@
 "use client";
 
 import type { BasketItem } from "@/catalog/types";
-import { amount, UNIT_LABEL } from "@/lib/format";
+import { amount, pieceWords, unitAmount } from "@/lib/format";
 import { removeFromBasket, updateBasketItem } from "./basket";
 
 const round = (n: number) => Math.round(n * 1000) / 1000;
@@ -15,9 +15,10 @@ export function wholePacks(item: Extract<BasketItem, { kind: "family" }>): numbe
 /**
  * − / + for an item on the shopping list, used in search and on the list itself.
  * Products count pieces; families step by the pack size they were added with.
- * Going below one removes the item.
+ * Going below one removes the item. pieceLabel: the family's piece word when known (the list
+ * has it from pricing), so pieces read "80 kapsler" rather than "80 stk.".
  */
-export function ItemStepper({ item, full = false }: { item: BasketItem; full?: boolean }) {
+export function ItemStepper({ item, full = false, pieceLabel }: { item: BasketItem; full?: boolean; pieceLabel?: string | null }) {
   if (item.kind === "product") {
     return (
       <Stepper
@@ -34,7 +35,11 @@ export function ItemStepper({ item, full = false }: { item: BasketItem; full?: b
     <Stepper
       full={full}
       label={item.label}
-      value={packs !== null ? `${amount(packs)} × ${item.packLabel!.replace(" x ", "×")}` : `${amount(item.amount)} ${UNIT_LABEL[item.unit]}`}
+      value={
+        packs !== null
+          ? `${amount(packs)} × ${pieceWords(item.packLabel!, pieceLabel).replace(" x ", "×")}`
+          : unitAmount(item.amount, item.unit, pieceLabel)
+      }
       onMinus={() =>
         item.amount - item.step > 0.0001 ? updateBasketItem(item.key, { amount: round(item.amount - item.step) }) : removeFromBasket(item.key)
       }
@@ -64,7 +69,7 @@ function Stepper({
       <button type="button" onClick={onMinus} className={btn} aria-label={`Færre ${label}`}>
         −
       </button>
-      <span className={`text-center tabular-nums ${full ? "min-w-0 flex-1 text-xs" : "min-w-16 text-sm"}`} aria-live="polite">
+      <span className={`text-center tabular-nums ${full ? "min-w-0 flex-1 text-xs" : "w-16 text-sm leading-tight"}`} aria-live="polite">
         {value}
       </span>
       <button type="button" onClick={onPlus} className={btn} aria-label={`Flere ${label}`}>

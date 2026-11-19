@@ -9,6 +9,44 @@ export const amount = (n: number) => n.toLocaleString("da-DK", { maximumFraction
 export const UNIT_LABEL: Record<Unit, string> = { l: "l", kg: "kg", piece: "stk." };
 export const PER_UNIT_LABEL: Record<Unit, string> = { l: "pr. liter", kg: "pr. kg", piece: "pr. stk." };
 
+/** Plurals of the piece words families are counted in (product_families.piece_label, singular). */
+const PIECE_PLURAL: Record<string, string> = {
+  kapsel: "kapsler",
+  pose: "poser",
+  vask: "vaske",
+  rulle: "ruller",
+  pude: "puder",
+  tab: "tabs",
+};
+
+/** "1 kapsel", "40 kapsler", "6 stk." - pieceLabel is the family's singular word ("stk." when unset). */
+export function pieces(n: number, pieceLabel?: string | null): string {
+  const word = pieceLabel || "stk.";
+  return `${amount(n)} ${n === 1 ? word : (PIECE_PLURAL[word] ?? word)}`;
+}
+
+/** "pr. liter", "pr. kg", or for a piece family its own word: "pr. vask", "pr. kapsel". */
+export function perUnitLabel(unit: Unit, pieceLabel?: string | null): string {
+  return unit === "piece" ? `pr. ${pieceLabel || "stk."}` : PER_UNIT_LABEL[unit];
+}
+
+/** An amount in its unit: "2 kg", "1,5 l", "40 kapsler". */
+export function unitAmount(n: number, unit: Unit, pieceLabel?: string | null): string {
+  return unit === "piece" ? pieces(n, pieceLabel) : `${amount(n)} ${UNIT_LABEL[unit]}`;
+}
+
+/**
+ * A pack label in its family's piece word: the catalog labels counted packs "40 stk.", which
+ * becomes "40 kapsler" in a capsule family. Other labels ("24 x 0,33 l") are left as they are.
+ */
+export function pieceWords(label: string, pieceLabel?: string | null): string;
+export function pieceWords(label: string | null | undefined, pieceLabel?: string | null): string | null;
+export function pieceWords(label: string | null | undefined, pieceLabel?: string | null): string | null {
+  if (!label) return null;
+  const m = /^([\d.,]+) stk\.$/.exec(label);
+  return m && pieceLabel ? pieces(Number(m[1].replace(/\./g, "").replace(",", ".")), pieceLabel) : label;
+}
+
 /**
  * A pack as shoppers know it: "24 x 0,33 l" for a case, "0,7 l" for one bottle.
  * Falls back to the total content when the pack shape is unknown.

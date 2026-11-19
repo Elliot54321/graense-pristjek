@@ -6,7 +6,7 @@ import { CouponBadge, COUPON_NOTE, MultiBuyBadge, OfferBadge } from "@/component
 import { ReportLink } from "@/components/report-link";
 import { ZoomablePhoto } from "@/components/zoomable-photo";
 import { ChevronDown } from "lucide-react";
-import { kr, PER_UNIT_LABEL } from "@/lib/format";
+import { kr, perUnitLabel, pieceWords } from "@/lib/format";
 import { FamilyMore, type ResultSource } from "./family-more";
 
 /** The two-column result grid; each card spans three rows through a subgrid (see FamilyCard). */
@@ -70,8 +70,10 @@ export function FamilyCard({
   const bestPack = family.best ? family.packs.find((p) => p.name === family.best!.productName) : undefined;
   // One pack per card - the cheapest per liter/kg, which "Billigste på listen" adds too -
   // so cards in the grid line up; the other variants (sizes, cans vs bottles) are one tap away.
-  const shown = bestPack ?? family.packs[0];
-  const listItem = cheapestListItem(family);
+  // Without one (priced per pack only), the pack the list would take - it has its own "Sæt på listen".
+  const listPack = family.listPack ? family.packs.find((p) => p.productId === family.listPack!.productId) : undefined;
+  const shown = bestPack ?? listPack ?? family.packs[0];
+  const listItem = family.best ? cheapestListItem(family) : null;
   const others = family.packs.filter((p) => p !== shown);
   return (
     // Subgrid: the card's three parts (header, pack, variants) share rows with its neighbour, so the
@@ -83,7 +85,7 @@ export function FamilyCard({
           <h2 className="text-lg font-semibold leading-snug">{family.name}</h2>
           {family.best && (
             <p className="mt-0.5 text-sm text-zinc-700 dark:text-zinc-300">
-              Billigst <strong className="text-emerald-700 dark:text-emerald-400">{kr(family.best.pricePerUnit)} kr. {PER_UNIT_LABEL[family.best.unit]}</strong>{" "}
+              Billigst <strong className="text-emerald-700 dark:text-emerald-400">{kr(family.best.pricePerUnit)} kr. {perUnitLabel(family.best.unit, family.pieceLabel)}</strong>{" "}
               hos {shopName(shops, family.best.shopId)}
               {family.best.deal && <span className="text-zinc-500"> ved {family.best.deal.quantity} stk.</span>}
               {family.best.coupon && <CouponBadge />}
@@ -139,6 +141,8 @@ function PackRow({ pack, shops, page }: { pack: Pack; shops: Map<string, Shop>; 
   // between variants (a 9 kr. bottle vs a 69 kr. crate). The pack price is what you pay, shown under it.
   const perUnit = best.pricePerUnit !== null && pack.contentUnit ? (best.pricePerUnit * low) / best.price : null;
   const deal = dealPerPiece(best) !== null ? best.multiBuy : null;
+  // "40 kapsler" rather than the catalog's "40 stk." in piece families.
+  const label = pieceWords(pack.packLabel, pack.pieceLabel);
   const packPrice = (
     <>
       {kr(low)} kr.{low < best.price && " stk."}
@@ -148,31 +152,33 @@ function PackRow({ pack, shops, page }: { pack: Pack; shops: Map<string, Shop>; 
     <li className="py-3">
       {/* Photo left, text and button right; the button sits under the price so the photo can be large. */}
       <div className="flex gap-3">
-        <ZoomablePhoto url={pack.imageUrl} name={pack.name} pack={pack.packLabel} className="h-24 w-24 sm:h-28 sm:w-28" />
+        <ZoomablePhoto url={pack.imageUrl} name={pack.name} pack={label} className="h-24 w-24 sm:h-28 sm:w-28" />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium">
             {pack.name}
             {/* The pack size is in the price line below ("69,95 kr. for 24 x 0,33 l") when there is one. */}
-            {pack.packLabel && perUnit === null && <span className="font-normal text-zinc-500"> · {pack.packLabel}</span>}
+            {label && perUnit === null && <span className="font-normal text-zinc-500"> · {label}</span>}
           </p>
           {perUnit !== null && pack.contentUnit ? (
             <>
               <p className="mt-1">
                 <strong className="text-lg tabular-nums">{kr(perUnit)} kr.</strong>{" "}
-                <span className="text-sm font-medium">{PER_UNIT_LABEL[pack.contentUnit]}</span>
+                <span className="text-sm font-medium">{perUnitLabel(pack.contentUnit, pack.pieceLabel)}</span>
                 {deal && <span className="text-sm text-zinc-500"> ved {deal.quantity} stk.</span>}
               </p>
               <p className="text-sm text-zinc-700 dark:text-zinc-300">
                 {/* "ved 3 stk." in the headline already says this is the deal rate. */}
                 <span className="tabular-nums">{kr(low)} kr.</span>
-                {pack.packLabel && <> for {pack.packLabel}</>} hos {shopName(shops, best.shopId)}
+                {label && <> for {label}</>} hos {shopName(shops, best.shopId)}
                 {ties > 0 && <span className="text-zinc-500"> (+{ties} til samme pris)</span>}
               </p>
             </>
           ) : (
-            // Nothing to measure per liter/kg: the pack price is the comparison.
+            // Nothing to measure per liter/kg: the pack price is the comparison. In a piece family whose
+            // pieces aren't counted, say it's the price for the pack - never a price per kg/l there.
             <p className="mt-1 text-sm">
-              <strong className="text-lg tabular-nums">{packPrice}</strong> hos {shopName(shops, best.shopId)}
+              <strong className="text-lg tabular-nums">{packPrice}</strong>
+              {pack.compareUnit === "piece" && low === best.price && " for pakken"} hos {shopName(shops, best.shopId)}
               {ties > 0 && <span className="text-zinc-500"> (+{ties} til samme pris)</span>}
             </p>
           )}
@@ -228,7 +234,7 @@ function OfferDetails({ offer: o, pack, page, perUnit = true }: { offer: Offer; 
     <div className="text-xs text-zinc-500">
       {perUnit && o.pricePerUnit !== null && pack.contentUnit && (
         <span>
-          {kr((o.pricePerUnit * effectivePrice(o)) / o.price)} kr. {PER_UNIT_LABEL[pack.contentUnit]}
+          {kr((o.pricePerUnit * effectivePrice(o)) / o.price)} kr. {perUnitLabel(pack.contentUnit, pack.pieceLabel)}
         </span>
       )}
       {deal && <MultiBuyBadge quantity={deal.quantity} price={deal.price} />}
@@ -265,7 +271,7 @@ function VariantThumbs({ packs }: { packs: Pack[] }) {
 
 /** "24 x 0,33 l, 0,5 l, 4 x 1,5 l og flere" - the pack sizes on offer, so people see the choice. */
 function variantSummary(packs: Pack[]): string {
-  const labels = [...new Set(packs.flatMap((p) => (p.packLabel ? [p.packLabel] : [])))];
+  const labels = [...new Set(packs.flatMap((p) => (p.packLabel ? [pieceWords(p.packLabel, p.pieceLabel)] : [])))];
   if (!labels.length) return "Andre pakninger og størrelser";
   return labels.slice(0, 3).join(", ") + (labels.length > 3 ? " og flere" : "");
 }

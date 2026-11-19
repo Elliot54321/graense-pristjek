@@ -7,7 +7,7 @@ import type { BasketItem, ShopResult } from "@/catalog/types";
 import { clearBasket, useBasket } from "@/components/basket";
 import { ItemStepper } from "@/components/item-stepper";
 import { ZoomablePhoto } from "@/components/zoomable-photo";
-import { amount, UNIT_LABEL } from "@/lib/format";
+import { pieceWords, unitAmount } from "@/lib/format";
 import { COUPON_NOTE } from "@/components/badges";
 import { ImportLimits } from "./import-limits";
 import { ShoppingOptions } from "./shopping-options";
@@ -68,11 +68,14 @@ export function BasketView() {
     );
   }
 
+  // Each piece family's word ("kapsel", "vask") from the pricing, for "80 kapsler" on its row.
+  const pieceLabels = new Map(state.results.flatMap((r) => r.lines.flatMap((l) => (l.buy?.pieceLabel ? [[l.key, l.buy.pieceLabel] as const] : []))));
+
   return (
     <>
       <ul className="mt-4 divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
         {items.map((item) => (
-          <BasketRow key={item.key} item={item} imageUrl={item.imageUrl ?? state.images[item.key]} />
+          <BasketRow key={item.key} item={item} imageUrl={item.imageUrl ?? state.images[item.key]} pieceLabel={pieceLabels.get(item.key)} />
         ))}
       </ul>
       <div className="mt-1 flex justify-between text-sm">
@@ -113,22 +116,23 @@ export function BasketView() {
   );
 }
 
-function BasketRow({ item, imageUrl }: { item: BasketItem; imageUrl?: string }) {
+function BasketRow({ item, imageUrl, pieceLabel }: { item: BasketItem; imageUrl?: string; pieceLabel?: string }) {
   return (
     <li className="flex items-center justify-between gap-3 px-3 py-2.5">
       {/* The shop's photo of the pack it was added from, else one the server picked (linked, not
           copied); a tap shows it large. Items no shop has a photo of get an empty tile. */}
-      <ZoomablePhoto url={imageUrl} name={item.label} pack={item.kind === "family" ? item.packLabel : undefined} className="h-12 w-12 sm:h-16 sm:w-16" zoomIcon={false} />
+      <ZoomablePhoto url={imageUrl} name={item.label} pack={item.kind === "family" ? pieceWords(item.packLabel, pieceLabel) : undefined} className="h-12 w-12 sm:h-16 sm:w-16" zoomIcon={false} />
       <div className="min-w-0 flex-1">
-        <p className="text-sm">{item.label}</p>
+        {/* A very long word wraps instead of running under the stepper on phones. */}
+        <p className="text-sm wrap-break-word">{item.label}</p>
         {/* Families are bought by amount: we pick the cheapest pack size in each shop. */}
         {item.kind === "family" && (
           <p className="text-xs text-zinc-500">
-            {amount(item.amount)} {UNIT_LABEL[item.unit]} · billigste pakning
+            {unitAmount(item.amount, item.unit, pieceLabel)} · billigste pakning
           </p>
         )}
       </div>
-      <ItemStepper item={item} />
+      <ItemStepper item={item} pieceLabel={pieceLabel} />
     </li>
   );
 }

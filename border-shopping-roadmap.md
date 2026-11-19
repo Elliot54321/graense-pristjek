@@ -1693,3 +1693,23 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   per-kg/l price (pack price only), 30 had none before or after. Household lists: the cheapest shop is the same in all
   five; Fleggaard's 90-tab Finish and 50-wash Omo now compete per piece (they had no comparable weight), which also
   raises the estimate for shops lacking them. For Data: "Omo Liquid White 71 vasker" has no count ("vasker" not parsed).
+
+### Piece words in the UI (2026-11-19, UI chat - "stk. prices" step 5)
+
+- **Words:** `src/lib/format.ts` gains `perUnitLabel(unit, pieceLabel)` ("pr. kapsel", "pr. vask", "pr. rulle"; "pr. stk."
+  by default), `pieces(n, pieceLabel)` with the plurals of the words Matching uses (kapsler, poser, vaske, ruller, puder,
+  tabs; "stk." stays), `unitAmount()` and `pieceWords(packLabel, pieceLabel)`, which turns the catalog's "40 stk." into
+  "40 kapsler" and leaves other labels alone. `PER_UNIT_LABEL` is no longer used by pages.
+- **Where:** search/category cards (headline, pack rows, every shop's price, the variants summary), popular cards, the
+  list rows and stepper ("2 × 10 kapsler", "100 vaske · billigste pakning") and "Anden pakning" ("prisen er for 2 × 50
+  vaske (du valgte 100 vaske)", "Kun 100 vaske"). The list gets each item's word from pricing (`LineResult.buy.pieceLabel`),
+  so lists saved with "10 stk." read "10 kapsler" too and don't get a false "Anden pakning".
+- **Priced per pack only** (piece family with an uncounted pack, `best` null): the card leads with `listPack` and has no
+  "Billigste på listen" (that pack's own "Sæt på listen" adds it); its price reads "50,00 kr. for pakken". Popular cards
+  show "fra X kr. pr. pakke" and add `listPack` as an exact product ("Sæt på listen"), as Catalog suggested 2026-11-18.
+- **Stepper:** its value now wraps in a fixed 4 rem column, so longer words don't squeeze the product name on phones.
+- **Not done (optional):** list items saved in l/kg for a family now counted per piece still show their saved amount
+  ("2,5 l"); Catalog prices them correctly (`asComparable`).
+- Checked on the build (no search logging) with Danæg (pr. stk.), Finish (pr. tab), Neutral/Omo (pr. vask), JT and
+  Veltie toilet paper (pr. rulle / for pakken), Lavazza/Dolce Gusto (pr. kapsel), Senseo (pr. pude), Pickwick (pr. pose);
+  Tuborg and Haribo unchanged. 375 px and desktop.

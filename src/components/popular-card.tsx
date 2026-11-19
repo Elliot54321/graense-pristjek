@@ -2,9 +2,9 @@
 
 import { X } from "lucide-react";
 import { useRef } from "react";
-import { dealPerPiece } from "@/catalog/compare";
+import { dealPerPiece, effectivePrice } from "@/catalog/compare";
 import type { FamilyResult, Shop } from "@/catalog/types";
-import { kr, PER_UNIT_LABEL } from "@/lib/format";
+import { kr, perUnitLabel, pieceWords } from "@/lib/format";
 import { AddToBasket } from "./add-to-basket";
 import { useBasket } from "./basket";
 import { CouponBadge, MultiBuyBadge, OfferBadge } from "./badges";
@@ -25,8 +25,12 @@ export function PopularCard({ family: f, shops }: { family: FamilyResult; shops:
   // The photo of the most widely sold pack - the one people recognise - not necessarily the
   // cheapest per liter (for Jägermeister that's a 3-litre bottle).
   const image = [...f.packs].filter((p) => p.imageUrl).sort((a, b) => b.offers.length - a.offers.length)[0]?.imageUrl ?? null;
-  const sizes = [...new Set(f.packs.flatMap((p) => (p.packLabel ? [p.packLabel] : [])))];
+  const sizes = [...new Set(f.packs.flatMap((p) => (p.packLabel ? [pieceWords(p.packLabel, p.pieceLabel)] : [])))];
   const item = cheapestListItem(f);
+  // No price per liter/kg/piece (a piece family whose packs aren't all counted): the cheapest pack price.
+  const packOffer = f.best
+    ? null
+    : f.packs.flatMap((p) => p.offers).sort((a, b) => effectivePrice(a) - effectivePrice(b))[0];
   const open = () => sheet.current?.showModal();
   // Exact variants picked in the sheet ("Sæt på listen" there); the family itself shows as a stepper below.
   const packIds = new Set(f.packs.map((p) => p.productId));
@@ -51,11 +55,19 @@ export function PopularCard({ family: f, shops }: { family: FamilyResult; shops:
           <p className="mt-auto pt-1.5 leading-tight">
             <span className="text-xs text-zinc-600">fra </span>
             <strong className="text-lg text-emerald-700">{kr(f.best.pricePerUnit)} kr.</strong>{" "}
-            <span className="text-xs text-zinc-600">{PER_UNIT_LABEL[f.best.unit]}</span>
+            <span className="text-xs text-zinc-600">{perUnitLabel(f.best.unit, f.pieceLabel)}</span>
             <span className="block truncate text-xs text-zinc-600">
               hos {shopById.get(f.best.shopId)?.name ?? f.best.shopId}
               {f.best.deal && ` ved ${f.best.deal.quantity} stk.`}
             </span>
+          </p>
+        )}
+        {packOffer && (
+          <p className="mt-auto pt-1.5 leading-tight">
+            <span className="text-xs text-zinc-600">fra </span>
+            <strong className="text-lg text-emerald-700">{kr(effectivePrice(packOffer))} kr.</strong>{" "}
+            <span className="text-xs text-zinc-600">pr. pakke</span>
+            <span className="block truncate text-xs text-zinc-600">hos {shopById.get(packOffer.shopId)?.name ?? packOffer.shopId}</span>
           </p>
         )}
       </button>
@@ -66,7 +78,7 @@ export function PopularCard({ family: f, shops }: { family: FamilyResult; shops:
       >
         Vælg variant
       </button>
-      {item && <AddToBasket item={item} label="Billigste på listen" variant="secondary" full className="mt-1.5" />}
+      {item && <AddToBasket item={item} label={item.kind === "family" ? "Billigste på listen" : "Sæt på listen"} variant="secondary" full className="mt-1.5" />}
       {variantsOnList > 0 && (
         <p className="mt-1 text-xs text-emerald-700">
           {variantsOnList === 1 ? "1 variant" : `${variantsOnList} varianter`} på listen ✓
