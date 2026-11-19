@@ -1756,3 +1756,15 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
 - **Left as is:** "Batterilyskæde LED" holds three different chains (all 9,99, no counts - pack price only); "Finish
   Power Essential" sits in Finish Power All in One by a human decision; Jollypaw toys are a catch-all with no counts
   (the list takes an exact pack).
+
+### Perfume shown per 100 ml (2026-11-20, Catalog chat)
+
+- **Why:** live search read "Calvin Klein CK One billigst 1.499,75 kr. pr. liter". Shampoo and other toiletries stay per
+  liter (decided; no per-bottle pricing).
+- **Migration `supabase/migrations/20261120000000_family_display_per.sql`** (not run yet): `product_families.display_per`
+  (text, check: null or `'100 ml'`). Display only: comparison stays per liter, so the cheapest pick never changes.
+  **Matching fills it.**
+- **Exposed:** `FamilyResult.displayPer` and `Pack.displayPer` (`DisplayPer` = `'100 ml'`, or null), next to
+  `compareUnit` / `pieceLabel`. Prices stay per liter in the data; **the UI** divides by 10 and writes "pr. 100 ml".
+- `loadPacks` falls back to the old columns on error 42703, so search and the list keep working if the code deploys
+  before the migration is run (checked locally: perfume families come back with `displayPer: null`, prices unchanged).

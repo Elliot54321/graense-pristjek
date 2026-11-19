@@ -15,7 +15,7 @@ import { indexFamily, matchScore, PARTIAL_MATCH, prepareQuery, type IndexedFamil
 import { packLabel } from "@/lib/format";
 import { POPULAR_PAGE, RESULTS_PAGE } from "./pages";
 import { isSubcategoryOf } from "./categories";
-import type { FamilyResult, Offer, Pack, ResultPage, Shop, Unit } from "./types";
+import type { DisplayPer, FamilyResult, Offer, Pack, ResultPage, Shop, Unit } from "./types";
 
 /** Most families rankFamilies() returns (pages are smaller; see RESULTS_PAGE and POPULAR_PAGE). */
 const MAX_FAMILIES = 30;
@@ -23,6 +23,8 @@ const MAX_FAMILIES = 30;
 interface FamilyUnitRow {
   compare_unit: Unit | null;
   piece_label: string | null;
+  /** Display only (migration 20261120000000); missing until that migration is run. */
+  display_per?: DisplayPer | null;
 }
 
 interface ProductRow {
@@ -166,11 +168,17 @@ async function loadPacks(productIds: number[], familyIds: number[]): Promise<Pac
   if (productIds.length) filters.push(`id.in.(${productIds.join(",")})`);
   if (!filters.length) return [];
 
-  const { data: products, error } = await db
-    .from("products")
-    .select("id, name, family_id, content_amount, content_unit, piece_count, product_families(compare_unit, piece_label)")
-    .or(filters.join(","));
+  const readProducts = (familyColumns: string) =>
+    db
+      .from("products")
+      .select(`id, name, family_id, content_amount, content_unit, piece_count, product_families(${familyColumns})` as string)
+      .or(filters.join(","))
+      .returns<ProductRow[]>();
+  let { data: products, error } = await readProducts("compare_unit, piece_label, display_per");
+  // 42703 = column doesn't exist yet: display_per until its migration is run - prices still work.
+  if (error?.code === "42703") ({ data: products, error } = await readProducts("compare_unit, piece_label"));
   if (error) throw error;
+  if (!products) return [];
   if (!products.length) return [];
 
   const { data: prices, error: priceError } = await db
@@ -258,6 +266,7 @@ async function loadPacks(productIds: number[], familyIds: number[]): Promise<Pac
         familyId: p.family_id,
         compareUnit: family?.compare_unit ?? null,
         pieceLabel: family?.compare_unit === "piece" ? family.piece_label || "stk." : null,
+        displayPer: family?.display_per ?? null,
         imageUrl: images.get(p.id) ?? null,
         // Cheapest first at the price a bulk shopper pays (multi-buy rate when there is one).
         offers,
@@ -628,6 +637,7 @@ async function priceFamilies(families: FamilyRow[], pre: Map<number, number>): P
       category: f.category,
       compareUnit,
       pieceLabel: own[0]?.pieceLabel ?? null,
+      displayPer: own[0]?.displayPer ?? null,
       best,
       packs: own,
     };

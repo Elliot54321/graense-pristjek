@@ -2,6 +2,13 @@
 
 export type Unit = "l" | "kg" | "piece";
 
+/**
+ * How a family's price per unit is shown, display only (product_families.display_per): '100 ml'
+ * shows a per-liter price divided by 10 ("149,98 kr. pr. 100 ml" for perfume). null = per
+ * contentUnit as usual. Comparing and the cheapest pick stay per liter.
+ */
+export type DisplayPer = "100 ml";
+
 export interface Shop {
   id: string;
   name: string;
@@ -52,6 +59,8 @@ export interface Pack {
   compareUnit: Unit | null;
   /** 'piece' families: the word per piece ("stk.", "vask", "kapsel", singular); null otherwise. */
   pieceLabel: string | null;
+  /** The family's display unit for prices per liter (see DisplayPer); null = as usual. */
+  displayPer: DisplayPer | null;
   contentAmount: number | null;
   contentUnit: Unit | null;
   /** "24 x 0,33 l" - how the shops sell it; contentAmount (7,92 l) is for comparing per liter. "40 stk." for counted piece packs. */
@@ -68,6 +77,7 @@ export interface FamilyResult {
   /** Pack.compareUnit and Pack.pieceLabel of its packs (null for families with no packs on sale). */
   compareUnit: Unit | null;
   pieceLabel: string | null;
+  displayPer: DisplayPer | null;
   /**
    * Cheapest price per liter/kg/piece across all packs and shops. A 'piece' family has one
    * (unit 'piece') only when every pack has a piece count; otherwise null and listPack is set.
