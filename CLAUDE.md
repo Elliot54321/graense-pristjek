@@ -101,6 +101,11 @@ after 8 unattended nightly runs; Phase 2 (matching) is largely done.
   rules in `src/matching/safety.ts`. First copies reviewed newsletter decisions onto reworded offers
   and joins identical Fleggaard/Calle offers into one product, or a new offer to its matched twin
   (`carry-over.ts`). Unreviewed LLM links below 0.8 confidence are held back from the site (`matched_prices`).
+- `src/matching/units.ts` – comparison unit per grocery/household family (`plan | rules | submit | collect |
+  apply [--save]`; `nightly --max-usd 0.5` for new families); `pieces.ts [--save]` copies listings'
+  `piece_count` onto products (nightly, idempotent); `audit-pieces.ts` checks piece families (wrong counts,
+  mixed sizes). `audit.ts` / `audit-baskets.ts` – `npm run match:audit -- <basket>|all`, trust audit of
+  realistic baskets.
 - `src/flyers/extract.ts` – reads a PDF newsletter page by page with Claude vision
   (`npm run flyer:extract -- <pdf> [--pages ...] [--direct]`), writes `<pdf>.offers.json` for review.
   Uses the Batch API by default (half price; waits for the result, rerun the same command to resume);
@@ -180,6 +185,12 @@ after 8 unattended nightly runs; Phase 2 (matching) is largely done.
   cheapest cola, not specifically 0,33 l cans. Products belong to a product family
   (same item regardless of pack size); baskets pick the cheapest pack(s) for the
   wanted amount and show both "cheapest per liter" and "cheapest for your amount".
+- **Count-type items are compared per piece** (decided 2026-11-19): a family's `compare_unit` is
+  `l`, `kg` or `piece` (null = from the products), with `piece_label` ("stk.", "vask", "kapsel",
+  "rulle"...). In a piece family a pack is priced per piece only when its `piece_count` is known
+  (smaller of listing and product); otherwise "for pakken", never per kg/l. One family = one size:
+  a 50 l bag and a 120 l sack, or Maxi and XL nappies, are separate families (else the small one
+  wins "per piece"). A wrong piece count is worse than none.
 - **Search before comparing:** searching e.g. "cola" lists families with their best
   price per liter and best price per specific pack; the user picks one, then the
   basket compares. Best prices come from database views (`product_best_prices`,
