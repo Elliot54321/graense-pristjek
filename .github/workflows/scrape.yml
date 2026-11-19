@@ -1,5 +1,5 @@
-# Scrape every shop once a day, save to Supabase, match products by EAN, then
-# match new products (families, cross-shop links) with Claude.
+# Scrape every shop once a day and import new Fleggaard/Calle newsletter issues, save to
+# Supabase, match products by EAN, then match new products (families, cross-shop links) with Claude.
 #
 # Needs these repository secrets (Settings -> Secrets and variables -> Actions):
 #   NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SECRET_KEY, SCRAPER_CONTACT_EMAIL, ANTHROPIC_API_KEY
@@ -53,6 +53,35 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+  # New Fleggaard/Calle newsletter issues from eTilbudsavis: one catalogue request per shop;
+  # only an issue not imported before is fetched, named with Claude (at most $3 a night,
+  # else this job fails without importing) and saved. Its own job, next to the scrapers:
+  # if eTilbudsavis is down only this job fails, and match-new still runs.
+  newsletters:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm install --no-audit --no-fund
+      - run: npm run flyer:etilbudsavis -- --new
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          SCRAPER_CONTACT_EMAIL: ${{ secrets.SCRAPER_CONTACT_EMAIL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      # The imported product list and raw offers, kept for a week.
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: newsletters
+          path: data/etilbudsavis/
+          retention-days: 7
+          if-no-files-found: ignore
+
   # Link newly seen products by EAN once all shops are scraped. Runs even if
   # one shop failed, so the other shop's new products still get matched.
   match:
@@ -76,7 +105,7 @@ jobs:
   # show up in search. Its own job: if it fails (e.g. expired API key or no credit
   # left), the scraped prices are already saved and GitHub emails the failure.
   match-new:
-    needs: match
+    needs: [match, newsletters]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -107,7 +136,7 @@ jobs:
   # shop runs, a newsletter about to expire), so GitHub emails the failure. The
   # report is shown on the run's summary page; see src/monitoring/check.ts.
   check:
-    needs: [scrape, match, match-new]
+    needs: [scrape, newsletters, match, match-new]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 10

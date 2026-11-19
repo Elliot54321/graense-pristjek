@@ -2,6 +2,11 @@
  * Newsletter offers from eTilbudsavis (Tjek's public "squid" API) instead of reading the PDF.
  *
  *   npm run flyer:etilbudsavis -- <fleggaard|calle> [--skip <catalogId,...>] [--dry-run]
+ *   npm run flyer:etilbudsavis -- --new [<shop>] [--dry-run] [--max-cost 3] [--pretend-new <id,...>] [--as-of <date>]
+ *
+ * --new is the nightly step: one catalogue request per shop, and only issues not imported
+ * before are fetched and imported (none: one log line, no model calls). Over the cost cap
+ * the shop fails without importing. --pretend-new and --as-of are for testing.
  *
  * Fleggaard allows using its newsletters and only said no to scraping its own website, so
  * reading the same newsletters here is fine (user, 2026-11-19). fleggaard.dk / calle.dk are
@@ -263,20 +268,114 @@ async function splitHeadings(offers: TjekOffer[], dryRun: boolean) {
 const effective = (p: { price: number; multiBuy?: { quantity: number; price: number } | null }) =>
   p.multiBuy ? Math.min(p.price, p.multiBuy.price / p.multiBuy.quantity) : p.price;
 
+/** A successful import notes the issues it handled on its run, so the nightly step knows them. */
+const ISSUES_NOTE = "eTilbudsavis issues:";
+/**
+ * The nightly step takes the issues after November's: those end 2026-11-24 and are in already
+ * (main issues from the PDF) or left out (the extras, decision 2026-11-19). Issues ending by
+ * this date count as imported, and before it nothing is new.
+ */
+const NIGHTLY_AFTER = "2026-11-24";
+/** One night's name split may cost at most this; above it the step fails without importing. */
+const MAX_NIGHTLY_COST = 3;
+
+/** Issues this shop already imported: noted on a successful run, or the source of a product. */
+async function importedIssues(db: ReturnType<typeof adminClient>, shop: string): Promise<Set<string>> {
+  const seen = new Set<string>();
+  const { data: runs, error } = await db
+    .from("scrape_runs")
+    .select("notes")
+    .eq("shop_id", shop)
+    .neq("status", "failed")
+    .like("notes", `%${ISSUES_NOTE}%`);
+  if (error) throw error;
+  for (const r of runs ?? []) {
+    for (const line of (r.notes ?? "").split("\n").filter((l: string) => l.startsWith(ISSUES_NOTE))) {
+      for (const id of line.slice(ISSUES_NOTE.length).split(/[\s,]+/)) if (id) seen.add(id);
+    }
+  }
+  const prefix = `${shop}-etilbudsavis-`;
+  const rows = await fetchAll<{ source_issue: string }>((f, t) =>
+    db.from("shop_products").select("source_issue").eq("shop_id", shop).like("source_issue", `${prefix}%`).order("id").range(f, t),
+  );
+  for (const r of rows) seen.add(r.source_issue.slice(prefix.length));
+  return seen;
+}
+
+/**
+ * Rough cost of splitting these offers' headings: ~45 tokens in per offer plus the
+ * instructions per batch, and a generous 60 tokens out per offer.
+ */
+export function estimateSplitCost(offers: number): number {
+  const batches = Math.ceil(offers / SPLIT_BATCH);
+  return costUsd(SPLIT_MODEL, batches * 500 + offers * 45, offers * 60);
+}
+
+interface Options {
+  dryRun: boolean;
+  skip: Set<string>;
+  /** Nightly: only issues not imported yet; nothing new -> no offer requests, no model calls. */
+  onlyNew: boolean;
+  /** Testing: treat these issues as not imported (also before NIGHTLY_AFTER). */
+  pretendNew: Set<string>;
+  /** Testing: the date the nightly rules use as today. */
+  asOf: string;
+  maxCost: number;
+}
+
 async function main() {
   const args = process.argv.slice(2);
+  const opt = (name: string) => (args.includes(name) ? args[args.indexOf(name) + 1] : undefined);
+  const list = (name: string) => new Set((opt(name) ?? "").split(",").filter(Boolean));
   const shop = args.find((a) => !a.startsWith("--") && DEALERS[a]);
-  const dryRun = args.includes("--dry-run");
-  const skipArg = args.includes("--skip") ? args[args.indexOf("--skip") + 1] : "";
-  const skip = new Set(skipArg.split(",").filter(Boolean));
-  if (!shop) {
-    console.error(`Usage: npm run flyer:etilbudsavis -- <${Object.keys(DEALERS).join("|")}> [--skip <catalogId,...>] [--dry-run]`);
+  const options: Options = {
+    dryRun: args.includes("--dry-run"),
+    skip: list("--skip"),
+    onlyNew: args.includes("--new"),
+    pretendNew: list("--pretend-new"),
+    asOf: opt("--as-of") ?? new Date().toISOString().slice(0, 10),
+    maxCost: Number(opt("--max-cost") ?? MAX_NIGHTLY_COST),
+  };
+  if (!shop && !options.onlyNew) {
+    console.error(
+      `Usage: npm run flyer:etilbudsavis -- <${Object.keys(DEALERS).join("|")}> [--skip <catalogId,...>] [--dry-run]\n` +
+        `       npm run flyer:etilbudsavis -- --new [<shop>] [--dry-run] [--max-cost 3] [--pretend-new <catalogId,...>] [--as-of YYYY-MM-DD]`,
+    );
     process.exit(1);
   }
+  // One shop failing (API down, over the cost cap) must not stop the other.
+  let failed = false;
+  for (const s of shop ? [shop] : Object.keys(DEALERS)) {
+    try {
+      await importShop(s, options);
+    } catch (e) {
+      failed = true;
+      console.error(`${s}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+  if (failed) process.exit(1);
+}
+
+async function importShop(shop: string, options: Options) {
+  const { dryRun, skip, onlyNew, pretendNew, asOf } = options;
   mkdirSync(RAW_DIR, { recursive: true });
   const today = new Date().toISOString().slice(0, 10);
+  const db = adminClient();
 
-  const catalogs = (await currentCatalogs(DEALERS[shop])).filter((c) => !skip.has(c.id));
+  let catalogs = (await currentCatalogs(DEALERS[shop])).filter((c) => !skip.has(c.id));
+  if (onlyNew) {
+    const seen = await importedIssues(db, shop);
+    const fresh = catalogs.filter(
+      (c) => pretendNew.has(c.id) || (!seen.has(c.id) && asOf > NIGHTLY_AFTER && lastDay(c.run_till) > NIGHTLY_AFTER),
+    );
+    if (!fresh.length) {
+      console.log(`${shop}: no new issue (${catalogs.length} current: ${catalogs.map((c) => c.id).join(", ")})`);
+      return;
+    }
+    console.log(`${shop}: new issue(s) ${fresh.map((c) => `${c.id} "${c.label.trim()}"`).join(", ")}`);
+    catalogs = fresh;
+  }
+
   const issues: { catalog: TjekCatalog; issue: string; until: string; offers: TjekOffer[] }[] = [];
   for (const catalog of catalogs) {
     const offers = await catalogOffers(catalog.id);
@@ -287,6 +386,12 @@ async function main() {
   }
   if (skip.size) console.log(`Skipped: ${[...skip].join(", ")}`);
 
+  const offerCount = issues.reduce((n, i) => n + i.offers.length, 0);
+  const estimate = estimateSplitCost(offerCount);
+  console.log(`Name split estimate: $${estimate.toFixed(2)} for ${offerCount} offers (cap $${options.maxCost}).`);
+  if (onlyNew && estimate > options.maxCost) {
+    throw new Error(`name split estimated at $${estimate.toFixed(2)}, over the $${options.maxCost} cap - nothing imported; run it by hand`);
+  }
   const split = await splitHeadings(issues.flatMap((i) => i.offers), dryRun);
   if (split.ruled) console.log(`${split.ruled} offers named by the free rule split${dryRun ? " (dry run: the model isn't called)" : " (model gave no answer)"}.`);
   if (split.cost) console.log(`Name split cost: $${split.cost.toFixed(4)}`);
@@ -311,7 +416,6 @@ async function main() {
   }
 
   // Never overwrite a cheaper row still listed from another issue (e.g. the PDF import).
-  const db = adminClient();
   const ours = new Set(issues.map((i) => i.issue));
   const listed = await fetchAll<{ id: number; shop_product_id: string; name: string; source_issue: string | null }>((f, t) =>
     db.from("shop_products").select("id, shop_product_id, name, source_issue").eq("shop_id", shop).gte("listed_until", today).order("id").range(f, t),
@@ -372,10 +476,15 @@ async function main() {
     const result = await saveProducts(db, shop, products);
     summary.priceChanges = result.priceChanges;
     summary.warnings.push(...result.warnings);
-    await finishRun(db, runId, summary);
-    console.log(`Saved: ${result.priceChanges} new price rows (run #${runId}). Next: npm run match:new`);
     // Offers an issue no longer has come off the site (rows that moved to a cheaper issue stay).
     for (const { issue } of issues) await retireDropped(db, shop, issue, products);
+    await finishRun(db, runId, summary);
+    // Noted after finishing, so it doesn't count as a warning; the nightly step reads it back.
+    const { data: run } = await db.from("scrape_runs").select("notes").eq("id", runId).single();
+    const note = `${ISSUES_NOTE} ${issues.map((i) => i.catalog.id).join(", ")}`;
+    const { error } = await db.from("scrape_runs").update({ notes: [run?.notes, note].filter(Boolean).join("\n") }).eq("id", runId);
+    if (error) throw error;
+    console.log(`Saved: ${result.priceChanges} new price rows (run #${runId}). Next: npm run match:new`);
   } catch (e) {
     await finishRun(db, runId, summary, String(e));
     throw e;

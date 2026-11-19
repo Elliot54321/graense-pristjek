@@ -25,7 +25,7 @@ of truth. Read it when deciding what to work on.
 
 **Current phase:** Phase 3 (first usable version). Phase 1 (data pipeline) finished 2026-10-25
 after 8 unattended nightly runs; Phase 2 (matching) is largely done.
-- Data: Fleggaard and Calle prices come from their newsletters (their websites must not be scraped).
+- Data: Fleggaard and Calle prices come from their newsletters (their websites must not be scraped), imported nightly.
   Every current issue, web-only ones included, can be read as structured offers from eTilbudsavis
   (`flyer:etilbudsavis`, decided 2026-11-19: Fleggaard allows newsletter use); PDF issues by hand
   (`data/newsletters/`, git-ignored) remain the fallback and the only source of Calle's coupon offers.
@@ -111,6 +111,9 @@ after 8 unattended nightly runs; Phase 2 (matching) is largely done.
   raw data in `data/etilbudsavis/` (git-ignored), and imports with the `flyer:import` rules (cheaper offer wins
   across issues, never overwrites a cheaper PDF price). The API has no coupon flag (Calle KUPONTILBUD) and no
   category; Claude splits combined headings into product names. Then run `npm run match:new`.
+  Nightly: `flyer:etilbudsavis -- --new` (own `newsletters` job before `match-new`) makes one catalogue request
+  per shop and imports only issues not seen before (noted on `scrape_runs`); estimated name-split cost over
+  $3 fails the job without importing. Offers changed inside an already-imported issue are not picked up.
 - `src/catalog/` – website data: `data.ts` (cached reads with the publishable key: search,
   packs for a basket, shops), `ranking.ts` (search scoring; bestsellers in `common-items.ts`),
   `compare.ts` (basket price per shop), `import-limits.ts` (Danish guide amounts for alcohol,

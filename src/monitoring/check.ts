@@ -4,9 +4,10 @@
  *
  * Fails on: a scraped shop without a finished run in 30 hours, a failed or stuck run,
  * products dropping more than 20 % against the past week, more than 10 % failed
- * pages, many price jumps in one run (something systematic), and a newsletter shop
- * whose issue has expired. Fleggaard and Calle release the next issue only when the
- * current one expires, so the end date is just a note until then. Single price jumps
+ * pages, many price jumps in one run (something systematic), a newsletter shop whose
+ * main issue has expired with no new one imported, and a failed nightly newsletter import.
+ * Fleggaard and Calle release the next issue only when the current one expires, so the end
+ * date is just a note until then. Single price jumps
  * happen most nights (offers ending) and are only listed in the run summary.
  */
 import { appendFileSync } from "node:fs";
@@ -84,13 +85,33 @@ async function main() {
 
   // Newsletter shops: the current issue (the end date most products share) must not run out.
   const today = new Date().toISOString().slice(0, 10);
+  const monthAgo = new Date(now - 30 * 24 * HOURS).toISOString().slice(0, 10);
   for (const shop of shops.filter((s) => NEWSLETTER_SHOPS.has(s.id))) {
-    const rows = await fetchAll<{ listed_until: string | null }>((f, t) =>
-      db.from("shop_products").select("listed_until").eq("shop_id", shop.id).gte("listed_until", today).order("id").range(f, t),
+    // The nightly eTilbudsavis import (flyer:etilbudsavis --new): a failure needs a human, an
+    // import is worth a line.
+    const lastNight = (runs as Run[]).filter((r) => r.shop_id === shop.id && now - Date.parse(r.started_at) < MAX_AGE_HOURS * HOURS);
+    for (const r of lastNight) {
+      const notes = (r.notes ?? "").split("\n").filter(Boolean);
+      if (r.status === "failed") problems.push(`${shop.name}: newsletter import failed - ${notes[0] ?? "no message"}`);
+      const issues = notes.find((n) => n.startsWith("eTilbudsavis issues:"));
+      if (issues && r.status !== "failed") {
+        info.push(`${shop.name}: imported ${issues.replace("eTilbudsavis issues:", "eTilbudsavis issue(s)")} (${r.products_scraped ?? 0} products)`);
+      }
+    }
+    const recent = await fetchAll<{ listed_until: string | null }>((f, t) =>
+      db.from("shop_products").select("listed_until").eq("shop_id", shop.id).gte("listed_until", monthAgo).order("id").range(f, t),
     );
+    const rows = recent.filter((r) => r.listed_until! >= today);
     if (!rows.length) {
       problems.push(`${shop.name}: the newsletter has expired - import the new issue (no prices on the site now)`);
       continue;
+    }
+    // A long-running side issue (Calle's "Julefavoritter", Fleggaard's "Parfumer") keeps some
+    // offers listed after the main issue ends, so also fail when far more offers ended in the past
+    // month than are still listed, i.e. the main issue ran out and no new one was imported.
+    const ended = recent.length - rows.length;
+    if (ended > rows.length * 2.5) {
+      problems.push(`${shop.name}: ${ended} offers ended in the past 30 days and only ${rows.length} are still listed - the main newsletter has expired and no new issue was imported`);
     }
     const counts = new Map<string, number>();
     for (const r of rows) counts.set(r.listed_until!, (counts.get(r.listed_until!) ?? 0) + 1);

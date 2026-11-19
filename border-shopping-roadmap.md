@@ -1542,7 +1542,34 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
     Calle's "Kom og spar": Hanuta/Knoppers/Kinder Crispy 19,99 vs 27,99, Tuborg 69,99 vs 79,99).
   - **Decision (user, 2026-11-19): use it from December**, not for the November extras (5 days left). Name split for
     a month's issues costs about $0.20-0.30 (~1,100 offers), `match:new` after it about $0.50-1.
-  - **Next (proposal):** use it for the December issues instead of `flyer:extract` (Calle's coupon offers still need
-    the PDF: run `flyer:import` on just those, or accept them missing). Then add it to the nightly workflow after
-    `scrape`: a step running `flyer:etilbudsavis` for both shops before `match-new`, which picks up a new issue the
-    night it appears (needs `ANTHROPIC_API_KEY`, already a secret; the split is cached, so unchanged issues cost nothing).
+  - **Decision (user, 2026-11-19): no PDF route for Calle's coupon offers.** From December newsletters come from
+    eTilbudsavis only, so KUPONTILBUD offers (3 in November's Calle issue) are simply not on the site.
+- **Nightly newsletter import (2026-11-19, Data & newsletters chat): `npm run flyer:etilbudsavis -- --new`** is the
+  `newsletters` job in `.github/workflows/scrape.yml`, next to the scrapers and before `match-new` (which waits for it
+  but still runs if it fails, so an eTilbudsavis outage only fails that job).
+  - **Each night:** one catalogue request per shop (`/v2/catalogs?dealer_ids=<id>&types=paged,incito` - without
+    `types` the web-only issues are missing). An issue counts as imported when a successful run noted it
+    ("eTilbudsavis issues: <ids>" in `scrape_runs.notes`, added after the run finishes so it isn't a warning) or a
+    product has it as `source_issue`. Nothing new: a "<shop>: no new issue" line and exit - no offer requests, no
+    model calls (~3 s for both shops). New issue(s): only those are fetched, split with Claude and imported with the
+    usual rules; the cheaper offer wins against every row still listed, from any issue.
+  - **Start:** issues ending by 2026-11-24 count as imported (November's main issues are in from the PDF, the extras
+    were left out), and nothing is new before 25 Nov. On the night of 25 Nov the step picks up the December issues
+    plus the two long-running side issues still valid then: Fleggaard "Parfumer" (to 31 Dec, 38 offers) and Calle
+    "Julefavoritter" (to 24 Dec, 113 offers).
+  - **Cost cap:** the name split is estimated before it runs ($0.23 for Fleggaard's 333-offer main issue, ~$0.70 per
+    1,000 offers); over $3 for one shop in one night the job fails without importing ("run it by hand"), so GitHub
+    emails. The user approved spending under the cap as a standing rule (2026-11-19). `match:new` after it is capped
+    by its own `--limit-chunks 20`.
+  - **Flags for testing:** `--dry-run` (no model calls, nothing saved), `--pretend-new <catalogId,...>` (treat an
+    issue as not imported), `--as-of YYYY-MM-DD` (the date the start rule uses), `--max-cost <usd>`, `[<shop>]` for
+    one shop. Tested 2026-11-19: nothing new exits after the two catalogue requests; `--pretend-new KV4qddNp` runs
+    the import path against the listed rows (79 products, 38 left to cheaper rows); `--max-cost 0.1` fails each shop
+    on its own with exit 1; `--as-of 2026-11-25` finds Parfumer and Julefavoritter.
+  - **`check:data`:** a nightly import adds a note ("Fleggaard: imported eTilbudsavis issue(s) <ids> (N products)"),
+    a failed import run is a problem. Expiry now also fails when far more offers ended in the past 30 days than are
+    still listed (more than 2,5x) - a side issue or the October premium wines (listed to 31 Dec) would otherwise keep
+    the shop "listed" after its main issue ran out. Simulated for 25 Nov without a new import: Fleggaard 66 listed /
+    1,210 ended and Calle 0 / 484, both fail.
+  - **Known gap:** offers changed inside an issue that's already imported (a corrected price, an added page) are not
+    picked up; the shops rarely do it. Rerun `npm run flyer:etilbudsavis -- <shop>` by hand to refresh all current issues.
