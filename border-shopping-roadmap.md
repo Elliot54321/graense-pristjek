@@ -1828,7 +1828,19 @@ The same applies to the Tønder-area independents (Süderlügumer Zentralmarkt, 
   Fan, Harry Potter Chokoladefrø, Kinder Surprise Aviator = 7 eggs and Paw Patrol box, 4 HOLY = 3 sticks, CK One Set,
   Rituals Amsterdam Set, 5 Lip Smacker 4 g + the 6-can pack = 6, Chrisco Plys) and 2 to "pr. 100 ml" (Autan Akut Gel
   25 ml, Derma Sun Ansigtslotion 50 ml). 151 left as is.
-- **Waiting for the '100 g' migration:** Santa Maria Oregano 30 g, Kluth frysetørrede hindbær 15 g, NutriPur Frugtsnacks
-  25 g (`units.ts dear --save --with-100g` once it's run).
+- **'100 g' saved 2026-11-20** after the Catalog migration: Santa Maria Oregano 30 g, Kluth frysetørrede hindbær 15 g,
+  NutriPur Frugtsnacks 25 g.
+
+### Household basket audit follow-up (2026-11-20, Matching chat)
+
+From the Data chat's `match:audit -- husholdning` run. Most "split"/"missed" lines there are real separate items (Omo
+Pro Formula 71 vaske vs OMO Flydende 100 vaske, Neutral hvid/farvet/Pro Formula, Finish Ultimate/Quantum/Powerball,
+Senseo and Dolce Gusto variants, Head & Shoulders variants) or expired Fleggaard/Calle offers (Lambi, which no other
+shop sells; Dolce Gusto, where F/C already share families with Scandinavian Park). Two real fixes, saved with user OK:
+- **Gillette Fusion5 8-pack:** the F/C product (newsletter "1-8 stk." = purchase limit; piece_count set to 8) moved into
+  Scandinavian Park's "Gillette Fusion 8 klinger" (f14599); the old family f11688 now only holds the razor pack and is
+  renamed "Gillette Fusion5 skraber med 5 blade". Calle's 0.75 LLM link to the 8-pack confirmed (reviewed).
+- **Finish:** "Power Essential 70 stk." (budget line) moved out of "Finish Power All in One tabs" (f3357) into its own
+  family f17951 "Finish Power Essential opvasketabs" (per tab), so it can't win "pr. tab" for All in 1.
 - **For Data:** Carletti P-Tærter Extra Dark at BorderShop (both stores) is stored as 50 g for 59,95 kr. (1.199 kr./kg);
   the product is 0,5 kg - probably a misread size.
