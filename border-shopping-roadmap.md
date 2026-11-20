@@ -1896,3 +1896,20 @@ shop sells; Dolce Gusto, where F/C already share families with Scandinavian Park
 - **Checked** (prod build, 375 px and desktop): cola under "forskel" (Vis flere: `sorter=forskel&fra=12`, `&fra=24`),
   back to the default, /kategori/sodavand under "enhedspris" (fra=0 then fra=12), back, shared link
   /kategori/ol/pilsner-lager?sorter=pakkepris, /sog?q=gin&sorter=tilbud. A cold sort took ~8 s locally (first read).
+
+### BorderShop: name's "N x size" beats a wrong order-card content (2026-11-20, Data & newsletters chat)
+- **Found by Matching:** Jacobsen Golden Naked Christmas Ale "12 x 0,33L" stored as 7,2 l, not 3,96 l. BorderShop's own
+  page says "7,2 l." on the order card (and 9,72 DKK / 1 l. from it), and `parseProductPage` trusted any plausible card
+  over the name. So it was shop data, but our rule picked it.
+- **Fix (`cardContradictsPack` in `src/scrapers/bordershop.ts`, test `bordershop.test.ts`):** when the name has
+  "N x size" and the card content is no whole number of that item (7,2 / 0,33 = 21,8), the name's total wins. A card
+  of a whole number of items is still kept: some listings sell one item but name the carton ("Skåne Akvavit 12x 5cl" at
+  24,95 kr. is 0,05 l), and the two Kuemmerling packs have their counts swapped in the names but cards that fit the prices.
+- **Corrected in the database (content + the latest price row's `price_per_unit`), both stores:** Jacobsen 7,2 -> 3,96 l;
+  Frem Abrikos/Hindbær/Grøn Sport 6 x 33 cl 2,055 -> 1,98 l; Grönstedts gaveæske 3x20cl 0,06 -> 0,6 l; Cult Energy 12x0,5L
+  6,24 -> 6 l; Faxe Kondi Energy 12x0,5L 5,94 -> 6 l; Somersby Hindbær 18x33cl 5,97 -> 5,94 l (16 rows). The other 538
+  BorderShop listings with a pack in the name are unchanged.
+- **Left as the card says (whole number of items, unclear which is right):** Gammel Dansk "3X0,03L" at 0,03 l for
+  49,95 kr., Anthon Berg "Chokoladekalender 14x264g" at 264 g, "Chocolate Lik Baileys 10 stk. 9x155g" at 155 g.
+- Poetzsch was checked the same way: its mismatches are wrong item sizes in the specs ("350 kg" for 350 g), while the
+  stored total ("Samlet indhold") is right, so nothing to fix there.

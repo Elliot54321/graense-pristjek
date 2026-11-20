@@ -60,6 +60,23 @@ function packFromName(name: string) {
   return m ? { packCount: Number(m[1]), unitSize: parseQuantity(m[2]) } : null;
 }
 
+/**
+ * True when the card's content can't be any whole number of the named item: "12 x 0,33L"
+ * with a card of 7,2 l (Jacobsen Christmas Ale), "6 x 33 cl" with 2,055 l, "3x20cl" with
+ * 0,06 l. The name's pack total is right then. A card of a whole number of items is kept,
+ * even when it isn't the named count: some listings sell one item but name the carton
+ * ("Skåne Akvavit 12x 5cl" for 24,95 at 0,05 l), and the two Kuemmerling packs have the
+ * counts swapped in their names but cards that fit their prices.
+ */
+export function cardContradictsPack(
+  card: { amount: number; unit: string },
+  pack: ReturnType<typeof packFromName>,
+): boolean {
+  if (!pack?.unitSize || card.unit !== pack.unitSize.unit || !pack.unitSize.amount) return false;
+  const items = card.amount / pack.unitSize.amount;
+  return Math.round(items) < 1 || Math.abs(items - Math.round(items)) > 0.02;
+}
+
 /** Parse a BorderShop product page. Exported separately so it can be tested on saved HTML. */
 export function parseProductPage(html: string, url: string, shop: ShopId = "bordershop"): ScrapedProduct | null {
   const $ = cheerio.load(html);
@@ -83,10 +100,9 @@ export function parseProductPage(html: string, url: string, shop: ShopId = "bord
         unit: pack.unitSize.unit,
       }
     : quantityFromName(name);
+  const plausibleCard = cardContent && (cardContent.unit === "piece" || cardContent.amount >= MIN_PLAUSIBLE_CONTENT);
   const totalContent =
-    cardContent && (cardContent.unit === "piece" || cardContent.amount >= MIN_PLAUSIBLE_CONTENT)
-      ? cardContent
-      : (nameContent ?? cardContent);
+    plausibleCard && !cardContradictsPack(cardContent, pack) ? cardContent : (nameContent ?? cardContent);
 
   // The reference can be per 1 l / 1 kg or per e.g. 100 g, so convert to per base unit.
   const reference = card.find(".c-price-box__reference").first().text();
