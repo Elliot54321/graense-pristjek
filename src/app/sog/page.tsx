@@ -2,9 +2,11 @@ import type { Metadata } from "next";
 import { after, connection } from "next/server";
 import { Suspense } from "react";
 import { getShops, searchFamilies } from "@/catalog/data";
+import { DEFAULT_SORT, parseSort, type SortId } from "@/catalog/sort";
 import { CategoryRow } from "@/components/category-row";
 import { FamilyList } from "@/components/family-list";
 import { SearchBox } from "@/components/search-box";
+import { SortSelect } from "@/components/sort-select";
 import { logSearch } from "@/db/log";
 
 const EXAMPLES = ["cola", "øl", "haribo", "gin", "chips"];
@@ -45,15 +47,17 @@ function SearchBar({ query }: { query: string }) {
 }
 
 async function Search({ searchParams }: { searchParams: PageProps<"/sog">["searchParams"] }) {
-  const raw = (await searchParams).q;
+  const params = await searchParams;
+  const raw = params.q;
   const query = (Array.isArray(raw) ? raw[0] : raw)?.trim() ?? "";
+  const sort = parseSort(Array.isArray(params.sorter) ? params.sorter[0] : params.sorter) ?? DEFAULT_SORT;
   return (
     <>
       <SearchBar query={query} />
       <CategoryRow />
       {query ? (
         <Suspense fallback={<p className="mt-8 text-zinc-500">Søger…</p>}>
-          <Results query={query} />
+          <Results query={query} sort={sort} />
         </Suspense>
       ) : (
         <Examples title="Skriv hvad du leder efter – eller prøv" />
@@ -83,12 +87,12 @@ function Examples({ title }: { title: string }) {
   );
 }
 
-async function Results({ query }: { query: string }) {
-  const [{ families, next, suggestion }, shops] = await Promise.all([searchFamilies(query), getShops()]);
+async function Results({ query, sort }: { query: string; sort: SortId }) {
+  const [{ families, next, suggestion }, shops] = await Promise.all([searchFamilies(query, 0, sort), getShops()]);
   // Logged after the page is sent, so it never slows the search down - and only for
-  // real requests, never while Next.js prerenders the page.
+  // real requests, never while Next.js prerenders the page. A re-sort isn't a new search.
   await connection();
-  after(() => logSearch(query, families.length));
+  if (sort === DEFAULT_SORT) after(() => logSearch(query, families.length));
   if (!families.length) {
     return (
       <div className="mt-8">
@@ -113,7 +117,10 @@ async function Results({ query }: { query: string }) {
           ?
         </p>
       )}
-      <FamilyList families={families} shops={shops} page={`/sog?q=${encodeURIComponent(query)}`} source={{ q: query }} next={next} />
+      <div className="mt-3 flex justify-end">
+        <SortSelect value={sort} />
+      </div>
+      <FamilyList families={families} shops={shops} page={`/sog?q=${encodeURIComponent(query)}`} source={{ q: query }} sort={sort} next={next} />
     </>
   );
 }

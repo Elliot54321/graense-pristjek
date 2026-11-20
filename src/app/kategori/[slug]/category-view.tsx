@@ -4,9 +4,10 @@ import { Suspense } from "react";
 import { categoryBySlug, subcategoryBySlug } from "@/catalog/categories";
 import { categoryFamilies, getShops } from "@/catalog/data";
 import { CategoryRow } from "@/components/category-row";
-import { FamilyList } from "@/components/family-list";
 import { SearchBox } from "@/components/search-box";
 import { visibleCategories } from "@/components/visible-categories";
+import { DefaultFamilies, SortedFamilies } from "./sorted-families";
+import { Chips, SubcategoryChips } from "./subcategory-chips";
 
 /**
  * A top-category page (/kategori/vin) or one of its subcategories (/kategori/vin/rodvin).
@@ -42,6 +43,7 @@ async function Category({ params }: { params: Promise<{ slug: string; sub?: stri
   const { category, sub } = found;
   const visibleSubs = (await visibleCategories()).find((c) => c.id === category.id)?.subcategories ?? [];
   const page = `/kategori/${category.slug}${sub ? `/${sub.slug}` : ""}`;
+  const chips = { categorySlug: category.slug, categoryLabel: category.label, subs: visibleSubs, current: sub?.slug ?? "" };
   return (
     <>
       <CategoryRow current={category.slug} />
@@ -56,31 +58,10 @@ async function Category({ params }: { params: Promise<{ slug: string; sub?: stri
       )}
       <h1 className={`${sub ? "mt-1" : "mt-8"} text-2xl font-semibold tracking-tight`}>{sub ? sub.label : category.title}</h1>
       {visibleSubs.length > 0 && (
-        // Scrolls sideways on phones (up to 10 subcategories), wraps on wider screens.
-        <nav aria-label={`Underkategorier i ${category.label}`} className="-mx-4 mt-3 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:px-0">
-          <ul className="flex min-w-max gap-2 sm:min-w-0 sm:flex-wrap">
-            {[{ slug: "", label: "Alle" }, ...visibleSubs].map((s) => {
-              const active = (sub?.slug ?? "") === s.slug;
-              return (
-                <li key={s.slug}>
-                  <Link
-                    href={`/kategori/${category.slug}${s.slug ? `/${s.slug}` : ""}`}
-                    aria-current={active ? "page" : undefined}
-                    className={`flex min-h-10 items-center whitespace-nowrap rounded-full border px-4 text-sm font-medium transition-colors ${
-                      active
-                        ? "border-zinc-700 bg-zinc-700 text-white"
-                        : "border-zinc-300 bg-white hover:border-emerald-600 hover:bg-emerald-100 hover:text-emerald-900"
-                    }`}
-                  >
-                    {s.label}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
+        <Suspense fallback={<Chips {...chips} />}>
+          <SubcategoryChips {...chips} />
+        </Suspense>
       )}
-      <p className="mt-3 text-sm text-zinc-600">De mest købte varer først. Søg for at finde en bestemt vare.</p>
       <Suspense fallback={<p className="mt-8 text-zinc-500">Henter priser…</p>}>
         <Families categoryId={category.id} slug={category.slug} subId={sub?.id} subSlug={sub?.slug} page={page} />
       </Suspense>
@@ -89,15 +70,14 @@ async function Category({ params }: { params: Promise<{ slug: string; sub?: stri
 }
 
 async function Families({ categoryId, slug, subId, subSlug, page }: { categoryId: string; slug: string; subId?: string; subSlug?: string; page: string }) {
-  const [{ families, next }, shops] = await Promise.all([categoryFamilies(categoryId, 0, subId), getShops()]);
-  if (!families.length) return <p className="mt-6 text-zinc-600">Ingen varer i denne kategori lige nu.</p>;
+  const [first, shops] = await Promise.all([categoryFamilies(categoryId, 0, subId), getShops()]);
+  if (!first.families.length) return <p className="mt-6 text-zinc-600">Ingen varer i denne kategori lige nu.</p>;
+  const props = { first, shops, page, source: subSlug ? { kategori: slug, under: subSlug } : { kategori: slug } };
+  // The order (?sorter=) is read in the browser, so the page itself stays prerendered: the
+  // fallback is the default order, which is what the static HTML shows.
   return (
-    <FamilyList
-      families={families}
-      shops={shops}
-      page={page}
-      source={subSlug ? { kategori: slug, under: subSlug } : { kategori: slug }}
-      next={next}
-    />
+    <Suspense fallback={<DefaultFamilies {...props} />}>
+      <SortedFamilies {...props} />
+    </Suspense>
   );
 }

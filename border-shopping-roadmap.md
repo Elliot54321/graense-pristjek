@@ -1844,3 +1844,55 @@ shop sells; Dolce Gusto, where F/C already share families with Scandinavian Park
   family f17951 "Finish Power Essential opvasketabs" (per tab), so it can't win "pr. tab" for All in 1.
 - **For Data:** Carletti P-Tærter Extra Dark at BorderShop (both stores) is stored as 50 g for 59,95 kr. (1.199 kr./kg);
   the product is 0,5 kg - probably a misread size.
+
+### Sorting search and category results (2026-11-20, Catalog chat)
+
+- **Contract** (UI builds the dropdown): `src/catalog/sort.ts` (`SORTS`, `SortId`, `DEFAULT_SORT` = "populaer",
+  `parseSort`); `searchFamilies(q, from, sort)` / `categoryFamilies(category, from, subcategory, sort)`;
+  `/api/families?...&sorter=<id>` (unknown = 400). **Addition:** with a non-default sort `fra=0` is allowed, since the
+  page itself is prerendered in the default order and the UI loads page 1 of other orders from the API.
+- **How:** the whole list is sorted before it's cut into pages, so "Vis flere" continues the order (checked: all 1,423
+  wine families under "forskel", no duplicates). Sort keys come from one cached read of every price
+  (`familySortKeys()`: products, `matched_prices`, listing piece counts), built with the cards' own code (`buildPacks`,
+  and `familyBest` now in `src/catalog/sorting.ts`), so a sorted price is the one the card shows. First sorted request
+  on a fresh server ~3 s (that read), then 0.2-0.4 s; responses are CDN-cached per URL as before.
+- **Rules** (`sortFamilies` in `sorting.ts`): ties and families a sort has nothing to say about keep the popular order,
+  last. "enhedspris"/"hoejest": groups per unit ('l', 'kg', 'piece:<label>' - "pr. tab" and "pr. rulle" don't
+  compare), most common group first. "pakkepris": cheapest pack at the deal rate. "tilbud": shown best price is an offer
+  (on offer, coupon or a deal that beats the single price), known spar % first (shop's own, else vs regular price, else
+  deal vs single), then by price per unit. "navn": `localeCompare("da")` (Æ, Ø, Å last; "Aalborg" as Å).
+- **"forskel" (`saving` on each result), two deliberate limits:** (1) another shop's price per unit only counts for packs
+  within 25 % of the same size - otherwise Poetzsch's 3 l bag-in-box beat ScandiPark's 0,75 l bottle by "82,96 kr."
+  while the same bottle cost 39,99 in both; (2) no saving under 1 kr. (architect; was 0,01), so those go last instead of showing
+  "spar 0,03 kr.". **Against another chain only** (architect): BorderShop Puttgarden and Rostock count as one chain
+  (`CHAIN` in `sorting.ts`); before, 235 of the first 480 wine families "saved 0,00 kr." against the other store. Now
+  324 of 1,423 wine families have a saving, none store vs store; "opvasketabs" gets Finish Power 27,27 kr. vs Fleggaard.
+- **Searches sort the relevant results only** (`sortRanked`): a non-default sort applies to strong matches (every query
+  word a whole name or search word, `matchScore` 35+) in the search's main categories (each holding 25 % of the strong
+  matches, or the largest); the rest follows in popular order, not dropped. That moves word-start matches ("cola" ->
+  "Pinaq Colada" liqueur), missing-word and typo matches, and whole-word hits in other kinds of product ("Sallos Kaffe"
+  candy for "kaffe", baking "Choco Chips" for "chips") below the real results; under "forskel" that tail carries no
+  `saving`, so no "spar" amount appears out of order. Category pages sort everything.
+  Checked "cola", "kaffe", "vodka", "chips" under enhedspris / hoejest / pakkepris. Still at the top of "cola" + hoejest:
+  "Cola Rola Roll-on" and SodaStream cola syrups (real cola products, priced high per liter).
+- **Seen in passing:** "forskel" surfaces likely wrong matches at the top - Poetzsch "Masso Antico Le Anfore Rosso" linked
+  to ScandiPark's "Negroamaro" (spar 55 kr.), Graham's "First Flight Port" to a "2003 Colheita" (70 kr.); with chains,
+  Dom Pérignon leads at 397,54 kr. vs ScandiPark (worth a look: vintage or gift box?).
+
+### Sort dropdown in the UI (2026-11-20, UI chat)
+
+- **What:** a native `<select>` "Sortér" (`src/components/sort-select.tsx`), right-aligned above the results on `/sog` and
+  both category levels; not on the front page or the popular grid. The choice is `?sorter=<id>` in the address (left
+  out for "populaer"), so back/forward and shared links keep it; changing it starts again from page 1 (`FamilyList`/
+  `FamilyMore` are keyed by source + sort, and "Vis flere" sends the same `sorter`).
+- **/sog** sorts on the server; the navigation is a transition, so the old list stays with a quiet "Sorterer…" until
+  the new one arrives. A re-sort (any non-default sorter) isn't logged in `search_log` as a new search.
+- **Category pages stay prerendered:** the default list is the Suspense fallback (`DefaultFamilies`); the client part
+  (`src/app/kategori/[slug]/sorted-families.tsx`) reads `?sorter=` and fetches page 1 from `/api/families?...&fra=0`,
+  dimming the current list until it arrives. "De mest købte varer først." only shows under the default order.
+  The subcategory chips ("Alle" included) keep `?sorter=` (`subcategory-chips.tsx`, same static-fallback pattern);
+  the breadcrumb link to the parent category doesn't.
+- **"Størst prisforskel":** cards show "Spar 42 kr. ift. Calle" (whole kroner from 10 kr., øre below) from `saving`.
+- **Checked** (prod build, 375 px and desktop): cola under "forskel" (Vis flere: `sorter=forskel&fra=12`, `&fra=24`),
+  back to the default, /kategori/sodavand under "enhedspris" (fra=0 then fra=12), back, shared link
+  /kategori/ol/pilsner-lager?sorter=pakkepris, /sog?q=gin&sorter=tilbud. A cold sort took ~8 s locally (first read).

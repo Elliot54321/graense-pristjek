@@ -7,7 +7,9 @@
  */
 import { cacheLife } from "next/cache";
 import { publicClient } from "@/db/public";
-import { dealPerPiece, effectivePrice, NEWSLETTER_SHOPS } from "./compare";
+import { effectivePrice, NEWSLETTER_SHOPS } from "./compare";
+import { DEFAULT_SORT, type SortId } from "./sort";
+import { familyBest, relevanceOf, sortKeyOf, sortRanked, type SortKey } from "./sorting";
 import type { FamilyInfo } from "./import-limits";
 import { COMMON_ITEMS } from "@/matching/common-items";
 import { commonTier, finalScore, preScore } from "./ranking";
@@ -161,6 +163,9 @@ function offerPieces(listing: number | null | undefined, product: number | null)
   return counts.length ? Math.min(...counts) : null;
 }
 
+const PRICE_COLUMNS =
+  "product_id, shop_product_id, shop_id, name, content_amount, content_unit, price, price_per_unit, on_offer, regular_price, offer_ends_at, url, observed_at, multi_buy_quantity, multi_buy_price, saving_vs_dk_percent, coupon";
+
 async function loadPacks(productIds: number[], familyIds: number[]): Promise<Pack[]> {
   const db = publicClient();
   const filters: string[] = [];
@@ -183,10 +188,9 @@ async function loadPacks(productIds: number[], familyIds: number[]): Promise<Pac
 
   const { data: prices, error: priceError } = await db
     .from("matched_prices")
-    .select(
-      "product_id, shop_product_id, shop_id, name, content_amount, content_unit, price, price_per_unit, on_offer, regular_price, offer_ends_at, url, observed_at, multi_buy_quantity, multi_buy_price, saving_vs_dk_percent, coupon",
-    )
-    .in("product_id", products.map((p) => p.id));
+    .select(PRICE_COLUMNS)
+    .in("product_id", products.map((p) => p.id))
+    .returns<PriceRow[]>();
   if (priceError) throw priceError;
 
   // Pack shape ("24 x 0,33 l") from the shops' listings; the most common one wins.
@@ -212,17 +216,34 @@ async function loadPacks(productIds: number[], familyIds: number[]): Promise<Pac
     const best = [...(shapes.get(id) ?? [])].sort((a, b) => b[1] - a[1])[0]?.[0];
     if (!best) return null;
     const [count, size, unit] = best.split("|");
-    return { count: Number(count), size: Number(size), unit: unit as Unit };
+    return { count: Number(count), size: Number(size), unit: unit as Unit } satisfies PackShape;
   };
 
-  const productById = new Map((products as ProductRow[]).map((p) => [p.id, p]));
+  return buildPacks(products, prices as PriceRow[], listingPieces, shapeOf, images);
+}
+
+type PackShape = { count: number; size: number; unit: Unit };
+
+/**
+ * Packs with their offers from the raw rows - shared by loadPacks (cards and the list) and
+ * allPacks (sort keys), so a sorted price is always the one the card shows. `listingPieces`:
+ * piece_count per shop product id; `shapeOf` and `images` only affect labels and photos.
+ */
+function buildPacks(
+  products: ProductRow[],
+  prices: PriceRow[],
+  listingPieces: Map<number, number | null>,
+  shapeOf: (productId: number) => PackShape | null,
+  images: Map<number, string>,
+): Pack[] {
+  const productById = new Map(products.map((p) => [p.id, p]));
   const unitOf = (p: ProductRow | undefined): FamilyUnitRow | null =>
     (Array.isArray(p?.product_families) ? p.product_families[0] : p?.product_families) ?? null;
   // A 'piece' family is priced per piece only, never per l/kg: an offer's "content" is its piece
   // count (unit 'piece'), or unknown - then it has no price per unit and the list buys it by pack.
   const isPieceFamily = (p: ProductRow | undefined) => unitOf(p)?.compare_unit === "piece";
   const offersByProduct = new Map<number, Offer[]>();
-  for (const r of prices as PriceRow[]) {
+  for (const r of prices) {
     const product = productById.get(r.product_id);
     let content: { amount: number; unit: Unit } | null;
     if (isPieceFamily(product)) {
@@ -256,7 +277,7 @@ async function loadPacks(productIds: number[], familyIds: number[]): Promise<Pac
     offersByProduct.set(r.product_id, [...(offersByProduct.get(r.product_id) ?? []), offer]);
   }
 
-  return (products as ProductRow[])
+  return products
     .map((p): Pack => {
       const offers = (offersByProduct.get(p.id) ?? []).sort((a, b) => effectivePrice(a) - effectivePrice(b) || a.price - b.price);
       const family = unitOf(p);
@@ -308,10 +329,17 @@ async function loadPacks(productIds: number[], familyIds: number[]): Promise<Pac
  * (`search_families_fuzzy`, pg_trgm) follow, ranked below every exact match. If the first result
  * is such a typo match, `suggestion` names it ("Mente du: Stroh Jagertee?").
  */
-export async function searchFamilies(rawQuery: string, from = 0): Promise<ResultPage> {
+export async function searchFamilies(rawQuery: string, from = 0, sort: SortId = DEFAULT_SORT): Promise<ResultPage> {
   "use cache";
   cacheLife("hours");
   const { order, fuzzy, firstPage } = await searchOrder(rawQuery);
+  if (sort !== DEFAULT_SORT) {
+    const [page, keys] = await Promise.all([sortedPage(order, from, sort), familySortKeys()]);
+    // The typo hint goes by relevance, not the chosen order: the most relevant family on sale is a
+    // typo match, i.e. none on sale matched as typed (typo matches come after every word match).
+    const top = order.find((f) => keys.has(f.id));
+    return { ...page, suggestion: from === 0 && top && fuzzy.includes(top.id) ? top.name : null };
+  }
   const page = from === 0 && firstPage ? firstPage : await pageFrom(order, from);
   const first = page.families[0];
   return { ...page, suggestion: from === 0 && first && fuzzy.includes(first.id) ? first.name : null };
@@ -333,7 +361,7 @@ const FUZZY_SPREAD = 0.2;
  */
 async function searchOrder(
   rawQuery: string,
-): Promise<{ order: (FamilyRow & { pre: number })[]; fuzzy: number[]; firstPage?: ResultPage }> {
+): Promise<{ order: Ranked[]; fuzzy: number[]; firstPage?: ResultPage }> {
   "use cache";
   cacheLife("hours");
   const q = prepareQuery(rawQuery.slice(0, 100));
@@ -342,8 +370,10 @@ async function searchOrder(
     .flatMap((f) => {
       const text = matchScore(f, q);
       if (text === null) return [];
-      // A match missing one word (text 5) comes after every full match.
-      return [{ id: f.id, name: f.name, category: f.category, pre: preScore(f, q, text) - (text === PARTIAL_MATCH ? 200 : 0) }];
+      // A match missing one word (text 5) comes after every full match. `strong`: every word is
+      // a whole name or search word (matchScore 35+) - the results a price sort applies to.
+      const pre = preScore(f, q, text) - (text === PARTIAL_MATCH ? 200 : 0);
+      return [{ id: f.id, name: f.name, category: f.category, pre, strong: text >= STRONG_MATCH }];
     })
     .sort((a, b) => b.pre - a.pre || a.name.length - b.name.length);
   if (exact.length > CHECK_SOLD_UP_TO) return { order: exact, fuzzy: [] };
@@ -392,7 +422,11 @@ async function fuzzyFamilies(key: string): Promise<(FamilyRow & { similarity: nu
  * full), ranked by availability within the page. `next` is where the following page starts,
  * or null at the end - "Vis flere resultater" passes it back.
  */
-async function pageFrom(order: (FamilyRow & { pre: number })[], from: number): Promise<ResultPage> {
+async function pageFrom(
+  order: (FamilyRow & { pre: number })[],
+  from: number,
+  sorted?: { sort: SortId; keys: Map<number, SortKey>; tail?: Set<number> },
+): Promise<ResultPage> {
   const pre = new Map(order.map((f) => [f.id, f.pre]));
   const taken: Scored[] = [];
   let pos = from;
@@ -405,7 +439,60 @@ async function pageFrom(order: (FamilyRow & { pre: number })[], from: number): P
       if (taken.length === RESULTS_PAGE) break;
     }
   }
-  return { families: taken.sort(byScore).map((r) => r.result), next: pos < order.length ? pos : null };
+  const next = pos < order.length ? pos : null;
+  // A chosen sort keeps its order; the popular one lets availability break near-ties per page.
+  if (!sorted) return { families: taken.sort(byScore).map((r) => r.result), next };
+  const families = taken.map((r) => r.result);
+  if (sorted.sort === "forskel") {
+    for (const f of families) {
+      const saving = sorted.keys.get(f.id)?.saving;
+      if (saving && !sorted.tail?.has(f.id)) f.saving = saving;
+    }
+  }
+  return { families, next };
+}
+
+/**
+ * The whole ranked list in a chosen order (sort.ts), families nobody sells left out - sorted
+ * before it's cut into pages, so "Vis flere" continues the same order.
+ */
+async function sortedPage(order: Ranked[], from: number, sort: SortId): Promise<ResultPage> {
+  const keys = await familySortKeys();
+  const sortable = order.flatMap((f) => {
+    const key = keys.get(f.id);
+    return key ? [{ ...f, key }] : [];
+  });
+  const sorted = sortRanked(sortable, sort).map(({ key: _key, ...f }) => f); // eslint-disable-line @typescript-eslint/no-unused-vars
+  // The weak tail of a search follows in popular order, so it shows no "spar" amount out of order.
+  const relevant = relevanceOf(sortable);
+  const tail = new Set(sortable.filter((f) => !relevant(f)).map((f) => f.id));
+  return pageFrom(sorted, from, { sort, keys, tail });
+}
+
+/**
+ * Sort keys for every family on sale (sorting.ts), from one read of all prices - cheaper than
+ * pricing a whole category's cards. Built with the cards' own code (buildPacks), so the order
+ * matches the prices shown; labels and photos aren't read here.
+ */
+async function familySortKeys(): Promise<Map<number, SortKey>> {
+  "use cache";
+  cacheLife("hours");
+  const productColumns = "id, name, family_id, content_amount, content_unit, piece_count, product_families";
+  const [products, prices, listings] = await Promise.all([
+    readAll<ProductRow>("products", `${productColumns}(compare_unit, piece_label, display_per)`, ["id"]).catch((error) => {
+      if (error?.code !== "42703") throw error; // display_per before its migration is run
+      return readAll<ProductRow>("products", `${productColumns}(compare_unit, piece_label)`, ["id"]);
+    }),
+    readAll<PriceRow>("matched_prices", PRICE_COLUMNS, ["shop_product_id"]),
+    readAll<{ id: number; piece_count: number }>("shop_products", "id, piece_count", ["id"], (q) => q.not("piece_count", "is", null)),
+  ]);
+  const packs = buildPacks(products, prices, new Map(listings.map((l) => [l.id, l.piece_count])), () => null, new Map());
+  const keys = new Map<number, SortKey>();
+  for (const [family, own] of Map.groupBy(packs, (p) => p.familyId)) {
+    const key = family === null ? null : sortKeyOf(own);
+    if (key) keys.set(family!, key);
+  }
+  return keys;
 }
 
 /**
@@ -415,10 +502,16 @@ async function pageFrom(order: (FamilyRow & { pre: number })[], from: number): P
  * buy" is guessed from the common-items list and from how many shops sell the family
  * (widely sold = mainstream); within a page, availability breaks near-ties.
  */
-export async function categoryFamilies(category: string, from = 0, subcategory?: string): Promise<ResultPage> {
+export async function categoryFamilies(
+  category: string,
+  from = 0,
+  subcategory?: string,
+  sort: SortId = DEFAULT_SORT,
+): Promise<ResultPage> {
   "use cache";
   cacheLife("hours");
-  return pageFrom(await categoryOrder(category, subcategory), from);
+  const order = await categoryOrder(category, subcategory);
+  return sort === DEFAULT_SORT ? pageFrom(order, from) : sortedPage(order, from, sort);
 }
 
 async function categoryOrder(category: string, subcategory?: string): Promise<(FamilyRow & { pre: number })[]> {
@@ -530,6 +623,10 @@ async function familyShopCounts(): Promise<Map<number, number>> {
 }
 
 type FamilyRow = { id: number; name: string; category: string };
+/** A family in a ranked list; `strong` only on search results (see sortRanked in sorting.ts). */
+type Ranked = FamilyRow & { pre: number; strong?: boolean };
+/** matchScore() from here up: every query word is a whole word of the name or a search word. */
+const STRONG_MATCH = 35;
 
 
 /**
@@ -615,21 +712,7 @@ async function priceFamilies(families: FamilyRow[], pre: Map<number, number>): P
   return families.map((f) => {
     const own = packs.filter((p) => p.familyId === f.id);
     const compareUnit = own[0]?.compareUnit ?? null;
-    // A 'piece' family compares per piece only when every pack has a count; otherwise per pack
-    // (no `best`, the list takes an exact pack), never per l/kg.
-    const comparable = compareUnit !== "piece" || own.every((p) => p.contentUnit === "piece");
-    let best: FamilyResult["best"] = null;
-    for (const pack of comparable ? own : []) {
-      for (const o of pack.offers) {
-        if (o.pricePerUnit === null || !pack.contentUnit) continue;
-        // At the multi-buy rate when there is one, like the basket (compare.ts).
-        const perUnit = (o.pricePerUnit * effectivePrice(o)) / o.price;
-        if (!best || perUnit < best.pricePerUnit) {
-          const deal = dealPerPiece(o) === null ? null : o.multiBuy;
-          best = { pricePerUnit: perUnit, unit: pack.contentUnit, shopId: o.shopId, productName: pack.name, coupon: o.coupon, deal };
-        }
-      }
-    }
+    const best = familyBest(own)?.best ?? null;
     const shops = new Set(own.flatMap((p) => p.offers.map((o) => o.shopId))).size;
     const result: FamilyResult = {
       id: f.id,

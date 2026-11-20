@@ -6,7 +6,8 @@ import { CouponBadge, COUPON_NOTE, MultiBuyBadge, OfferBadge } from "@/component
 import { ReportLink } from "@/components/report-link";
 import { ZoomablePhoto } from "@/components/zoomable-photo";
 import { ChevronDown } from "lucide-react";
-import { kr, smallUnitWords, perUnit as shownPerUnit, pieceWords } from "@/lib/format";
+import { kr, krRound, smallUnitWords, perUnit as shownPerUnit, pieceWords } from "@/lib/format";
+import { DEFAULT_SORT, type SortId } from "@/catalog/sort";
 import { FamilyMore, type ResultSource } from "./family-more";
 
 /** The two-column result grid; each card spans three rows through a subgrid (see FamilyCard). */
@@ -21,12 +22,15 @@ export function FamilyList({
   shops,
   page,
   source,
+  sort = DEFAULT_SORT,
   next,
 }: {
   families: FamilyResult[];
   shops: Shop[];
   page: string;
   source: ResultSource;
+  /** The order the families come in ("Vis flere" fetches the rest in the same one). */
+  sort?: SortId;
   /** Where the second page starts; null when this page held everything. */
   next: number | null;
 }) {
@@ -36,13 +40,14 @@ export function FamilyList({
     <>
       <ul className={`mt-6 ${RESULT_GRID}`}>
         {families.map((f) => (
-          <FamilyCard key={f.id} family={f} shops={shopById} page={page} />
+          <FamilyCard key={f.id} family={f} shops={shopById} page={page} showSaving={sort === "forskel"} />
         ))}
       </ul>
-      {/* Keyed by the search/category: moving from Øl to Vin starts a fresh list instead of keeping beer pages. */}
+      {/* Keyed by the search/category and order: moving from Øl to Vin, or to another order, starts a fresh list. */}
       <FamilyMore
-        key={JSON.stringify(source)}
+        key={`${JSON.stringify(source)} ${sort}`}
         source={source}
+        sort={sort}
         shops={shops}
         page={page}
         next={next}
@@ -55,17 +60,23 @@ export function FamilyList({
 /** Short shop name for price rows ("BorderShop Puttgarden"); where the store is lives on /om and the basket. */
 const shopName = (shops: Map<string, Shop>, id: string) => shops.get(id)?.name ?? id;
 
-/** openVariants: start with "Se N andre varianter" open (the front page's variant picker). */
+/**
+ * openVariants: start with "Se N andre varianter" open (the front page's variant picker).
+ * showSaving: "Spar 42 kr. ift. Calle" under the header - only when sorted by price difference,
+ * where it's the reason for the order.
+ */
 export function FamilyCard({
   family,
   shops,
   page,
   openVariants = false,
+  showSaving = false,
 }: {
   family: FamilyResult;
   shops: Map<string, Shop>;
   page: string;
   openVariants?: boolean;
+  showSaving?: boolean;
 }) {
   const bestPack = family.best ? family.packs.find((p) => p.name === family.best!.productName) : undefined;
   // One pack per card - the cheapest per liter/kg, which "Billigste på listen" adds too -
@@ -89,6 +100,12 @@ export function FamilyCard({
               hos {shopName(shops, family.best.shopId)}
               {family.best.deal && <span className="text-zinc-500"> ved {family.best.deal.quantity} stk.</span>}
               {family.best.coupon && <CouponBadge />}
+            </p>
+          )}
+          {showSaving && family.saving && (
+            <p className="mt-0.5 text-sm font-medium text-emerald-800 dark:text-emerald-300">
+              {/* Whole kroner reads calmer; small savings keep their øre so they never show as "0 kr.". */}
+              Spar {family.saving.kr >= 10 ? krRound(family.saving.kr) : kr(family.saving.kr)} kr. ift. {shopName(shops, family.saving.vsShop)}
             </p>
           )}
         </div>

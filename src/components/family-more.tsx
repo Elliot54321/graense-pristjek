@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { DEFAULT_SORT, type SortId } from "@/catalog/sort";
 import type { FamilyResult, ResultPage, Shop } from "@/catalog/types";
 import { FamilyCard, RESULT_GRID } from "./family-list";
 
@@ -13,8 +14,10 @@ export type ResultSource = { q: string } | { kategori: string; under?: string };
  * the next page is fetched in the background as soon as the previous one shows - so a
  * press is usually instant. Hidden when the first page already held everything.
  */
-export function FamilyMore({ source, shops, page: reportPage, next: firstNext }: {
+export function FamilyMore({ source, sort = DEFAULT_SORT, shops, page: reportPage, next: firstNext }: {
   source: ResultSource;
+  /** The list's order; later pages must come in the same one. */
+  sort?: SortId;
   shops: Shop[];
   /** Where "Fejl?" returns to. */
   page: string;
@@ -33,7 +36,7 @@ export function FamilyMore({ source, shops, page: reportPage, next: firstNext }:
     if (ahead.current?.from !== from) {
       // Only the fields that are set ("under" is missing on a top-category page).
       const fields = Object.entries(source).filter((e): e is [string, string] => typeof e[1] === "string");
-      const params = new URLSearchParams([...fields, ["fra", String(from)]]);
+      const params = new URLSearchParams([...fields, ...(sort === DEFAULT_SORT ? [] : [["sorter", sort]]), ["fra", String(from)]]);
       const result = fetch(`/api/families?${params}`).then(async (res) => {
         if (!res.ok) throw new Error(String(res.status));
         return (await res.json()) as ResultPage;
@@ -47,7 +50,7 @@ export function FamilyMore({ source, shops, page: reportPage, next: firstNext }:
   // Fetch the next page right away when there may be more; the visitor is likely to want it.
   useEffect(() => {
     if (firstNext !== null) prefetch(firstNext);
-    // Once, on first show: FamilyList keys this component by search/category, so a new one remounts it.
+    // Once, on first show: FamilyList keys this component by search/category and order, so a new one remounts it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -80,7 +83,7 @@ export function FamilyMore({ source, shops, page: reportPage, next: firstNext }:
       {families.length > 0 && (
         <ul className={`mt-4 ${RESULT_GRID}`}>
           {families.map((f) => (
-            <FamilyCard key={f.id} family={f} shops={shopById} page={reportPage} />
+            <FamilyCard key={f.id} family={f} shops={shopById} page={reportPage} showSaving={sort === "forskel"} />
           ))}
         </ul>
       )}
