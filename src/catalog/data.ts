@@ -166,6 +166,10 @@ function offerPieces(listing: number | null | undefined, product: number | null)
 const PRICE_COLUMNS =
   "product_id, shop_product_id, shop_id, name, content_amount, content_unit, price, price_per_unit, on_offer, regular_price, offer_ends_at, url, observed_at, multi_buy_quantity, multi_buy_price, saving_vs_dk_percent, coupon";
 
+/** PRICE_COLUMNS without the text and dates the sort keys never look at (sortKeyTable). */
+const SORT_PRICE_COLUMNS =
+  "product_id, shop_product_id, shop_id, content_amount, content_unit, price, price_per_unit, on_offer, regular_price, multi_buy_quantity, multi_buy_price, saving_vs_dk_percent, coupon";
+
 async function loadPacks(productIds: number[], familyIds: number[]): Promise<Pack[]> {
   const db = publicClient();
   const filters: string[] = [];
@@ -396,6 +400,8 @@ async function searchOrder(
 
 /** All families with their name and search words prepared for matching (search.ts). */
 async function searchIndex(): Promise<IndexedFamily[]> {
+  // Per-instance cache only: the family list is ~1,2 MB even raw (the prepared index ~1,9 MB), too
+  // big to be sure of fitting the remote cache, and reading it costs only ~0,7 s on a cold instance.
   "use cache";
   cacheLife("hours");
   const families = await readAll<SearchFamily>("product_families", "id, name, category, search_words", ["id"]);
@@ -469,13 +475,50 @@ async function sortedPage(order: Ranked[], from: number, sort: SortId): Promise<
   return pageFrom(sorted, from, { sort, keys, tail });
 }
 
-/**
- * Sort keys for every family on sale (sorting.ts), from one read of all prices - cheaper than
- * pricing a whole category's cards. Built with the cards' own code (buildPacks), so the order
- * matches the prices shown; labels and photos aren't read here.
- */
+/** Sort keys for every family on sale (sorting.ts), from the shared table below. */
 async function familySortKeys(): Promise<Map<number, SortKey>> {
   "use cache";
+  cacheLife("hours");
+  return new Map((await sortKeyTable()).map(unpackKey));
+}
+
+/**
+ * One family's SortKey as a flat row, so the whole table stays small in the remote cache (~0,4 MB
+ * instead of 0,9 MB as objects): id, per unit, unit group, pack price, saving kr., vs shop,
+ * on offer (1/0), offer %, offer per unit. Prices are rounded to 0,0001 kr. - no order changes.
+ */
+type KeyRow = [number, number | null, string | null, number, number | null, string | null, 0 | 1, number | null, number | null];
+const r4 = (n: number | null) => (n === null ? null : Math.round(n * 1e4) / 1e4);
+const packKey = (id: number, k: SortKey): KeyRow => [
+  id,
+  r4(k.unit?.perUnit ?? null),
+  k.unit?.group ?? null,
+  r4(k.packPrice)!,
+  k.saving?.kr ?? null,
+  k.saving?.vsShop ?? null,
+  k.offer ? 1 : 0,
+  r4(k.offer?.percent ?? null),
+  r4(k.offer?.perUnit ?? null),
+];
+const unpackKey = ([id, perUnit, group, packPrice, kr, vsShop, offer, percent, offerPerUnit]: KeyRow): [number, SortKey] => [
+  id,
+  {
+    unit: perUnit !== null && group !== null ? { perUnit, group } : null,
+    packPrice,
+    saving: kr !== null && vsShop !== null ? { kr, vsShop } : null,
+    offer: offer ? { percent, perUnit: offerPerUnit } : null,
+  },
+];
+
+/**
+ * The sort keys of every family on sale, from one read of all prices - cheaper than pricing a
+ * whole category's cards - in the shared remote cache, since every sorted request needs it and
+ * on Vercel the in-memory cache rarely survives between requests (it took 5-7 s per request,
+ * 2026-11-23). Built with the cards' own code (buildPacks), so the order matches the prices
+ * shown; labels and photos aren't read here.
+ */
+async function sortKeyTable(): Promise<KeyRow[]> {
+  "use cache: remote";
   cacheLife("hours");
   const productColumns = "id, name, family_id, content_amount, content_unit, piece_count, product_families";
   const [products, prices, listings] = await Promise.all([
@@ -483,16 +526,19 @@ async function familySortKeys(): Promise<Map<number, SortKey>> {
       if (error?.code !== "42703") throw error; // display_per before its migration is run
       return readAll<ProductRow>("products", `${productColumns}(compare_unit, piece_label)`, ["id"]);
     }),
-    readAll<PriceRow>("matched_prices", PRICE_COLUMNS, ["shop_product_id"]),
+    // Only what the sort keys use: names, URLs and dates are ~20 % of the read time (2026-11-23).
+    readAll<PriceRow>("matched_prices", SORT_PRICE_COLUMNS, ["shop_product_id"]).then((rows) =>
+      rows.map((r) => ({ ...r, name: "", url: "", observed_at: "", offer_ends_at: null })),
+    ),
     readAll<{ id: number; piece_count: number }>("shop_products", "id, piece_count", ["id"], (q) => q.not("piece_count", "is", null)),
   ]);
   const packs = buildPacks(products, prices, new Map(listings.map((l) => [l.id, l.piece_count])), () => null, new Map());
-  const keys = new Map<number, SortKey>();
+  const rows: KeyRow[] = [];
   for (const [family, own] of Map.groupBy(packs, (p) => p.familyId)) {
     const key = family === null ? null : sortKeyOf(own);
-    if (key) keys.set(family!, key);
+    if (key) rows.push(packKey(family!, key));
   }
-  return keys;
+  return rows;
 }
 
 /**
@@ -607,7 +653,9 @@ async function readAll<T>(
 
 /** Number of shops currently selling each family (any pack). */
 async function familyShopCounts(): Promise<Map<number, number>> {
-  "use cache";
+  // Shared remote cache (~80 KB): category pages, popular items and categoryCounts all need it,
+  // and it reads all of matched_prices.
+  "use cache: remote";
   cacheLife("hours");
   const [prices, products] = await Promise.all([
     readAll<{ product_id: number; shop_id: string }>("matched_prices", "product_id, shop_id", ["product_id", "shop_id"]),

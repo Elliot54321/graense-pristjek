@@ -1913,3 +1913,22 @@ shop sells; Dolce Gusto, where F/C already share families with Scandinavian Park
   49,95 kr., Anthon Berg "Chokoladekalender 14x264g" at 264 g, "Chocolate Lik Baileys 10 stk. 9x155g" at 155 g.
 - Poetzsch was checked the same way: its mismatches are wrong item sizes in the specs ("350 kg" for 350 g), while the
   stored total ("Samlet indhold") is right, so nothing to fix there.
+
+### Fast sorted results (2026-11-23, Catalog chat)
+
+- **Problem:** every sorted request took 5-7 s live (`x-vercel-cache: MISS`), default ~2 s. `familySortKeys` read all of
+  `matched_prices` (17,600 rows, 20 pages) on almost every request: plain `"use cache"` lives in one serverless
+  instance's memory, which Vercel rarely reuses.
+- **Migration `20261123000000_latest_price_pointer.sql`** (run 2026-11-23): `shop_products.latest_price_id`, backfilled and
+  kept current by triggers on `prices` (insert: move if at least as recent by observed_at, id; delete: next latest);
+  `current_prices` is a plain join on it (same columns, security_invoker; no longer sorted - every reader orders).
+  **Measured: it barely helps.** The old DISTINCT ON in `shop_product_id` order was already fast (0,13 s per page via
+  `prices_latest_idx`); a full `matched_prices` read went 1,8-4,6 s -> 2,1-2,6 s, live sorted 4,7-6,3 s -> 4,8-5,3 s.
+  Per page the time is the joins plus moving the text columns (1000 rows with names/URLs 0,2-0,4 s, two columns
+  0,08 s). Kept: it's correct, cheaper for filtered reads (scrapers, admin), and removes the arbitrary tie.
+- **What fixes it - shared cache:** `"use cache: remote"` (Vercel's shared cache, one per deployment, cleared by
+  every deploy) on `sortKeyTable()` (all sort keys as compact rows, 0,4 MB instead of 0,9 MB as objects;
+  `familySortKeys()` turns it back into a Map per instance) and `familyShopCounts()` (80 KB; category pages, popular
+  items, category counts). Search's family list stays per instance: ~1,2 MB raw, too big to be sure it fits the
+  remote cache, and only ~0,7 s on a cold instance. Sort keys read only the columns they use (1,9 -> 1,5 s).
+  Locally: first sorted request ~3,2 s (builds the table), then 0,2 s. The live after-numbers need the deploy.
