@@ -84,6 +84,25 @@ export function indexFamily(f: SearchFamily): IndexedFamily {
   };
 }
 
+/**
+ * A family as one small row for the shared remote cache (data.ts searchRows, 2026-11-23): id, name,
+ * category and its search-word stems as one string - deduplicated, and without stems that are
+ * already name words (those match as name words first, see wordMatch), so it matches exactly
+ * like indexFamily(). The name's key and words are cheap to rebuild per server instance.
+ */
+export type SearchRow = [id: number, name: string, category: string, searchWords: string];
+
+export function compactFamily(f: SearchFamily): SearchRow {
+  const indexed = indexFamily(f);
+  const extra = [...new Set(indexed.searchWords)].filter((w) => !indexed.words.includes(w));
+  return [f.id, f.name, f.category, extra.join(" ")];
+}
+
+export function indexRow([id, name, category, searchWords]: SearchRow): IndexedFamily {
+  const key = searchKey(name);
+  return { id, name, category, key, words: key.split(" ").filter(Boolean).map(stem), searchWords: searchWords ? searchWords.split(" ") : [] };
+}
+
 /** How one query word matches: 3 = a name word, 2 = a search word, 1 = the start of a name word, 0 = not. */
 function wordMatch(q: string, f: IndexedFamily): 0 | 1 | 2 | 3 {
   if (f.words.includes(q)) return 3;

@@ -1931,4 +1931,13 @@ shop sells; Dolce Gusto, where F/C already share families with Scandinavian Park
   `familySortKeys()` turns it back into a Map per instance) and `familyShopCounts()` (80 KB; category pages, popular
   items, category counts). Search's family list stays per instance: ~1,2 MB raw, too big to be sure it fits the
   remote cache, and only ~0,7 s on a cold instance. Sort keys read only the columns they use (1,9 -> 1,5 s).
-  Locally: first sorted request ~3,2 s (builds the table), then 0,2 s. The live after-numbers need the deploy.
+  Locally: first sorted request ~3,2 s (builds the table), then 0,2 s. **Live after deploy (c302a0e):** vin enhedspris
+  5,0 s first, then 0,63-0,73 s; ol pakkepris / forskel / tilbud 0,48-0,65 s; vin default 0,62 s (was ~2 s). Searches
+  still 1,0-1,6 s.
+- **Search's family list in the remote cache too** (user's go-ahead, 2026-11-23): Vercel's runtime cache takes items
+  up to 2 MB (vercel.com/docs/runtime-cache; what happens above is not documented), so `searchRows()` stores compact
+  rows (`SearchRow` in `search.ts`: id, name, category, search-word stems without duplicates or name words) - 0,53 MB,
+  vs 1,18 MB raw and 1,88 MB prepared. `indexRow()` rebuilds the index per instance; checked to match exactly like
+  before (83 queries x 9,586 families, 0 differences). If the remote cache throws, `searchIndex()` builds the index
+  in memory as before. Locally: first search 1,1 s, then 0,2-0,5 s; results unchanged. **To undo** (if live searches
+  don't improve): revert the commit - no migration involved.

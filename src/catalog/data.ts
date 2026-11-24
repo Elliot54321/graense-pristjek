@@ -13,7 +13,17 @@ import { familyBest, relevanceOf, sortKeyOf, sortRanked, type SortKey } from "./
 import type { FamilyInfo } from "./import-limits";
 import { COMMON_ITEMS } from "@/matching/common-items";
 import { commonTier, finalScore, preScore } from "./ranking";
-import { indexFamily, matchScore, PARTIAL_MATCH, prepareQuery, type IndexedFamily, type SearchFamily } from "./search";
+import {
+  compactFamily,
+  indexFamily,
+  indexRow,
+  matchScore,
+  PARTIAL_MATCH,
+  prepareQuery,
+  type IndexedFamily,
+  type SearchFamily,
+  type SearchRow,
+} from "./search";
 import { packLabel } from "@/lib/format";
 import { POPULAR_PAGE, RESULTS_PAGE } from "./pages";
 import { isSubcategoryOf } from "./categories";
@@ -400,13 +410,31 @@ async function searchOrder(
 
 /** All families with their name and search words prepared for matching (search.ts). */
 async function searchIndex(): Promise<IndexedFamily[]> {
-  // Per-instance cache only: the family list is ~1,2 MB even raw (the prepared index ~1,9 MB), too
-  // big to be sure of fitting the remote cache, and reading it costs only ~0,7 s on a cold instance.
   "use cache";
   cacheLife("hours");
-  const families = await readAll<SearchFamily>("product_families", "id, name, category, search_words", ["id"]);
-  return families.map(indexFamily);
+  try {
+    return (await searchRows()).map(indexRow);
+  } catch (error) {
+    // The shared cache must never break search: build the index here instead.
+    console.error("searchRows (remote cache) failed, building in memory:", error);
+    return (await readSearchFamilies()).map(indexFamily);
+  }
 }
+
+/**
+ * Every family as a compact row (search.ts SearchRow) in the shared remote cache, so a cold
+ * server instance doesn't read all ~9,600 families per search (~0,7 s; searches took 1,0-1,6 s
+ * live, 2026-11-23). Vercel's runtime cache takes items up to 2 MB (its docs don't say what happens
+ * above): the prepared index is 1,9 MB and the raw rows 1,2 MB, these rows 0,53 MB. Checked to
+ * match identically: 83 queries x 9,586 families, 0 differences.
+ */
+async function searchRows(): Promise<SearchRow[]> {
+  "use cache: remote";
+  cacheLife("hours");
+  return (await readSearchFamilies()).map(compactFamily);
+}
+
+const readSearchFamilies = () => readAll<SearchFamily>("product_families", "id, name, category, search_words", ["id"]);
 
 /**
  * Typo matches from the database (pg_trgm word similarity on name + search words; migration
