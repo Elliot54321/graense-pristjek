@@ -1977,3 +1977,15 @@ shop sells; Dolce Gusto, where F/C already share families with Scandinavian Park
   - For Matching: two pairs are linked to different products: Havrefras (74065 kept, 459512 retired) and Graasten
     Karrysalat (459501 kept, 459502 retired). Those products look like duplicates.
 
+
+### Carry-over catches more rewordings (2026-11-25, Matching chat)
+
+From the Data chat's December check: 19 of 764 new Fleggaard/Calle rows were rewordings, and 8 got a new product
+instead of the earlier one. Two causes, both fixed in `src/matching/carry-over.ts`:
+- **Joined or split words** ("Hvid Kål" -> "Hvidkål", "5,8x24cm" -> "5,8x24 cm", "Karry Salat" -> "Karrysalat"): a second
+  key, `looseWordingKey`, ignores spaces and punctuation but keeps the order of letters and digits. Either key may match
+  (both must agree when both find a source); content and shop must match and the price stay within 1.4x, as before.
+  "Coca-Cola" vs "Coca-Cola Zero" still differ, since a word is added, not moved.
+- **Only reviewed links were copied:** now links shown on the site (0.8+, incl. an offer's own product) are copied too,
+  keeping their method, confidence and review (an unreviewed link stays unreviewed); a reviewed source beats an
+  unreviewed one, and two different decisions at the same level are skipped.

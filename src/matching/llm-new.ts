@@ -188,9 +188,9 @@ async function main() {
   const limitChunks = limitArg >= 0 ? Number(args[limitArg + 1]) : null;
   const db = adminClient();
 
-  // Reviewed newsletter decisions first: a reworded offer needs no API call (carry-over.ts).
+  // Earlier newsletter decisions first: a reworded offer needs no API call (carry-over.ts).
   const carried = await carryOverReviewed(db, dryRun);
-  console.log(`Carried over reviewed newsletter decisions: ${carried}${dryRun ? " (dry run, not saved)" : ""}`);
+  console.log(`Carried over earlier newsletter decisions: ${carried}${dryRun ? " (dry run, not saved)" : ""}`);
   const twins = await linkNewsletterTwins(db, dryRun);
   console.log(`Fleggaard/Calle twin offers joined: ${twins}${dryRun ? " (dry run, not saved)" : ""}`);
 

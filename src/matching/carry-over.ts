@@ -1,14 +1,18 @@
 /**
- * Review decisions on newsletter products carry over to the next issue.
+ * Decisions on newsletter products carry over to the next issue.
  *
  * An offer printed with the same name and pack keeps its shop product (stable id,
  * see flyers/import.ts), so its match - and the review - simply comes along. This
  * covers small rewordings on top of that: "Heineken 0.0" -> "Heineken 0,0",
- * "18-24 x" -> "18 - 24 x", "Kæmpeplade Hvid" -> "Hvid Kæmpeplade". Only the exact
- * same words (any order, case or punctuation) with the same content count, so
- * "Coca-Cola" and "Coca-Cola Zero" never share a decision. Only matches a human
- * reviewed are copied, within the same shop, and not when the price jumped more
- * than the usual safety margin. Runs at the start of `match:new`, before any API call.
+ * "18-24 x" -> "18 - 24 x", "Kæmpeplade Hvid" -> "Hvid Kæmpeplade" (same words in any
+ * order: wordingKey), and "Hvid Kål" -> "Hvidkål", "5,8x24cm" -> "5,8x24 cm",
+ * "Jerry's" -> "Jerry’s" (same letters and digits in the same order: looseWordingKey).
+ * Either key must match, with the same content, so "Coca-Cola" and "Coca-Cola Zero"
+ * never share a decision. Copied are links a human reviewed and links shown on the site
+ * (0.8+, including an offer's own product), within the same shop, and not when the price
+ * jumped more than the usual safety margin. A copy keeps the source's method, confidence
+ * and review, so an unreviewed link stays unreviewed. Runs at the start of `match:new`,
+ * before any API call.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fetchAll } from "../db/admin";
@@ -42,10 +46,21 @@ export function wordingKey(name: string): string {
     .join(" ");
 }
 
-const keyOf = (r: Row) => `${r.shop_id}|${wordingKey(r.name)}|${r.content_amount === null ? "?" : Number(r.content_amount)}${r.content_unit ?? ""}`;
+/** "Sønderjydsk Hvid Kål" and "Sønderjydsk Hvidkål" -> the same key (order kept, spacing ignored). */
+export function looseWordingKey(name: string): string {
+  return name
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "") // accents: "rosé" = "rose", "kål" = "kal" (æ, ø and ß stay)
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, "");
+}
+
+const contentOf = (r: Row) => `${r.content_amount === null ? "?" : Number(r.content_amount)}${r.content_unit ?? ""}`;
+const keyOf = (r: Row) => `${r.shop_id}|${wordingKey(r.name)}|${contentOf(r)}`;
+const looseKeyOf = (r: Row) => `${r.shop_id}|${looseWordingKey(r.name)}|${contentOf(r)}`;
 const matchOf = (r: Row) => (Array.isArray(r.product_matches) ? r.product_matches[0] : r.product_matches) ?? null;
 
-/** Copy reviewed decisions onto new, unmatched newsletter products. Returns how many. */
+/** Copy reviewed and shown decisions onto new, unmatched newsletter products. Returns how many. */
 export async function carryOverReviewed(db: SupabaseClient, dryRun: boolean): Promise<number> {
   const [rows, prices] = await Promise.all([
     fetchAll<Row>((f, t) =>
@@ -62,33 +77,41 @@ export async function carryOverReviewed(db: SupabaseClient, dryRun: boolean): Pr
   ]);
   const priceOf = new Map(prices.map((p) => [p.shop_product_id, Number(p.price)]));
 
-  // Reviewed decisions by wording; a wording reviewed two different ways is ambiguous - skip it.
-  const reviewed = new Map<string, { row: Row; productId: number; method: string } | null>();
+  // Earlier decisions by wording (both keys). A reviewed one beats an unreviewed one; a wording
+  // decided two different ways at the same level is ambiguous - skip it.
+  type Source = { row: Row; match: NonNullable<ReturnType<typeof matchOf>> } | null;
+  const sources = new Map<string, Source>();
+  const rank = (m: NonNullable<ReturnType<typeof matchOf>>) => (m.reviewed ? 2 : 1);
   for (const r of rows) {
     const m = matchOf(r);
-    if (!m?.reviewed) continue;
-    const key = keyOf(r);
-    const seen = reviewed.get(key);
-    if (seen === undefined) reviewed.set(key, { row: r, productId: m.product_id, method: m.method });
-    else if (seen && seen.productId !== m.product_id) reviewed.set(key, null);
+    if (!m || (!m.reviewed && Number(m.confidence) < SHOWN_CONFIDENCE)) continue; // weak links aren't on the site
+    for (const key of new Set([keyOf(r), looseKeyOf(r)])) {
+      const seen = sources.get(key);
+      if (seen === undefined || (seen && rank(m) > rank(seen.match))) sources.set(key, { row: r, match: m });
+      else if (seen && rank(m) === rank(seen.match) && seen.match.product_id !== m.product_id) sources.set(key, null);
+    }
   }
 
   const carried: { shop_product_id: number; product_id: number; method: string; confidence: number; reviewed: boolean; note: string }[] = [];
   for (const r of rows) {
     if (matchOf(r)) continue; // already matched (or same wording as before: same row)
-    const from = reviewed.get(keyOf(r));
+    // Both keys must agree when both have a source; otherwise use the one that has.
+    const [a, b] = [sources.get(keyOf(r)), sources.get(looseKeyOf(r))];
+    if (a === null || b === null || (a && b && a.match.product_id !== b.match.product_id)) continue;
+    const from = a && b ? (rank(b.match) > rank(a.match) ? b : a) : (a ?? b);
     if (!from) continue;
-    const [a, b] = [priceOf.get(r.id), priceOf.get(from.row.id)];
-    if (a && b && Math.max(a, b) / Math.min(a, b) > MAX_PRICE_RATIO) continue; // let match:new look at it
+    const [pa, pb] = [priceOf.get(r.id), priceOf.get(from.row.id)];
+    if (pa && pb && Math.max(pa, pb) / Math.min(pa, pb) > MAX_PRICE_RATIO) continue; // let match:new look at it
+    const m = from.match;
     carried.push({
       shop_product_id: r.id,
-      product_id: from.productId,
-      method: from.method,
-      confidence: 1,
-      reviewed: true,
-      note: `Carried over from #${from.row.id} ("${from.row.name}"), reviewed in an earlier issue`,
+      product_id: m.product_id,
+      method: m.method,
+      confidence: m.reviewed ? 1 : Number(m.confidence),
+      reviewed: m.reviewed,
+      note: `Carried over from #${from.row.id} ("${from.row.name}")${m.reviewed ? ", reviewed in an earlier issue" : ", earlier issue"}`,
     });
-    console.log(`  carry over: "${from.row.name}" -> "${r.name}"`);
+    console.log(`  carry over${m.reviewed ? " (reviewed)" : ""}: "${from.row.name}" -> "${r.name}"`);
   }
   if (carried.length && !dryRun) {
     const { error } = await db.from("product_matches").upsert(carried, { onConflict: "shop_product_id" });

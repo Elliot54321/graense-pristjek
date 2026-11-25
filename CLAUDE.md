@@ -98,7 +98,7 @@ after 8 unattended nightly runs; Phase 2 (matching) is largely done.
   single price is stored at the deal price per item - add the printed "Pr. stk. X" to `limit_note` if missed.
 - `src/matching/llm-new.ts` – `npm run match:new [-- --dry-run]`: matches unmatched shop products
   (and products without family) against existing products with Sonnet 5.5; shared safety
-  rules in `src/matching/safety.ts`. First copies reviewed newsletter decisions onto reworded offers
+  rules in `src/matching/safety.ts`. First copies reviewed or shown newsletter decisions onto reworded offers
   and joins identical Fleggaard/Calle offers into one product, or a new offer to its matched twin
   (`carry-over.ts`). Unreviewed LLM links below 0.8 confidence are held back from the site (`matched_prices`).
 - `src/matching/units.ts` – comparison unit per grocery/household family (`plan | rules | submit | collect |
