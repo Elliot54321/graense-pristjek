@@ -1955,4 +1955,25 @@ shop sells; Dolce Gusto, where F/C already share families with Scandinavian Park
   - eTilbudsavis rows are stored with `source_page` 0, and the card hid the whole source line when the page was 0, so
     they showed no printed text. Now issue and text are shown; page and image only when there is a page.
 - After: 34 winner cards say "Linket som samme vare", 15 "Kun samme familie"; no "side 0" lines.
-- **Open (Data/Matching, not done):** the same offer in several issues of one shop is one row per issue, so one card each.
+- **Open (Data/Matching) - fixed at import, see the next note:** the same offer in several issues of one shop is one row per issue, so one card each.
+
+### One row per reworded newsletter offer (2026-11-25, Data & newsletters chat)
+- **Cause:** an offer printed in two issues of one shop was only one row when the wording was identical (the key is
+  name + pack). The twins differ slightly: "Cuvee" / "Cuvée", "400 g." / "400 g", "Havrefras" / "Havre Fras",
+  "Karry Salat" / "Karrysalat", and one eTilbudsavis issue garbles "ÀN/2" to "ÃN/2". 6 such groups were listed (5
+  Fleggaard, 1 Calle) out of 1,264 listed newsletter rows; identical wordings were already one row.
+- **Fix in the import (`looseKey`, `foldVariants` in `src/flyers/etilbudsavis.ts`, test `etilbudsavis.test.ts`):** names
+  are compared without case, accents, spacing or punctuation, together with the content. Twins in one run become one row:
+  the cheapest (deal rate counts), at the same price the one listed longest. When a still-listed row of the shop has the
+  same loose key, the offer is saved onto that row, so the cheapest-wins check against it works as before. Different
+  contents stay apart.
+  - Not "the cheapest price with the latest `listed_until`": a cheaper offer that ends sooner would then be shown after it
+    ended. The listing's end date always belongs to its price. Once that offer ends, the row leaves the site, even if
+    the dearer issue still runs. This is the same as for identical twins before.
+- **Existing twins (`src/flyers/fold-twins.ts [--save]`, one-off):** per group, it keeps the cheapest row, then the one
+  listed longest, then the reviewed link, then the oldest. It retires the others like `retireDropped` (listed until
+  yesterday), with no deletes and no `product_matches` changes, so no reviewed link moves. Dry run 2026-11-25: 6 rows to
+  retire. All the pairs have the same price; Fleggaard's Potel keeps the October premium-wine row (to 31 Dec, reviewed).
+  - For Matching: two pairs are linked to different products: Havrefras (74065 kept, 459512 retired) and Graasten
+    Karrysalat (459501 kept, 459502 retired). Those products look like duplicates.
+

@@ -26,6 +26,8 @@
  * All of a shop's issues are imported in one run, because the same item (same name + pack =
  * same row) can be in two issues at different prices: the cheapest wins, and an offer never
  * overwrites a cheaper row still listed from another issue (e.g. imported from the PDF).
+ * Names that differ only in case, accents, spacing or punctuation count as the same item
+ * (`looseKey`), so an offer reworded between issues stays one row and one /admin card.
  * Then run `npm run match:new`.
  */
 import { createHash } from "node:crypto";
@@ -268,6 +270,40 @@ async function splitHeadings(offers: TjekOffer[], dryRun: boolean) {
 const effective = (p: { price: number; multiBuy?: { quantity: number; price: number } | null }) =>
   p.multiBuy ? Math.min(p.price, p.multiBuy.price / p.multiBuy.quantity) : p.price;
 
+/**
+ * The same offer worded slightly differently in two issues ("Cuvee" / "Cuvée", "Mutti ... 400 g."
+ * / "400 g", a garbled "ÃN/2" for "ÀN/2") gets a different productKey, so it would be two rows
+ * and two /admin cards. This loose key ignores case, accents, spacing and punctuation; with the
+ * content it decides when two listings are one row. "Havrefras" / "Havre Fras" are one too.
+ */
+export function looseKey(name: string, content: { amount: number; unit: string } | null): string {
+  const words = name
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9æøåß]+/g, "");
+  return `${words}|${content ? `${Number(content.amount)}${content.unit}` : "-"}`;
+}
+
+/**
+ * One row per loose key: the cheapest offer wins (at the same price, the one listed longest),
+ * stored under `keyFor` (an existing row's shop_product_id) when given, else its own key.
+ */
+export function foldVariants(products: ScrapedProduct[], keyFor: (loose: string) => string | undefined = () => undefined) {
+  const best = new Map<string, ScrapedProduct>();
+  for (const p of products) {
+    const k = looseKey(p.name, p.totalContent);
+    const had = best.get(k);
+    const better =
+      !had || effective(p) < effective(had) || (effective(p) === effective(had) && (p.listedUntil ?? "") > (had.listedUntil ?? ""));
+    if (better) best.set(k, p);
+  }
+  return [...best].map(([k, p]) => {
+    const key = keyFor(k);
+    return key && key !== p.shopProductId ? { ...p, shopProductId: key } : p;
+  });
+}
+
 /** A successful import notes the issues it handled on its run, so the nightly step knows them. */
 const ISSUES_NOTE = "eTilbudsavis issues:";
 /**
@@ -417,9 +453,28 @@ async function importShop(shop: string, options: Options) {
 
   // Never overwrite a cheaper row still listed from another issue (e.g. the PDF import).
   const ours = new Set(issues.map((i) => i.issue));
-  const listed = await fetchAll<{ id: number; shop_product_id: string; name: string; source_issue: string | null }>((f, t) =>
-    db.from("shop_products").select("id, shop_product_id, name, source_issue").eq("shop_id", shop).gte("listed_until", today).order("id").range(f, t),
+  type Listed = { id: number; shop_product_id: string; name: string; source_issue: string | null; content_amount: number | null; content_unit: string | null };
+  const listed = await fetchAll<Listed>((f, t) =>
+    db
+      .from("shop_products")
+      .select("id, shop_product_id, name, source_issue, content_amount, content_unit")
+      .eq("shop_id", shop)
+      .gte("listed_until", today)
+      .order("id")
+      .range(f, t),
   );
+  // Reworded twins of one offer become one row, the oldest listed one when there is one.
+  const existingKey = new Map<string, string>();
+  for (const r of listed) {
+    const content = r.content_amount !== null && r.content_unit ? { amount: Number(r.content_amount), unit: r.content_unit } : null;
+    const k = looseKey(r.name, content);
+    if (!existingKey.has(k)) existingKey.set(k, r.shop_product_id);
+  }
+  const before = byKey.size;
+  const folded = foldVariants([...byKey.values()], (k) => existingKey.get(k));
+  byKey.clear();
+  for (const p of folded) byKey.set(p.shopProductId, p);
+  if (before > byKey.size) console.log(`${before - byKey.size} reworded twins folded into one row each.`);
   const others = listed.filter((r) => byKey.has(r.shop_product_id) && !ours.has(r.source_issue ?? ""));
   const latest = new Map<number, { price: number; multiBuy: { quantity: number; price: number } | null }>();
   for (let i = 0; i < others.length; i += 200) {
