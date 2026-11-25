@@ -100,6 +100,12 @@ export interface FamilyResult {
    */
   listPack?: { productId: number; name: string; imageUrl: string | null } | null;
   /**
+   * The family's photo: its most widely sold pack that has one (photos.ts), also when the pack
+   * the card leads with has none (newsletter listings never do). The list (/api/compare) uses
+   * the same rule. null when no pack has a photo.
+   */
+  imageUrl: string | null;
+  /**
    * Only under the "Størst prisforskel" sort (sort.ts): kr. saved buying the family's cheapest
    * pack at its shop instead of `vsShop` (a shop id), the next-cheapest shop for it. Missing when
    * no other chain sells it comparably, or the difference is under 1 kr.

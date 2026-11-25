@@ -22,9 +22,9 @@ import { cheapestListItem } from "./list-item";
 export function PopularCard({ family: f, shops }: { family: FamilyResult; shops: Shop[] }) {
   const sheet = useRef<HTMLDialogElement>(null);
   const shopById = new Map(shops.map((s) => [s.id, s]));
-  // The photo of the most widely sold pack - the one people recognise - not necessarily the
-  // cheapest per liter (for Jägermeister that's a 3-litre bottle).
-  const image = [...f.packs].filter((p) => p.imageUrl).sort((a, b) => b.offers.length - a.offers.length)[0]?.imageUrl ?? null;
+  // The family's photo (Catalog, photos.ts): its most widely sold pack with one - the one people
+  // recognise, not necessarily the cheapest per liter (for Jägermeister that's a 3-litre bottle).
+  const image = f.imageUrl;
   const sizes = [...new Set(f.packs.flatMap((p) => (p.packLabel ? [smallUnitWords(pieceWords(p.packLabel, p.pieceLabel), p.displayPer)] : [])))];
   // "149,99 kr. pr. 100 ml" for perfume, else per liter/kg/piece.
   const shown = f.best ? perUnit(f.best.pricePerUnit, f.best.unit, f) : null;

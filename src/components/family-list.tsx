@@ -112,7 +112,8 @@ export function FamilyCard({
         {listItem && <AddToBasket label="Billigste på listen" className="shrink-0" item={listItem} />}
       </div>
       <ul className="mt-3 border-t border-zinc-300 dark:border-zinc-800">
-        <PackRow pack={shown} shops={shops} page={page} />
+        {/* A pack without a photo (newsletter-only: Fleggaard/Calle) borrows the family's photo, from a scraped shop. */}
+        <PackRow pack={shown} shops={shops} page={page} fallbackImage={family.imageUrl} />
       </ul>
       {others.length > 0 ? (
         <details open={openVariants} className="group/sizes mt-1 min-w-0 self-start">
@@ -131,7 +132,7 @@ export function FamilyCard({
           </summary>
           <ul className="divide-y divide-zinc-300 border-t border-zinc-300 dark:divide-zinc-800 dark:border-zinc-800">
             {others.map((p) => (
-              <PackRow key={p.productId} pack={p} shops={shops} page={page} />
+              <PackRow key={p.productId} pack={p} shops={shops} page={page} fallbackImage={family.imageUrl} />
             ))}
           </ul>
         </details>
@@ -148,7 +149,9 @@ export function FamilyCard({
  * so a long list of shops doesn't bury the answer. page: the search to return to
  * after reporting a price.
  */
-function PackRow({ pack, shops, page }: { pack: Pack; shops: Map<string, Shop>; page: string }) {
+function PackRow({ pack, shops, page, fallbackImage = null }: { pack: Pack; shops: Map<string, Shop>; page: string; fallbackImage?: string | null }) {
+  // The photo may show another pack of the same family (a bottle above a case) - accepted, no label.
+  const imageUrl = pack.imageUrl ?? fallbackImage;
   // Offers are sorted by the price a bulk shopper pays (multi-buy rate when there is one),
   // so the first is the cheapest; others may tie with it.
   const [best, ...rest] = pack.offers;
@@ -170,7 +173,7 @@ function PackRow({ pack, shops, page }: { pack: Pack; shops: Map<string, Shop>; 
     <li className="py-3">
       {/* Photo left, text and button right; the button sits under the price so the photo can be large. */}
       <div className="flex gap-3">
-        <ZoomablePhoto url={pack.imageUrl} name={pack.name} pack={label} className="h-24 w-24 sm:h-28 sm:w-28" />
+        <ZoomablePhoto url={imageUrl} name={pack.name} pack={label} className="h-24 w-24 sm:h-28 sm:w-28" />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium">
             {pack.name}
@@ -205,7 +208,7 @@ function PackRow({ pack, shops, page }: { pack: Pack; shops: Map<string, Shop>; 
             label="Sæt på listen"
             variant="secondary"
             className="mt-2"
-            item={{ key: `p-${pack.productId}`, kind: "product", productId: pack.productId, label: pack.name, quantity: 1, imageUrl: pack.imageUrl ?? undefined }}
+            item={{ key: `p-${pack.productId}`, kind: "product", productId: pack.productId, label: pack.name, quantity: 1, imageUrl: imageUrl ?? undefined }}
           />
         </div>
       </div>

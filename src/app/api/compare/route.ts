@@ -10,6 +10,7 @@ import { z } from "zod";
 import { compareBasket } from "@/catalog/compare";
 import { familiesById, getShops, packsForBasket } from "@/catalog/data";
 import { alcoholLiters } from "@/catalog/import-limits";
+import { familyImage } from "@/catalog/photos";
 import { allow, clientIp } from "@/lib/rate-limit";
 import type { Pack } from "@/catalog/types";
 
@@ -64,14 +65,12 @@ export async function POST(request: Request) {
   });
 }
 
-/** A photo per item: the product's own, or for a family its most widely sold pack's (as on the front page). */
+/** A photo per item: the product's own, or for a family the same one its result card shows (photos.ts). */
 function itemImages(items: z.infer<typeof Item>[], packs: Pack[]): Record<string, string> {
   const images: Record<string, string> = {};
   for (const item of items) {
-    const candidates = packs
-      .filter((p) => p.imageUrl && (item.kind === "product" ? p.productId === item.productId : p.familyId === item.familyId))
-      .sort((a, b) => b.offers.length - a.offers.length);
-    if (candidates[0]) images[item.key] = candidates[0].imageUrl!;
+    const image = familyImage(packs.filter((p) => (item.kind === "product" ? p.productId === item.productId : p.familyId === item.familyId)));
+    if (image) images[item.key] = image;
   }
   return images;
 }

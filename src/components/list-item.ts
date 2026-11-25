@@ -28,7 +28,7 @@ export function cheapestListItem(family: FamilyResult): BasketItem | null {
     packLabel: pieceWords(pack.packLabel, pack.pieceLabel) ?? undefined,
     // Which pack this was, so the list can say when a shop is priced with another one.
     productId: pack.productId,
-    // Newsletter packs have no photo: fall back to another pack of the family.
-    imageUrl: (pack.imageUrl ?? family.packs.find((p) => p.imageUrl)?.imageUrl) || undefined,
+    // Newsletter packs have no photo: fall back to the family's (the same one the card shows).
+    imageUrl: (pack.imageUrl ?? family.imageUrl) || undefined,
   };
 }

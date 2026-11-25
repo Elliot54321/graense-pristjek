@@ -9,6 +9,7 @@ import { cacheLife } from "next/cache";
 import { publicClient } from "@/db/public";
 import { effectivePrice, NEWSLETTER_SHOPS } from "./compare";
 import { DEFAULT_SORT, type SortId } from "./sort";
+import { familyImage } from "./photos";
 import { familyBest, relevanceOf, sortKeyOf, sortRanked, type SortKey } from "./sorting";
 import type { FamilyInfo } from "./import-limits";
 import { COMMON_ITEMS } from "@/matching/common-items";
@@ -51,6 +52,7 @@ interface ProductRow {
 
 interface ListingShape {
   id: number;
+  shop_id: string;
   piece_count: number | null;
   pack_count: number | null;
   unit_size_amount: number | null;
@@ -208,10 +210,11 @@ async function loadPacks(productIds: number[], familyIds: number[]): Promise<Pac
   if (priceError) throw priceError;
 
   // Pack shape ("24 x 0,33 l") from the shops' listings; the most common one wins.
-  // The photo is the first one a scraped shop has (newsletter listings have none).
+  // The photo is the first one a scraped shop has - only ever from a scraped shop's own product
+  // page, never a newsletter listing (Tjek/eTilbudsavis images must not appear; photos.ts).
   const { data: listings, error: listingError } = await db
     .from("product_matches")
-    .select("product_id, shop_products(id, piece_count, pack_count, unit_size_amount, unit_size_unit, image_url)")
+    .select("product_id, shop_products(id, shop_id, piece_count, pack_count, unit_size_amount, unit_size_unit, image_url)")
     .in("product_id", products.map((p) => p.id));
   if (listingError) throw listingError;
   const shapes = new Map<number, Map<string, number>>();
@@ -220,7 +223,7 @@ async function loadPacks(productIds: number[], familyIds: number[]): Promise<Pac
   for (const l of listings as unknown as ListingRow[]) {
     const sp = Array.isArray(l.shop_products) ? l.shop_products[0] : l.shop_products;
     if (sp) listingPieces.set(sp.id, sp.piece_count);
-    if (sp?.image_url && !images.has(l.product_id)) images.set(l.product_id, sp.image_url);
+    if (sp?.image_url && !NEWSLETTER_SHOPS.has(sp.shop_id) && !images.has(l.product_id)) images.set(l.product_id, sp.image_url);
     if (!sp?.unit_size_amount || !sp.unit_size_unit) continue;
     const key = `${sp.pack_count ?? 1}|${Number(sp.unit_size_amount)}|${sp.unit_size_unit}`;
     const counts = shapes.get(l.product_id) ?? new Map<string, number>();
@@ -797,6 +800,7 @@ async function priceFamilies(families: FamilyRow[], pre: Map<number, number>): P
       compareUnit,
       pieceLabel: own[0]?.pieceLabel ?? null,
       displayPer: own[0]?.displayPer ?? null,
+      imageUrl: familyImage(own),
       best,
       packs: own,
     };
@@ -805,7 +809,7 @@ async function priceFamilies(families: FamilyRow[], pre: Map<number, number>): P
       const pack = [...own].sort(
         (a, b) => new Set(b.offers.map((o) => o.shopId)).size - new Set(a.offers.map((o) => o.shopId)).size || effectivePrice(a.offers[0]) - effectivePrice(b.offers[0]),
       )[0];
-      result.listPack = { productId: pack.productId, name: pack.name, imageUrl: pack.imageUrl ?? own.find((p) => p.imageUrl)?.imageUrl ?? null };
+      result.listPack = { productId: pack.productId, name: pack.name, imageUrl: pack.imageUrl ?? result.imageUrl };
     }
     return { result, score: finalScore(pre.get(f.id)!, shops, own.length) };
   });
