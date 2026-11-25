@@ -41,8 +41,11 @@ export interface Listing {
   ean: string | null;
   /** The shop's product photo (scraped shops), shown next to the listing. */
   imageUrl: string | null;
-  /** Newsletter products: issue, page, printed text, and a short-lived link to the page image. */
-  source: { issue: string; page: number; text: string; image: string | null } | null;
+  /**
+   * Newsletter products: issue, page, printed text, and a short-lived link to the page image.
+   * eTilbudsavis offers have no page (stored as 0) and no image - only the printed text.
+   */
+  source: { issue: string; page: number | null; text: string; image: string | null } | null;
 }
 
 export interface ProductInfo {
@@ -148,8 +151,8 @@ function toListing(r: LinkedRow, price: PriceRow | undefined): Listing {
     imageUrl: sp.image_url,
     ean: sp.ean,
     source:
-      sp.source_issue && sp.source_page
-        ? { issue: sp.source_issue, page: sp.source_page, text: sp.source_text ?? "", image: null }
+      sp.source_issue
+        ? { issue: sp.source_issue, page: sp.source_page || null, text: sp.source_text ?? "", image: null }
         : null,
   };
 }
@@ -342,13 +345,13 @@ export async function loadReview(): Promise<{
     ...shownSuggestions.flatMap((s) => [s.self, ...s.targetListings]),
     ...shownLinks.flatMap((l) => [l.self, ...l.others]),
     ...shownWinners.flatMap((w) => [w.self, ...w.rivals]),
-  ].filter((l) => l.source);
-  const paths = [...new Set(shownListings.map((l) => pagePath(l.source!.issue, l.source!.page)))];
+  ].filter((l) => l.source?.page);
+  const paths = [...new Set(shownListings.map((l) => pagePath(l.source!.issue, l.source!.page!)))];
   if (paths.length) {
     const { data, error } = await db.storage.from(PAGES_BUCKET).createSignedUrls(paths, 3600);
     if (error) console.error("signed page links failed:", error.message);
     const url = new Map((data ?? []).filter((d) => d.signedUrl).map((d) => [d.path, d.signedUrl]));
-    for (const l of shownListings) l.source!.image = url.get(pagePath(l.source!.issue, l.source!.page)) ?? null;
+    for (const l of shownListings) l.source!.image = url.get(pagePath(l.source!.issue, l.source!.page!)) ?? null;
   }
 
   return {

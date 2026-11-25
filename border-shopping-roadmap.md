@@ -1941,3 +1941,18 @@ shop sells; Dolce Gusto, where F/C already share families with Scandinavian Park
   before (83 queries x 9,586 families, 0 differences). If the remote cache throws, `searchIndex()` builds the index
   in memory as before. Locally: first search 1,1 s, then 0,2-0,5 s; results unchanged. **To undo** (if live searches
   don't improve): revert the commit - no migration involved.
+
+### `/admin` cards for twin offers and eTilbudsavis rows (2026-11-25, Admin chat)
+
+- **Found (user asked about "Nicolas Potel Chardonnay Brut Premiere Cuvee", 4 cards):** two wines, two rows each. Calle
+  prints the Chardonnay in two current issues (`eDGBId_4` p19 and web-only `PFxrifMQ`), and eTilbudsavis imports each
+  issue as its own row, so one offer gets a card per issue; both are linked to Fleggaard's reviewed product. The Chablis
+  got one product per shop (same family); `linkNewsletterTwins` should join them on a later run. Prices identical, so
+  the matches were right - but the cards had two display bugs:
+  - A newsletter twin joined to the other shop's product (`carry-over.ts`, confidence 1) was shown as "Kun samme
+    familie" without "Fjern link": `winners.ts` only looked for the same product when confidence < 1. Now it always
+    shows the same product in other shops when they have it; the card treats that as an exact link.
+  - eTilbudsavis rows are stored with `source_page` 0, and the card hid the whole source line when the page was 0, so
+    they showed no printed text. Now issue and text are shown; page and image only when there is a page.
+- After: 34 winner cards say "Linket som samme vare", 15 "Kun samme familie"; no "side 0" lines.
+- **Open (Data/Matching, not done):** the same offer in several issues of one shop is one row per issue, so one card each.

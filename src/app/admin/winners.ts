@@ -72,8 +72,9 @@ export async function findWinners(db: SupabaseClient): Promise<Winner[]> {
       if (confidence === undefined || !NEWSLETTER_SHOPS.has(r.shop_id)) continue;
       const others = group.filter((o) => o.shop_id !== r.shop_id);
       if (!others.length) continue;
-      // Exact link: show the linked product in the other shops (falls back to the family).
-      const linked = confidence < 1 ? others.filter((o) => o.product_id === r.product_id) : [];
+      // Show the linked product in the other shops when they have it, else the family. Not only for
+      // links below 1: a newsletter twin joined to the other shop's product (carry-over.ts) keeps 1.
+      const linked = others.filter((o) => o.product_id === r.product_id);
       const sameProduct = linked.length > 0;
       const shown = sameProduct ? linked : others;
       const cheapestPerShop = new Map<string, PriceRow>();

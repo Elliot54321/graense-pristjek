@@ -161,7 +161,8 @@ function SameBarcode({ listings }: { listings: Listing[] }) {
 
 function WinnerItem({ w }: { w: WinnerCard }) {
   const pct = Math.round(w.saving * 100);
-  const exactLink = w.confidence < 1;
+  // A link to another shop's product (below 1, or a newsletter twin joined at 1), not just the family.
+  const exactLink = w.confidence < 1 || w.sameProduct;
   return (
     <DecisionCard
       id={w.self.shopProductId}
@@ -307,7 +308,8 @@ function ListingRow({ x }: { x: Listing }) {
       {x.source && (
         <div className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
           <p>
-            Avis {x.source.issue}, side {x.source.page}: <span className="italic">{x.source.text}</span>
+            Avis {x.source.issue}
+            {x.source.page && <>, side {x.source.page}</>}: <span className="italic">{x.source.text}</span>
           </p>
           {x.source.image && (
             <a href={x.source.image} target="_blank" rel="noopener noreferrer" className="mt-1 block">
