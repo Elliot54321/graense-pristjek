@@ -120,6 +120,29 @@ async function hasPieceCount(db: SupabaseClient): Promise<boolean> {
 }
 
 /**
+ * Where a newsletter listing comes from (issue, page, printed text, Tjek's crop) lives in the
+ * private shop_product_sources table (migration 20261125000000_private_listing_sources.sql),
+ * secret key only: it's Tjek-derived and must not be readable with the publishable key.
+ * Without the table a newsletter import fails: the nightly step finds imported issues there.
+ */
+export const SOURCES = "shop_product_sources";
+
+type SourceRow = { shop_product_id: number; source_issue: string; source_page: number; source_text: string; source_image_url?: string | null; updated_at: string };
+
+async function saveSources(db: SupabaseClient, rows: SourceRow[]) {
+  // Rows without a crop (PDF imports) must not clear one: upsert them apart, without the column
+  // (a mixed batch would send null for the rows missing it).
+  for (const part of [rows.filter((r) => r.source_image_url !== undefined), rows.filter((r) => r.source_image_url === undefined)]) {
+    if (!part.length) continue;
+    const { error } = await db.from(SOURCES).upsert(part, { onConflict: "shop_product_id" });
+    if (error?.code === "42P01" || error?.code === "PGRST205") {
+      throw new Error(`${SOURCES} doesn't exist yet - run supabase/migrations/20261125000000_private_listing_sources.sql first`);
+    }
+    if (error) throw error;
+  }
+}
+
+/**
  * Upsert the products and add a price row for every product whose price or
  * offer changed since the last run. Returns the number of price rows added and
  * warnings for suspicious price jumps.
@@ -160,13 +183,27 @@ export async function saveProducts(
           last_seen_at: now,
           listed_until: p.listedUntil ?? null,
           ...(p.imageUrl !== undefined ? { image_url: p.imageUrl } : {}),
-          // Only newsletter products carry a source; scraped rows leave the columns alone.
-          ...(p.source ? { source_issue: p.source.issue, source_page: p.source.page, source_text: p.source.text } : {}),
         })),
         { onConflict: "shop_id,shop_product_id" },
       )
       .select("id, shop_product_id");
     if (error) throw error;
+
+    // Only newsletter products carry a source; it goes to the private table, never to
+    // shop_products (public). Scraped rows leave it alone.
+    const sources: SourceRow[] = data.flatMap(({ id, shop_product_id }) => {
+      const s = byShopId.get(shop_product_id)!.source;
+      if (!s) return [];
+      return [{
+        shop_product_id: id,
+        source_issue: s.issue,
+        source_page: s.page,
+        source_text: s.text,
+        ...(s.imageUrl !== undefined ? { source_image_url: s.imageUrl } : {}),
+        updated_at: now,
+      }];
+    });
+    if (sources.length) await saveSources(db, sources);
 
     for (const { id, shop_product_id } of data) {
       const product = byShopId.get(shop_product_id)!;

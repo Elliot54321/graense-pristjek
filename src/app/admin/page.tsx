@@ -293,6 +293,19 @@ function ListingRow({ x }: { x: Listing }) {
           />
         </a>
       )}
+      {/* Newsletter offer: the crop eTilbudsavis serves (Tjek's content - /admin only, never the public site). */}
+      {!x.imageUrl && x.source?.crop && (
+        <a href={x.source.crop} target="_blank" rel="noopener noreferrer" className="float-right ml-3">
+          {/* eslint-disable-next-line @next/next/no-img-element -- Tjek's own crop, loaded from their CDN as-is */}
+          <img
+            src={x.source.crop}
+            alt="Tilbuddet i avisen"
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            className="h-28 w-28 rounded border border-zinc-200 bg-white object-contain dark:border-zinc-700"
+          />
+        </a>
+      )}
       <a href={x.url} target="_blank" rel="noopener noreferrer" className="font-medium underline-offset-2 hover:underline">
         {x.name}
       </a>
@@ -308,7 +321,7 @@ function ListingRow({ x }: { x: Listing }) {
       {x.source && (
         <div className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
           <p>
-            Avis {x.source.issue}
+            Avis {x.source.issue ?? "?"}
             {x.source.page && <>, side {x.source.page}</>}: <span className="italic">{x.source.text}</span>
           </p>
           {x.source.image && (

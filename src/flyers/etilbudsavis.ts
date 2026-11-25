@@ -41,9 +41,9 @@ import { GROUP_IDS } from "../matching/groups";
 import { costUsd } from "../matching/llm";
 import { politeFetch } from "../scrapers/http";
 import { parseQuantity } from "../scrapers/quantity";
-import { adminClient, finishRun, saveProducts, startRun, type RunSummary } from "../scrapers/save";
+import { SOURCES, adminClient, finishRun, saveProducts, startRun, type RunSummary } from "../scrapers/save";
 import type { ScrapedProduct } from "../scrapers/types";
-import { offersToProducts, retireDropped, type Extracted, type Offer } from "./import";
+import { offersToProducts, retireDropped, sourceOf, type Extracted, type Offer, type Source } from "./import";
 import { printedSingle } from "./prices";
 
 const API = "https://squid-api.tjek.com/v2";
@@ -66,6 +66,8 @@ export interface TjekOffer {
     pieces: { from: number | null; to: number | null };
   };
   run_till: string;
+  /** The offer's crop of the page (Incito issues: the product photo), 300/600/1000 px wide. */
+  images?: { thumb?: string | null; view?: string | null; zoom?: string | null } | null;
 }
 interface TjekCatalog {
   id: string;
@@ -189,6 +191,8 @@ export function toOffer(a: TjekOffer, names: string[], category: string): Offer 
     saving_vs_dk_percent: Number(text.match(/SPAR\s*(\d+)\s*%/i)?.[1] ?? NaN) || null,
     limit_note: text || null,
     coupon: /KUPON/i.test(`${a.heading} ${text}`),
+    // 600 px is plenty for an /admin card; the 1000 px "zoom" only when there's no "view".
+    source_image_url: a.images?.view ?? a.images?.zoom ?? null,
   };
 }
 
@@ -331,8 +335,9 @@ async function importedIssues(db: ReturnType<typeof adminClient>, shop: string):
     }
   }
   const prefix = `${shop}-etilbudsavis-`;
+  // The prefix names the shop, so the private source table alone answers this.
   const rows = await fetchAll<{ source_issue: string }>((f, t) =>
-    db.from("shop_products").select("source_issue").eq("shop_id", shop).like("source_issue", `${prefix}%`).order("id").range(f, t),
+    db.from(SOURCES).select("source_issue").like("source_issue", `${prefix}%`).order("shop_product_id").range(f, t),
   );
   for (const r of rows) seen.add(r.source_issue.slice(prefix.length));
   return seen;
@@ -454,15 +459,19 @@ async function importShop(shop: string, options: Options) {
   // Never overwrite a cheaper row still listed from another issue (e.g. the PDF import).
   const ours = new Set(issues.map((i) => i.issue));
   type Listed = { id: number; shop_product_id: string; name: string; source_issue: string | null; content_amount: number | null; content_unit: string | null };
-  const listed = await fetchAll<Listed>((f, t) =>
-    db
-      .from("shop_products")
-      .select("id, shop_product_id, name, source_issue, content_amount, content_unit")
-      .eq("shop_id", shop)
-      .gte("listed_until", today)
-      .order("id")
-      .range(f, t),
-  );
+  type ListedRow = Omit<Listed, "source_issue"> & { shop_product_sources: Source | Source[] | null };
+  const listed: Listed[] = (
+    await fetchAll<ListedRow>((f, t) =>
+      db
+        .from("shop_products")
+        .select(`id, shop_product_id, name, content_amount, content_unit, ${SOURCES}(source_issue)`)
+        .eq("shop_id", shop)
+        .gte("listed_until", today)
+        .order("id")
+        .range(f, t)
+        .overrideTypes<ListedRow[], { merge: false }>(),
+    )
+  ).map(({ shop_product_sources, ...r }) => ({ ...r, source_issue: sourceOf({ shop_product_sources })?.source_issue ?? null }));
   // Reworded twins of one offer become one row, the oldest listed one when there is one.
   const existingKey = new Map<string, string>();
   for (const r of listed) {

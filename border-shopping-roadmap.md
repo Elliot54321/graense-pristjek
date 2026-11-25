@@ -1989,3 +1989,65 @@ instead of the earlier one. Two causes, both fixed in `src/matching/carry-over.t
 - **Only reviewed links were copied:** now links shown on the site (0.8+, incl. an offer's own product) are copied too,
   keeping their method, confidence and review (an unreviewed link stays unreviewed); a reviewed source beats an
   unreviewed one, and two different decisions at the same level are skipped.
+
+### Newsletter crop addresses saved privately (2026-11-25, Data & newsletters chat)
+- **What:** every eTilbudsavis offer has `images.thumb/view/zoom`: Tjek's crop of the offer on its page (`w=300/600/1000`
+  px wide; Incito issues give the product photo). The import now keeps `view` (600 px, enough for an `/admin` card at
+  2x; `zoom` only if `view` is missing) as `source.imageUrl`. `saveProducts` writes it to the private
+  `shop_product_sources` table (Catalog's migration `20261125000000_private_listing_sources.sql`), never to `image_url`.
+  Only the address is stored; the image is never fetched or copied (Tjek's terms, 2026-11-19). Until the table exists,
+  the import goes on and adds one warning to the run. PDF imports carry no address and leave the table alone.
+- **Expiry:** the addresses are signed (`s=`, an HMAC of the parameters) but have no time parameter. The same offer
+  had the same address on 19 and 25 Nov (135 of 136), so they don't expire by time. They could only stop working if Tjek
+  removes the page images, e.g. some time after an issue ends (not seen; not tested, to avoid requests). The nightly
+  `--new` import only touches new issues, so older rows keep the address they got. If it breaks, `/admin` falls back to
+  the printed text (`source_text`).
+- **Backfill (`src/flyers/backfill-source-images.ts [<dir>...] [--save]`, one-off):** reads the saved raw files. No API
+  requests: the nightly run's are in the Daily scrape "newsletters" artifact (`gh run download <id> -n newsletters`).
+  It finds each listed row's offer again by issue, page and the printed text after the names, and breaks ties by the
+  heading words the name shares. Dry run 2026-11-25: 1,189 of 1,192 listed eTilbudsavis rows found. Three stay without
+  (Solsikkeolie, Ris-Fix, Pepsi: several offers alike on one page). Spot check: every pick shares a word with its
+  heading except "Hamburgerbrød" <- "Hamburger el. Hotdogbrød" and "Engangsvinglas" <- "Engangsvin el.
+  Champagneglas", both right. Fleggaard's 66 rows from the October PDF have no crop.
+- **Source moved off `shop_products` too (same day, architect):** issue, page and printed text are Tjek-derived and were
+  readable with the publishable key, so they live in `shop_product_sources` now, next to the crop (Catalog's migration
+  copies the old values; a later migration drops the old columns). Every read and write in `src/flyers/` and `save.ts`
+  goes to the private table: `saveProducts` upserts it, and the nightly "already imported" check, the cheaper-row
+  check, `retireDropped`, `--source-only`, `fold-twins` and the crop backfill read it embedded
+  (`shop_product_sources(...)`). A PDF re-import never clears a crop. Without the table a newsletter import now fails
+  with "run the 20261125 migration", so the code must not ship before the migration has run.
+
+### Newsletter crop images private; one family photo rule (2026-11-25, Catalog chat)
+
+- **Migration `20261125000000_private_listing_sources.sql`:** private table `shop_product_sources(shop_product_id,
+  source_issue, source_page, source_text, source_image_url, updated_at)` - where a newsletter offer came from, incl.
+  the crop eTilbudsavis/Tjek serves - for `/admin` only (Tjek's terms, 2026-11-19). A table, not columns:
+  `shop_products` has a table-wide public `select`, which Postgres can't narrow to hide one column without granting
+  every other column by name (and every future one). RLS on, no policy, nothing granted to anon/authenticated;
+  written by the imports and read by `/admin` with the secret key. It copies source_issue/page/text from
+  `shop_products`, where they were public (the text partly from eTilbudsavis since 3e0e820; architect: move them).
+  **Step 2, `20261125000001_drop_public_source_columns.sql`:** drops the three columns from `shop_products` - run
+  only after the Data and Admin chats' code using `shop_product_sources` is deployed.
+- **Family photo** (`src/catalog/photos.ts` `familyImage`): the family's most widely sold pack with a photo - the rule
+  `/api/compare` already used, now shared - as `FamilyResult.imageUrl`; `listPack` falls back to it. Photos come only
+  from scraped shops' own pages: `loadPacks` now skips any newsletter listing's `image_url`.
+- **Counts** (all category pages, local, 2026-11-25): 8,286 cards; 665 lead with a pack without photo; 35 of them get
+  the family photo; 630 stay without: 629 families sold only by Fleggaard/Calle (no photo exists outside Tjek) and 1
+  scraped family. Families on sale: 8,294, 7,664 with a photo. **For the UI chat:** the card shows `pack.imageUrl` of
+  its lead pack - use `pack.imageUrl ?? family.imageUrl` there; `popular-card.tsx` and `list-item.ts` can use
+  `family.imageUrl` instead of their own copies of the rule.
+
+- **Family photo as fallback in the UI (2026-11-25, UI chat):** a card's lead pack without a photo (Fleggaard/Calle
+  newsletter listings) shows `FamilyResult.imageUrl` (`family-list.tsx`, also on its "Sæt på listen" item); the popular
+  card uses `f.imageUrl` and `cheapestListItem` falls back to it, so card and list agree. The photo can be another pack
+  of the family (accepted). Checked at 375 px: Jacobsen Golden Naked Christmas Ale (Fleggaard), Barón de Ley Reserva
+  (Calle), Laroche Chardonnay (Fleggaard) now have photos. The other variant rows borrow it too (architect, same day):
+  an empty tile next to filled ones looked broken.
+
+- **`/admin` reads the private table (2026-11-25, Admin chat):** `loadReview()` no longer selects source columns from
+  `shop_products`; `attachSources()` in `src/app/admin/data.ts` reads issue, page, printed text and the crop from
+  `shop_product_sources` (secret key), only for the ~250 listings on the page, then signs PDF page images as before.
+  `ListingRow` shows the crop top right (opens full size) when the listing has no scraped photo. Checked on live data:
+  all 187 newsletter rows on the page show their printed text, no blank tiles, PDF page links still sign (November p15,
+  p23). Crops: 0 of 2,159 rows had an address yet when checked (backfill running), so the image itself isn't seen on a
+  card yet. Must deploy after the migration (done) and before `20261125000001` drops the old columns.

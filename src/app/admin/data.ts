@@ -42,10 +42,12 @@ export interface Listing {
   /** The shop's product photo (scraped shops), shown next to the listing. */
   imageUrl: string | null;
   /**
-   * Newsletter products: issue, page, printed text, and a short-lived link to the page image.
-   * eTilbudsavis offers have no page (stored as 0) and no image - only the printed text.
+   * Newsletter products, from the private shop_product_sources table (secret key only): issue, page,
+   * printed text, a short-lived link to the page image (PDF imports), and the offer's crop that
+   * eTilbudsavis serves (`crop`; Tjek's content - shown only here, never on the public site).
+   * eTilbudsavis offers have no page (stored as 0).
    */
-  source: { issue: string; page: number | null; text: string; image: string | null } | null;
+  source: { issue: string | null; page: number | null; text: string; image: string | null; crop: string | null } | null;
 }
 
 export interface ProductInfo {
@@ -111,9 +113,6 @@ interface LinkedRow {
     content_unit: string | null;
     last_seen_at: string | null;
     listed_until: string | null;
-    source_issue: string | null;
-    source_page: number | null;
-    source_text: string | null;
     image_url: string | null;
     ean: string | null;
   };
@@ -150,15 +149,58 @@ function toListing(r: LinkedRow, price: PriceRow | undefined): Listing {
     listed: isListed(sp),
     imageUrl: sp.image_url,
     ean: sp.ean,
-    source:
-      sp.source_issue
-        ? { issue: sp.source_issue, page: sp.source_page || null, text: sp.source_text ?? "", image: null }
-        : null,
+    source: null, // filled for the shown listings only, from shop_product_sources (attachSources)
   };
 }
 
 const LISTING_FIELDS =
-  "shop_id, name, url, content_amount, content_unit, last_seen_at, listed_until, source_issue, source_page, source_text, image_url, ean";
+  "shop_id, name, url, content_amount, content_unit, last_seen_at, listed_until, image_url, ean";
+
+interface SourceRow {
+  shop_product_id: number;
+  source_issue: string | null;
+  source_page: number | null;
+  source_text: string | null;
+  source_image_url: string | null;
+}
+
+/**
+ * Newsletter source for the listings on the page, from the private shop_product_sources table
+ * (no public grants; only the secret key reads it), then signed links to the PDF page images.
+ */
+async function attachSources(db: SupabaseClient, listings: Listing[]): Promise<void> {
+  const ids = [...new Set(listings.map((l) => l.shopProductId))];
+  const byId = new Map<number, SourceRow>();
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data, error } = await db
+      .from("shop_product_sources")
+      .select("shop_product_id, source_issue, source_page, source_text, source_image_url")
+      .in("shop_product_id", ids.slice(i, i + 200));
+    if (error) throw error;
+    for (const r of (data ?? []) as SourceRow[]) byId.set(r.shop_product_id, r);
+  }
+  for (const l of listings) {
+    const r = byId.get(l.shopProductId);
+    if (!r || !(r.source_issue || r.source_image_url)) continue;
+    l.source = {
+      issue: r.source_issue,
+      page: r.source_page || null,
+      text: r.source_text ?? "",
+      image: null,
+      crop: r.source_image_url,
+    };
+  }
+
+  // PDF page images: signed links to the private bucket, valid an hour.
+  const paged = listings.filter((l) => l.source?.issue && l.source.page);
+  const pathOf = (l: Listing) => pagePath(l.source!.issue!, l.source!.page!);
+  const paths = [...new Set(paged.map(pathOf))];
+  if (!paths.length) return;
+  const { data, error } = await db.storage.from(PAGES_BUCKET).createSignedUrls(paths, 3600);
+  if (error) console.error("signed page links failed:", error.message);
+  const url = new Map((data ?? []).filter((d) => d.signedUrl).map((d) => [d.path, d.signedUrl]));
+  for (const l of paged) l.source!.image = url.get(pathOf(l)) ?? null;
+}
 
 /** Listings by shop product id (for shop products not reached through a product). */
 async function listingsById(db: SupabaseClient, ids: number[]): Promise<Map<number, Listing>> {
@@ -340,19 +382,12 @@ export async function loadReview(): Promise<{
     priority,
   }));
 
-  // Newsletter page images for the shown items: signed links to the private bucket, valid an hour.
-  const shownListings = [
+  // Newsletter source (printed text, page image, crop) for the shown items only.
+  await attachSources(db, [
     ...shownSuggestions.flatMap((s) => [s.self, ...s.targetListings]),
     ...shownLinks.flatMap((l) => [l.self, ...l.others]),
     ...shownWinners.flatMap((w) => [w.self, ...w.rivals]),
-  ].filter((l) => l.source?.page);
-  const paths = [...new Set(shownListings.map((l) => pagePath(l.source!.issue, l.source!.page!)))];
-  if (paths.length) {
-    const { data, error } = await db.storage.from(PAGES_BUCKET).createSignedUrls(paths, 3600);
-    if (error) console.error("signed page links failed:", error.message);
-    const url = new Map((data ?? []).filter((d) => d.signedUrl).map((d) => [d.path, d.signedUrl]));
-    for (const l of shownListings) l.source!.image = url.get(pagePath(l.source!.issue, l.source!.page!)) ?? null;
-  }
+  ]);
 
   return {
     suggestions: shownSuggestions,

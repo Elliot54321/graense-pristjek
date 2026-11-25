@@ -48,7 +48,8 @@ export interface ScrapedProduct {
   /** Address of the product photo on the shop's site (og:image), for /admin. */
   imageUrl?: string | null;
   /** Newsletter products: the issue and page they were read from, and what was printed. */
-  source?: { issue: string; page: number; text: string } | null;
+  /** imageUrl: eTilbudsavis crop, private (shop_product_sources); undefined = leave it as it is. */
+  source?: { issue: string; page: number; text: string; imageUrl?: string | null } | null;
   /** Multi-buy deal, e.g. 3 for 155 kr. */
   multiBuy?: { quantity: number; price: number } | null;
   /** The shop's own "SPAR x% ift. DK" claim. */

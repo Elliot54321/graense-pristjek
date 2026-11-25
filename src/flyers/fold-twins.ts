@@ -13,7 +13,9 @@
  * row is touched: a retired row keeps its link and review for the record.
  */
 import { adminClient, fetchAll } from "../db/admin";
+import { SOURCES } from "../scrapers/save";
 import { looseKey } from "./etilbudsavis";
+import { sourceOf, type Source } from "./import";
 
 type Match = { product_id: number; method: string; reviewed: boolean };
 interface Row {
@@ -23,7 +25,7 @@ interface Row {
   content_amount: number | null;
   content_unit: string | null;
   listed_until: string;
-  source_issue: string | null;
+  shop_product_sources: Source | Source[] | null;
   product_matches: Match | Match[] | null;
 }
 
@@ -34,7 +36,7 @@ async function main() {
   const rows = await fetchAll<Row>((f, t) =>
     db
       .from("shop_products")
-      .select("id, shop_id, name, content_amount, content_unit, listed_until, source_issue, product_matches(product_id, method, reviewed)")
+      .select(`id, shop_id, name, content_amount, content_unit, listed_until, ${SOURCES}(source_issue), product_matches(product_id, method, reviewed)`)
       .in("shop_id", ["fleggaard", "calle"])
       .gte("listed_until", today)
       .order("id")
@@ -83,7 +85,7 @@ async function main() {
       const m = match(r);
       console.log(
         `  ${r === keep ? "keep  " : "retire"} #${r.id} "${r.name}" ${price.get(r.id) ?? "?"} kr. to ${r.listed_until} ` +
-          `${(r.source_issue ?? "-").replace(/^.*etilbudsavis-/, "")} -> ${m ? `product ${m.product_id} (${m.method}${m.reviewed ? ", reviewed" : ""})` : "unmatched"}`,
+          `${(sourceOf(r)?.source_issue ?? "-").replace(/^.*etilbudsavis-/, "")} -> ${m ? `product ${m.product_id} (${m.method}${m.reviewed ? ", reviewed" : ""})` : "unmatched"}`,
       );
     }
     retire.push(...rest.map((r) => r.id));

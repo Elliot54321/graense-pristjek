@@ -25,7 +25,8 @@ import { readFileSync } from "node:fs";
 import { isCapacity, listingPieces, unitPrice } from "../scrapers/quantity";
 import { uploadPages } from "./pages";
 import { packPrice, printedSingle, singlePrice } from "./prices";
-import { adminClient, finishRun, saveProducts, startRun, type RunSummary } from "../scrapers/save";
+import { fetchAll } from "../db/admin";
+import { SOURCES, adminClient, finishRun, saveProducts, startRun, type RunSummary } from "../scrapers/save";
 import type { BaseUnit, ScrapedProduct } from "../scrapers/types";
 
 const SHOP_WEBSITES: Record<string, string> = { fleggaard: "https://www.fleggaard.dk", calle: "https://www.calle.dk" };
@@ -48,6 +49,11 @@ export interface Offer {
   limit_note?: string | null;
   /** Missing in extractions made before coupons were read (2026-11-05). */
   coupon?: boolean;
+  /**
+   * eTilbudsavis only: Tjek's crop of this offer on the page. Private - stored in
+   * shop_product_sources for /admin, never in image_url (Tjek's terms forbid public use).
+   */
+  source_image_url?: string | null;
 }
 export interface Extracted {
   pdf: string;
@@ -87,7 +93,7 @@ const productKey = (name: string, pack: string) =>
   "nl-" + createHash("sha1").update(`${name}|${pack}`.toLowerCase().replace(/\s+/g, " ").trim()).digest("hex").slice(0, 16);
 
 /** What the newsletter printed with an offer, for checking a match: "Coca Cola / Coca Cola Zero · 6 x 1,25 l. · 6,66 Pr. fl. · ..." */
-function printedText(o: Offer): string {
+export function printedText(o: Offer): string {
   return [
     [...o.products, ...o.visible_variants].join(" / "),
     o.pack,
@@ -200,7 +206,7 @@ export function offersToProducts(
           offerEndsAt: o.always_low_price ? null : until,
           pfand: null,
           listedUntil: until,
-          source: { issue, page, text: printedText(read) },
+          source: { issue, page, text: printedText(read), ...(read.source_image_url !== undefined ? { imageUrl: read.source_image_url } : {}) },
           multiBuy: o.multi_buy ? { quantity: o.multi_buy.quantity, price: o.multi_buy.total_price } : null,
           savingVsDkPercent: o.saving_vs_dk_percent,
           coupon: o.coupon ?? false,
@@ -264,33 +270,44 @@ async function main() {
   }
 }
 
-/** --source-only: fill source_issue/page/text on still-listed rows that have none. */
+/** A listing's private source row, embedded as `shop_product_sources(...)` (one per row, or none). */
+export type Source = { source_issue: string | null; source_page?: number | null; source_text?: string | null };
+export const sourceOf = (r: { shop_product_sources?: Source | Source[] | null }): Source | null =>
+  (Array.isArray(r.shop_product_sources) ? r.shop_product_sources[0] : r.shop_product_sources) ?? null;
+
+/** --source-only: fill the source (issue, page, text) of still-listed rows that have none. */
 async function backfillSource(args: string[], file: string, shop: string, issue: string, products: ScrapedProduct[]) {
   const db = adminClient();
   const today = new Date().toISOString().slice(0, 10);
-  const { data, error } = await db
-    .from("shop_products")
-    .select("id, shop_product_id, name")
-    .eq("shop_id", shop)
-    .is("source_issue", null)
-    .gte("listed_until", today);
-  if (error) throw error;
+  type Row = { id: number; shop_product_id: string; name: string; shop_product_sources: Source | Source[] | null };
+  const listed = await fetchAll<Row>((f, t) =>
+    db
+      .from("shop_products")
+      .select(`id, shop_product_id, name, ${SOURCES}(source_issue)`)
+      .eq("shop_id", shop)
+      .gte("listed_until", today)
+      .order("id")
+      .range(f, t)
+      .overrideTypes<Row[], { merge: false }>(),
+  );
+  const data = listed.filter((r) => !sourceOf(r)?.source_issue);
   const byKey = new Map(products.map((p) => [p.shopProductId, p]));
-  const found = (data ?? []).filter((r) => byKey.has(r.shop_product_id));
-  const missing = (data ?? []).filter((r) => !byKey.has(r.shop_product_id));
+  const found = data.filter((r) => byKey.has(r.shop_product_id));
+  const missing = data.filter((r) => !byKey.has(r.shop_product_id));
   console.log(`Source backfill: ${found.length} listed rows without a source found in ${issue}, ${missing.length} not in it.`);
   for (const r of missing) console.log(`  not in this issue: ${r.name}`);
   for (const r of found) console.log(`  p${byKey.get(r.shop_product_id)!.source!.page}  ${r.name}`);
   if (args.includes("--dry-run")) return console.log("Dry run - nothing saved.");
-  for (const r of found) {
+  const now = new Date().toISOString();
+  const rows = found.map((r) => {
     const { page, text } = byKey.get(r.shop_product_id)!.source!;
-    const { error: updateError } = await db
-      .from("shop_products")
-      .update({ source_issue: issue, source_page: page, source_text: text })
-      .eq("id", r.id);
-    if (updateError) throw updateError;
+    return { shop_product_id: r.id, source_issue: issue, source_page: page, source_text: text, updated_at: now };
+  });
+  for (let i = 0; i < rows.length; i += 500) {
+    const { error: upsertError } = await db.from(SOURCES).upsert(rows.slice(i, i + 500), { onConflict: "shop_product_id" });
+    if (upsertError) throw upsertError;
   }
-  console.log(`Updated ${found.length} rows (source columns only).`);
+  console.log(`Updated ${found.length} rows (source only).`);
   if (!args.includes("--no-pages") && found.length) {
     const pages = [...new Set(found.map((r) => byKey.get(r.shop_product_id)!.source!.page))].sort((a, b) => a - b);
     await uploadPages(db, file.replace(/\.offers\.json$/, ".pdf"), issue, pages);
@@ -306,14 +323,17 @@ async function backfillSource(args: string[], file: string, shop: string, issue:
 export async function retireDropped(db: ReturnType<typeof adminClient>, shop: string, issue: string, products: ScrapedProduct[]) {
   const keep = new Set(products.map((p) => p.shopProductId));
   const today = new Date().toISOString().slice(0, 10);
-  const { data, error } = await db
-    .from("shop_products")
-    .select("id, shop_product_id, name")
-    .eq("shop_id", shop)
-    .eq("source_issue", issue)
-    .gte("listed_until", today); // still listed: not retired already
-  if (error) throw error;
-  const dropped = (data ?? []).filter((r) => !keep.has(r.shop_product_id));
+  const data = await fetchAll<{ id: number; shop_product_id: string; name: string }>((f, t) =>
+    db
+      .from("shop_products")
+      .select(`id, shop_product_id, name, ${SOURCES}!inner(source_issue)`)
+      .eq("shop_id", shop)
+      .eq(`${SOURCES}.source_issue`, issue)
+      .gte("listed_until", today) // still listed: not retired already
+      .order("id")
+      .range(f, t),
+  );
+  const dropped = data.filter((r) => !keep.has(r.shop_product_id));
   if (!dropped.length) return;
   const day = 24 * 3600 * 1000;
   const { error: updateError } = await db
