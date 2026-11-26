@@ -2051,3 +2051,21 @@ instead of the earlier one. Two causes, both fixed in `src/matching/carry-over.t
   all 187 newsletter rows on the page show their printed text, no blank tiles, PDF page links still sign (November p15,
   p23). Crops: 0 of 2,159 rows had an address yet when checked (backfill running), so the image itself isn't seen on a
   card yet. Must deploy after the migration (done) and before `20261125000001` drops the old columns.
+
+### One `/admin` decision covers identical newsletter offers (2026-11-26, Admin chat)
+
+- **Problem (user):** "Jacobsen Christmas Ale 12 x 0,33 l." had two cards, Fleggaard #216690 and Calle #217699: same
+  wording, content, price (66,66) and product. Confirming one left the other open.
+- **Now:** every decision action (Link, Ikke den samme, Bekræft, Fjern link, Ikke sammenlignelig) ends with
+  `decideTwins()` in `src/app/admin/actions.ts`. It copies the result onto other newsletter listings that are still
+  on sale, have the same wording (`wordingKey`) and content, are unreviewed, sit on the product the decided one had,
+  and are within 1.4x of its price. They get the same product, method and confidence, marked reviewed. Their cards
+  turn "saved" too ("✓ Bekræftet (samme tilbud)"), and the clicked card says "– også N ens tilbud". Checked with a dry
+  run (no writes): from Fleggaard #216690 it finds Calle #217699; from a decided twin's side it finds nothing.
+- **Left over:** 10 open Calle cards whose Fleggaard twin was decided before this change (Coca-Cola PET 24 x 0,33,
+  Albani Blålys, Jacobsen Christmas Ale, Tuborg Classic/Guld/Rød, Domestos, Carlsberg Nordlyst, ...). The nightly
+  carry-over doesn't reach them (it only fills unmatched rows, per shop). **Copied (user, same day):** a one-off script
+  (not in the repo) gave each the decided twin's product, method and confidence, reviewed, note "Same newsletter offer
+  as fleggaard #..., decided in review": Coca-Cola PET, Albani Blålys, Jacobsen Christmas Ale, Tuborg Classic/Guld/Rød,
+  Domestos, Carlsberg Nordlyst, Harboe, Ramlösa (all the same product already; prices equal or within 4 %). A second
+  dry run finds none left.

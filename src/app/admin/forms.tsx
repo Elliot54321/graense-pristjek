@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { login } from "./actions";
 
@@ -29,8 +29,12 @@ export function LoginForm() {
   );
 }
 
+/** Fired when a decision also covered other listings (identical newsletter offers). */
+const ALSO_DECIDED = "admin-also-decided";
+
 export interface Decision {
-  action: (formData: FormData) => Promise<void>;
+  /** May return the ids of other listings the decision also covered (identical newsletter offers). */
+  action: (formData: FormData) => Promise<{ also: number[] } | void>;
   label: string;
   variant: "yes" | "no";
   /** Shown on the card once saved, e.g. "Linket". */
@@ -58,6 +62,17 @@ export function DecisionCard({
   const [done, setDone] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Another card's decision covered this one too (same newsletter offer): show it as saved.
+  useEffect(() => {
+    if (idName !== "shopProductId") return;
+    const onAlso = (e: Event) => {
+      const { ids, done } = (e as CustomEvent<{ ids: number[]; done: string }>).detail;
+      if (ids.includes(id)) setDone((d) => d ?? `${done} (samme tilbud)`);
+    };
+    window.addEventListener(ALSO_DECIDED, onAlso);
+    return () => window.removeEventListener(ALSO_DECIDED, onAlso);
+  }, [id, idName]);
+
   const decide = (d: Decision) => {
     setBusy(d.label);
     setError(null);
@@ -65,8 +80,10 @@ export function DecisionCard({
       const form = new FormData();
       form.set(idName, String(id));
       try {
-        await d.action(form);
-        setDone(d.done);
+        const result = await d.action(form);
+        const also = result?.also ?? [];
+        setDone(also.length ? `${d.done} – også ${also.length} ens tilbud` : d.done);
+        if (also.length) window.dispatchEvent(new CustomEvent(ALSO_DECIDED, { detail: { ids: also, done: d.done } }));
       } catch (e) {
         setError(e instanceof Error ? e.message : "Kunne ikke gemme.");
       } finally {
